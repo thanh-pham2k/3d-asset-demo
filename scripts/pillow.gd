@@ -12,11 +12,40 @@ var spin := 0.0
 var trail_timer := 0.0
 var visual: Node3D
 var chain_level := 0
+var display_name := "Gối"
+var item_category := "cushion"
+var interaction_type := "pickup"
+var valid_destinations: Array = ["sofa"]
 
 func _ready() -> void:
  add_to_group("interactables")
  collision_layer = 4
  collision_mask = 3
+ match prop_kind:
+  "pillow":
+   display_name = "Gối"
+   item_category = "cushion"
+   valid_destinations = ["sofa"]
+  "hammer":
+   display_name = "Búa đồ chơi"
+   item_category = "tool"
+   valid_destinations = ["basket"]
+  "bear":
+   display_name = "Gấu bông"
+   item_category = "toy"
+   valid_destinations = ["basket"]
+  "box":
+   display_name = "Hộp đồ"
+   item_category = "toy"
+   valid_destinations = ["basket"]
+  "book":
+   display_name = "Sách"
+   item_category = "toy"
+   valid_destinations = ["basket"]
+  "ball":
+   display_name = "Quả bóng"
+   item_category = "toy"
+   valid_destinations = ["basket"]
  var col = CollisionShape3D.new()
  var shape: Shape3D
  if prop_kind == "ball":
@@ -63,7 +92,7 @@ func add_kenney_prop(asset: String, center: Vector3, factor: float, flatten: boo
 func available(_player: Node3D) -> bool:
  return state == State.IDLE and pickup_timer <= 0
 func prompt(_player: Node3D) -> String:
- return "Nhặt " + {"pillow":"gối", "hammer":"búa đồ chơi", "bear":"gấu bông", "box":"hộp", "book":"sách", "ball":"bóng"}.get(prop_kind, "đồ")
+ return "Nhặt " + display_name
 func interact(player: Node3D) -> void:
  if not available(player) or player.held_pillow: return
  state = State.HELD
@@ -72,6 +101,7 @@ func interact(player: Node3D) -> void:
  velocity = Vector3.ZERO
  collision_layer = 0
  collision_mask = 0
+ add_collision_exception_with(player)
  emit_feedback("pickup")
 
 func emit_feedback(event: String) -> void:

@@ -138,6 +138,38 @@ func run() -> void:
  check(player.held_pillow == null, "player released bottle after trash deposit")
  check(trash.items_inside.has(bottle), "bottle registered inside trash")
  
+ # 9. Test Item Metadata & Display Names
+ var PillowScript = load("res://scripts/pillow.gd")
+ var HazardBananaScript = load("res://scripts/cleaning/hazard_banana.gd")
+ var test_bear = PillowScript.new()
+ test_bear.prop_kind = "bear"
+ root.add_child(test_bear)
+ check(test_bear.display_name == "Gấu bông", "pillow bear has display_name 'Gấu bông'")
+ check(test_bear.item_category == "toy", "pillow bear item_category is 'toy'")
+ check(test_bear.valid_destinations.has("basket"), "pillow bear destination has 'basket'")
+ 
+ var test_banana = HazardBananaScript.new()
+ root.add_child(test_banana)
+ check(test_banana.display_name == "Vỏ chuối", "hazard banana has display_name 'Vỏ chuối'")
+ check(test_banana.valid_destinations.has("trash"), "hazard banana destination has 'trash'")
+ 
+ # 10. Test Destination Beacon
+ basket.set_destination_beacon(true)
+ check(basket.beacon_label.visible == true, "beacon label visible when active")
+ check("Giỏ đồ" in basket.beacon_label.text, "beacon label text includes 'Giỏ đồ'")
+ basket.set_destination_beacon(false)
+ check(basket.beacon_label.visible == false, "beacon label hidden when inactive")
+ 
+ # 11. Test Player Movement Around Zones (No invisible walls / no stuck)
+ player.global_position = Vector3(0, 0, 0)
+ player.velocity = Vector3(1, 0, 0)
+ player.move_and_slide()
+ check(player.global_position.x != 0.0 or player.velocity.x > 0.0, "player moves freely without getting stuck in placement zone")
+ 
+ # Cleanup
+ test_bear.queue_free()
+ test_banana.queue_free()
+ 
  # Cleanup
  player.queue_free()
  toy_held.queue_free()

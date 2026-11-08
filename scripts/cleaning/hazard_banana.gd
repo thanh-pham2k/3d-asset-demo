@@ -8,6 +8,10 @@ var pickup_delay := 0.0
 var visual: Node3D
 var trigger_area: Area3D
 var slip_cooldown := 0.0
+var display_name := "Vỏ chuối"
+var item_category := "trash"
+var interaction_type := "pickup"
+var valid_destinations: Array = ["trash"]
 
 func _ready() -> void:
  add_to_group("interactables")
@@ -19,9 +23,9 @@ func _ready() -> void:
  
  var col := CollisionShape3D.new()
  var box := BoxShape3D.new()
- box.size = Vector3(0.36, 0.10, 0.36)
+ box.size = Vector3(0.24, 0.04, 0.24)
  col.shape = box
- col.position.y = 0.05
+ col.position.y = 0.02
  add_child(col)
  
  visual = Node3D.new()
@@ -82,6 +86,7 @@ func interact(player: Node3D) -> void:
  freeze = true
  collision_layer = 0
  collision_mask = 0
+ add_collision_exception_with(player)
  emit_feedback("pickup")
  linear_velocity = Vector3.ZERO
  angular_velocity = Vector3.ZERO

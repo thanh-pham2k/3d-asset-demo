@@ -10,6 +10,10 @@ var trail_timer := 0.0
 var feedback: Node
 var chain_level := 0
 var last_impulse_source: Node
+var display_name := "Đồ"
+var item_category := "prop"
+var interaction_type := "pickup"
+var valid_destinations: Array = []
 
 func _ready() -> void:
  add_to_group("interactables")
@@ -18,15 +22,56 @@ func _ready() -> void:
  contact_monitor = true
  max_contacts_reported = 4
  body_entered.connect(_on_body_entered)
+ match prop_kind:
+  "bottle":
+   display_name = "Chai nước"
+   item_category = "trash"
+   valid_destinations = ["trash"]
+  "cup":
+   display_name = "Cốc nước"
+   item_category = "trash"
+   valid_destinations = ["trash"]
+  "pillow":
+   display_name = "Gối"
+   item_category = "cushion"
+   valid_destinations = ["sofa"]
+  "toy":
+   display_name = "Đồ chơi"
+   item_category = "toy"
+   valid_destinations = ["basket"]
+  "slipper":
+   display_name = "Dép"
+   item_category = "toy"
+   valid_destinations = ["basket"]
+  "container":
+   display_name = "Hộp nhựa"
+   item_category = "toy"
+   valid_destinations = ["basket"]
+  "stack_box":
+   display_name = "Thùng các-tông"
+   item_category = "toy"
+   valid_destinations = ["basket"]
+  "chair":
+   display_name = "Ghế"
+   item_category = "furniture"
+   valid_destinations = []
+  "vase":
+   display_name = "Bình hoa"
+   item_category = "decor"
+   valid_destinations = []
  var col := CollisionShape3D.new()
  var shape := BoxShape3D.new()
- shape.size = Vector3(0.32,0.32,0.32)
+ shape.size = Vector3(0.24,0.24,0.24)
  match prop_kind:
   "chair": shape.size = Vector3(0.48,0.7,0.48)
-  "bottle": shape.size = Vector3(0.18,0.42,0.18)
-  "slipper": shape.size = Vector3(0.18,0.10,0.34)
-  "stack_box": shape.size = Vector3(0.42,0.42,0.42)
-  "pillow": shape.size = Vector3(0.46,0.18,0.36)
+  "bottle": shape.size = Vector3(0.16,0.38,0.16)
+  "cup": shape.size = Vector3(0.16,0.20,0.16)
+  "vase": shape.size = Vector3(0.20,0.32,0.20)
+  "toy": shape.size = Vector3(0.22,0.24,0.22)
+  "container": shape.size = Vector3(0.28,0.22,0.28)
+  "slipper": shape.size = Vector3(0.18,0.10,0.30)
+  "stack_box": shape.size = Vector3(0.40,0.40,0.40)
+  "pillow": shape.size = Vector3(0.44,0.16,0.34)
  col.shape = shape
  add_child(col)
  match prop_kind:
@@ -79,7 +124,7 @@ func available(player: Node3D) -> bool:
  return not held and not broken and pickup_delay <= 0 and player.held_pillow == null
 
 func prompt(_player: Node3D) -> String:
- return "Nhặt " + {"chair":"ghế", "vase":"bình hoa", "cup":"cốc", "bottle":"chai", "slipper":"dép", "toy":"đồ chơi", "container":"hộp", "stack_box":"thùng", "pillow":"gối"}.get(prop_kind,"đồ")
+ return "Nhặt " + display_name
 
 func interact(player: Node3D) -> void:
  if not available(player): return
@@ -89,6 +134,7 @@ func interact(player: Node3D) -> void:
  freeze = true
  collision_layer = 0
  collision_mask = 0
+ add_collision_exception_with(player)
  emit_feedback("pickup")
  linear_velocity = Vector3.ZERO
  angular_velocity = Vector3.ZERO

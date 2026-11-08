@@ -531,8 +531,19 @@ func _format_number(n: int) -> String:
 func _process(_delta: float) -> void:
  if not is_instance_valid(player): return
  dash_bar.value = 100.0 * (1.0 - clampf(player.dash_cooldown_remaining / player.config.dash_cooldown, 0.0, 1.0))
- var names := {"pillow":"gối", "hammer":"búa", "bear":"gấu", "box":"hộp", "book":"sách", "ball":"bóng", "chair":"ghế", "vase":"bình", "cup":"cốc", "bottle":"chai", "slipper":"dép", "toy":"đồ chơi", "container":"hộp", "stack_box":"thùng", "banana":"vỏ chuối"}
- item_label.text = "Đang cầm: " + names.get(player.held_pillow.prop_kind, "đồ") if is_instance_valid(player.held_pillow) else "Lướt (Space)"
+ if is_instance_valid(player.held_pillow):
+  var item_name: String = player.held_pillow.get("display_name") if "display_name" in player.held_pillow else "đồ"
+  var dests: Array = player.held_pillow.get("valid_destinations") if "valid_destinations" in player.held_pillow else []
+  var dest_name := ""
+  if "basket" in dests: dest_name = "Giỏ đồ"
+  elif "trash" in dests: dest_name = "Thùng rác"
+  elif "sofa" in dests: dest_name = "Sofa"
+  if dest_name != "":
+   item_label.text = "Đang cầm: %s  ➜  Mang đến: %s" % [item_name, dest_name]
+  else:
+   item_label.text = "Đang cầm: " + item_name
+ else:
+  item_label.text = "Lướt (Space)"
 
 func _unhandled_key_input(event: InputEvent) -> void:
  if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_ESCAPE and not menu.visible and not results_panel.visible:

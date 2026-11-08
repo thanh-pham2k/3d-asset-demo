@@ -79,9 +79,9 @@ func _ready() -> void:
   ["bottle", Vector3(4.1,0.4,2.8)],
   ["slipper", Vector3(-4.5,0.2,1.1)],
   ["toy", Vector3(-3.4,0.2,2.2)],
-  ["container", Vector3(1.4,0.25,2.8)],
-  ["stack_box", Vector3(2.1,0.23,2.8)],
-  ["stack_box", Vector3(2.1,0.68,2.8)],
+  ["container", Vector3(0.9,0.25,2.8)],
+  ["stack_box", Vector3(1.5,0.23,2.8)],
+  ["stack_box", Vector3(1.5,0.68,2.8)],
   # Additional props for cleaning mission (sofa pillows & trash items)
   ["pillow", Vector3(-5.5,0.55,2.4)], # Pillow 2 on bed
   ["pillow", Vector3(-2.35,0.45,-1.75)], # Pillow 3 on coffee table
@@ -114,7 +114,7 @@ func _ready() -> void:
  trash_zone.zone_type = "trash"
  trash_zone.accepted_prop_kinds = ["bottle", "cup", "banana"]
  trash_zone.capacity = 8
- trash_zone.position = Vector3(1.8, 0.0, 2.6)
+ trash_zone.position = Vector3(2.2, 0.0, 1.8)
  add_child(trash_zone)
  
  var sofa_slots := []

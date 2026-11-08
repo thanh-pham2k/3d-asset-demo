@@ -17,16 +17,34 @@ var items_inside: Array[Node3D] = []
 var trigger_area: Area3D
 var visual: Node3D
 var highlight_mesh: MeshInstance3D
+var beacon_label: Label3D
+var destination_name: String = "Giỏ đồ"
 
 var _candidates: Dictionary = {}
 var _rejected_cooldowns: Dictionary = {}
 
 func _ready() -> void:
  add_to_group("placement_zones")
+ match zone_type:
+  "basket": destination_name = "Giỏ đồ"
+  "trash": destination_name = "Thùng rác"
+  "sofa_slot": destination_name = "Sofa"
  
  visual = Node3D.new()
  visual.name = "ZoneVisual"
  add_child(visual)
+ 
+ beacon_label = Label3D.new()
+ beacon_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+ beacon_label.no_depth_test = true
+ beacon_label.font_size = 28
+ beacon_label.pixel_size = 0.0035
+ beacon_label.outline_size = 8
+ beacon_label.outline_modulate = Color.BLACK
+ beacon_label.position.y = 0.85
+ beacon_label.modulate = Color("fef08a")
+ beacon_label.visible = false
+ add_child(beacon_label)
  
  trigger_area = Area3D.new()
  trigger_area.name = "TriggerArea"
@@ -41,12 +59,10 @@ func _ready() -> void:
    box.size = Vector3(0.68, 0.48, 0.68)
    col.position.y = 0.24
    _build_basket_visual()
-   _build_basket_colliders()
   "trash":
    box.size = Vector3(0.52, 0.68, 0.52)
    col.position.y = 0.34
    _build_trash_visual()
-   _build_trash_colliders()
   "sofa_slot":
    box.size = Vector3(0.50, 0.40, 0.45)
    col.position.y = 0.18
@@ -87,14 +103,6 @@ func _build_basket_visual() -> void:
  highlight_mesh = Art.box(visual, Vector3(0, 0.42, 0), Vector3(0.78, 0.02, 0.78), Color("ffe082"))
  highlight_mesh.visible = false
 
-func _build_basket_colliders() -> void:
- # Solid physical side walls so thrown items stay in basket
- Art.solid(self, Vector3(0, 0.02, 0), Vector3(0.70, 0.04, 0.70))
- Art.solid(self, Vector3(0, 0.20, 0.34), Vector3(0.70, 0.36, 0.06))
- Art.solid(self, Vector3(0, 0.20, -0.34), Vector3(0.70, 0.36, 0.06))
- Art.solid(self, Vector3(0.34, 0.20, 0), Vector3(0.06, 0.36, 0.62))
- Art.solid(self, Vector3(-0.34, 0.20, 0), Vector3(0.06, 0.36, 0.62))
-
 func _build_trash_visual() -> void:
  var body_color := Color("4a705b")
  var lid_color := Color("334d3f")
@@ -113,14 +121,6 @@ func _build_trash_visual() -> void:
  highlight_mesh = Art.box(visual, Vector3(0, 0.60, 0), Vector3(0.56, 0.02, 0.56), Color("a7f3d0"))
  highlight_mesh.visible = false
 
-func _build_trash_colliders() -> void:
- # Solid physical side walls so thrown items stay in trash can
- Art.solid(self, Vector3(0, 0.02, 0), Vector3(0.50, 0.04, 0.50))
- Art.solid(self, Vector3(0, 0.30, 0.24), Vector3(0.50, 0.56, 0.05))
- Art.solid(self, Vector3(0, 0.30, -0.24), Vector3(0.50, 0.56, 0.05))
- Art.solid(self, Vector3(0.24, 0.30, 0), Vector3(0.05, 0.56, 0.44))
- Art.solid(self, Vector3(-0.24, 0.30, 0), Vector3(0.05, 0.56, 0.44))
-
 func _build_sofa_slot_visual() -> void:
  Art.box(visual, Vector3(0, 0.015, 0), Vector3(0.42, 0.03, 0.35), Color(0.95, 0.88, 0.78, 0.45))
  highlight_mesh = Art.box(visual, Vector3(0, 0.025, 0), Vector3(0.46, 0.015, 0.39), Color("fde68a"))
@@ -129,6 +129,16 @@ func _build_sofa_slot_visual() -> void:
 func highlight(active: bool) -> void:
  if is_instance_valid(highlight_mesh):
   highlight_mesh.visible = active
+
+func set_destination_beacon(active: bool) -> void:
+ if not is_instance_valid(beacon_label): return
+ if active and not is_full():
+  beacon_label.text = "➜ " + destination_name + (" [%d/%d]" % [items_inside.size(), capacity] if capacity > 1 else "")
+  beacon_label.visible = true
+  if is_instance_valid(highlight_mesh): highlight_mesh.visible = true
+ else:
+  beacon_label.visible = false
+  if is_instance_valid(highlight_mesh): highlight_mesh.visible = false
 
 func deposit_held_item(item: Node3D, player: Node3D) -> bool:
  if not is_instance_valid(item): return false
@@ -166,6 +176,8 @@ func deposit_held_item(item: Node3D, player: Node3D) -> bool:
    target_pos = global_position + snap_position
  
  # Release from player and place
+ item.add_collision_exception_with(player)
+ get_tree().create_timer(0.4).timeout.connect(func(): if is_instance_valid(player) and is_instance_valid(item): item.remove_collision_exception_with(player))
  if item is CharacterBody3D:
   item.state = item.State.IDLE if "State" in item else 0
   item.holder = null
@@ -183,7 +195,7 @@ func deposit_held_item(item: Node3D, player: Node3D) -> bool:
   item.linear_velocity = Vector3.ZERO
   item.angular_velocity = Vector3.ZERO
   item.global_position = target_pos
-  item.freeze = snap_items
+  item.freeze = true
  
  player.held_pillow = null
  
@@ -241,6 +253,14 @@ func _physics_process(delta: float) -> void:
     if ui and ui.has_method("_spawn_floating_text"):
      ui._spawn_floating_text("Không phải rác! (Chỉ bỏ chai, cốc, vỏ chuối)")
    continue
+  
+  if accepted_prop_kinds.has(kind) and not items_inside.has(body):
+   if body is RigidBody3D and not body.freeze:
+    body.linear_velocity.x *= 0.8
+    body.linear_velocity.z *= 0.8
+   elif body is CharacterBody3D and "velocity" in body:
+    body.velocity.x *= 0.8
+    body.velocity.z *= 0.8
   
   var speed := 0.0
   if body is RigidBody3D: speed = body.linear_velocity.length()

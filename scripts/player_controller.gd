@@ -31,6 +31,10 @@ func _ready() -> void:
  add_to_group("players")
  collision_layer = 2
  collision_mask = 7
+ safe_margin = 0.04
+ wall_min_slide_angle = 0.1
+ floor_constant_speed = true
+ floor_snap_length = 0.15
  var col = CollisionShape3D.new()
  var capsule = CapsuleShape3D.new()
  capsule.radius = 0.23
@@ -228,6 +232,9 @@ func _physics_process(delta: float) -> void:
   if is_instance_valid(target_zone) and target_zone.has_method("highlight"):
    target_zone.highlight(false)
   target_zone = null
+  for zone in get_tree().get_nodes_in_group("placement_zones"):
+   if zone.has_method("set_destination_beacon"):
+    zone.set_destination_beacon(false)
   held_pillow.throw_from(self)
   throw_anim = 0.35
   visual.scale = Vector3(0.9, 1.15, 0.9)
@@ -245,7 +252,18 @@ func find_target() -> void:
   target_zone = null
   var nearest_zone_dist := 1.7
   var zones = get_tree().get_nodes_in_group("placement_zones")
+  var kind: String = held_pillow.get("prop_kind") if "prop_kind" in held_pillow else ""
+  var item_name: String = held_pillow.get("display_name") if "display_name" in held_pillow else "đồ"
+  var dests: Array = held_pillow.get("valid_destinations") if "valid_destinations" in held_pillow else []
+  var default_dest := ""
+  if "basket" in dests: default_dest = "Giỏ đồ"
+  elif "trash" in dests: default_dest = "Thùng rác"
+  elif "sofa" in dests: default_dest = "Sofa"
+
   for zone in zones:
+   var zone_accepts: bool = zone.has_method("accepts_prop") and zone.accepts_prop(kind)
+   if zone.has_method("set_destination_beacon"):
+    zone.set_destination_beacon(zone_accepts)
    var d: float = global_position.distance_to(zone.global_position)
    if d < nearest_zone_dist:
     nearest_zone_dist = d
@@ -255,7 +273,6 @@ func find_target() -> void:
    prev_zone.highlight(false)
 
   if target_zone:
-   var kind: String = held_pillow.get("prop_kind") if "prop_kind" in held_pillow else ""
    var accepts: bool = target_zone.has_method("accepts_prop") and target_zone.accepts_prop(kind)
    if target_zone.has_method("highlight"):
     target_zone.highlight(accepts)
@@ -266,16 +283,22 @@ func find_target() -> void:
      action_text = "Bỏ rác vào thùng"
     elif ztype == "sofa_slot":
      action_text = "Đặt gối lên sofa"
-    prompt_label.text = "%s  %s · %s ném" % [key, action_text, throw_key]
+    prompt_label.text = "%s — %s · %s ném" % [key, action_text, throw_key]
    else:
     var ztype: String = target_zone.get("zone_type") if "zone_type" in target_zone else ""
     if ztype == "trash":
-     prompt_label.text = "Không phải rác! · %s ném" % [throw_key]
+     prompt_label.text = "Không phải rác! · %s ném · %s thả" % [throw_key, key]
     else:
-     prompt_label.text = "Không thể đặt vào đây · %s ném" % [throw_key]
+     prompt_label.text = "Không thể đặt vào đây · %s ném · %s thả" % [throw_key, key]
   else:
-   prompt_label.text = throw_key + (" ném · Q đập · E thả" if held_pillow.get("prop_kind") == "hammer" else " ném · E thả")
+   if default_dest != "":
+    prompt_label.text = "Đang cầm: %s · Mang đến: %s · %s ném · %s thả" % [item_name, default_dest, throw_key, key]
+   else:
+    prompt_label.text = throw_key + (" ném · Q đập · E thả" if kind == "hammer" else " ném · E thả")
  else:
+  for zone in get_tree().get_nodes_in_group("placement_zones"):
+   if zone.has_method("set_destination_beacon"):
+    zone.set_destination_beacon(false)
   if target_zone and is_instance_valid(target_zone) and target_zone.has_method("highlight"):
    target_zone.highlight(false)
   target_zone = null
@@ -286,7 +309,7 @@ func find_target() -> void:
    if distance < nearest:
     nearest = distance
     target = item
-  if target: prompt_label.text = key + "  " + target.prompt(self)
+  if target: prompt_label.text = key + " — " + target.prompt(self)
   else: prompt_label.text = "P%d" % player_id
 
 func update_animation(move: float, running: bool) -> void:

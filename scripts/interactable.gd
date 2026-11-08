@@ -9,9 +9,26 @@ var moving_part: Node3D
 var light: OmniLight3D
 var stand_point := Vector3.ZERO
 var seat_point := Vector3.ZERO
+var display_name := "Nội thất"
+var item_category := "furniture"
+var interaction_type := "interact"
+var valid_destinations: Array = []
 
 func _ready() -> void:
  add_to_group("interactables")
+ match kind:
+  "sofa":
+   display_name = "Sofa"
+   interaction_type = "rest"
+  "bed":
+   display_name = "Giường"
+   interaction_type = "rest"
+  "lamp":
+   display_name = "Đèn phòng"
+   interaction_type = "toggle"
+  "door":
+   display_name = "Cửa phòng"
+   interaction_type = "toggle"
 
 func available(player: Node3D) -> bool:
  return enabled and (user == null or user == player)

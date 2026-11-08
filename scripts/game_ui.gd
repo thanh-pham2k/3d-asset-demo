@@ -37,6 +37,7 @@ var cleaning_labels := {
 }
 
 func _ready() -> void:
+ add_to_group("game_ui")
  process_mode = Node.PROCESS_MODE_ALWAYS
  build_ui()
  show_main_menu()

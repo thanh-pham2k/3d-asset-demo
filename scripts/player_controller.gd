@@ -22,6 +22,7 @@ var hammer_cooldown := 0.0
 var knockback_fx_timer := 0.0
 var dizzy_fx_pending := false
 var target: Node3D
+var target_zone: Node3D = null
 var prompt_label: Label3D
 @export var config: PlayerConfig = PlayerConfig.new()
 var animation_controller: Node
@@ -185,6 +186,19 @@ func _physics_process(delta: float) -> void:
  find_target()
  if Input.is_action_just_pressed(prefix + "interact") and interaction_cooldown <= 0:
   if held_pillow:
+   if is_instance_valid(target_zone) and target_zone.has_method("deposit_held_item"):
+    var deposited: bool = target_zone.deposit_held_item(held_pillow, self)
+    interaction_cooldown = 0.25
+    if deposited:
+     if target_zone.has_method("highlight"):
+      target_zone.highlight(false)
+     target_zone = null
+     return
+    else:
+     return
+   if is_instance_valid(target_zone) and target_zone.has_method("highlight"):
+    target_zone.highlight(false)
+   target_zone = null
    held_pillow.drop_from(self)
    interaction_cooldown = 0.25
   elif target:
@@ -211,6 +225,9 @@ func _physics_process(delta: float) -> void:
    var cam = get_viewport().get_camera_3d()
    if cam and cam.has_method("add_trauma"): cam.add_trauma(0.38)
  if Input.is_action_just_pressed(prefix + "throw") and held_pillow:
+  if is_instance_valid(target_zone) and target_zone.has_method("highlight"):
+   target_zone.highlight(false)
+  target_zone = null
   held_pillow.throw_from(self)
   throw_anim = 0.35
   visual.scale = Vector3(0.9, 1.15, 0.9)
@@ -220,17 +237,57 @@ func _physics_process(delta: float) -> void:
 
 func find_target() -> void:
  target = null
- var nearest := 1.1
- for item in get_tree().get_nodes_in_group("interactables"):
-  if not item.available(self): continue
-  var distance: float = global_position.distance_to(item.global_position)
-  if distance < nearest:
-   nearest = distance
-   target = item
  var key = "E" if player_id == 1 else "Enter"
- if held_pillow: prompt_label.text = ("F" if player_id == 1 else "Right Ctrl") + (" ném · Q đập · E thả" if held_pillow.prop_kind == "hammer" else " ném · E thả")
- elif target: prompt_label.text = key + "  " + target.prompt(self)
- else: prompt_label.text = "P%d" % player_id
+ var throw_key = "F" if player_id == 1 else "Right Ctrl"
+
+ if held_pillow:
+  var prev_zone = target_zone
+  target_zone = null
+  var nearest_zone_dist := 1.7
+  var zones = get_tree().get_nodes_in_group("placement_zones")
+  for zone in zones:
+   var d: float = global_position.distance_to(zone.global_position)
+   if d < nearest_zone_dist:
+    nearest_zone_dist = d
+    target_zone = zone
+
+  if prev_zone and prev_zone != target_zone and is_instance_valid(prev_zone) and prev_zone.has_method("highlight"):
+   prev_zone.highlight(false)
+
+  if target_zone:
+   var kind: String = held_pillow.get("prop_kind") if "prop_kind" in held_pillow else ""
+   var accepts: bool = target_zone.has_method("accepts_prop") and target_zone.accepts_prop(kind)
+   if target_zone.has_method("highlight"):
+    target_zone.highlight(accepts)
+   if accepts:
+    var action_text := "Bỏ vào giỏ"
+    var ztype: String = target_zone.get("zone_type") if "zone_type" in target_zone else ""
+    if ztype == "trash":
+     action_text = "Bỏ rác vào thùng"
+    elif ztype == "sofa_slot":
+     action_text = "Đặt gối lên sofa"
+    prompt_label.text = "%s  %s · %s ném" % [key, action_text, throw_key]
+   else:
+    var ztype: String = target_zone.get("zone_type") if "zone_type" in target_zone else ""
+    if ztype == "trash":
+     prompt_label.text = "Không phải rác! · %s ném" % [throw_key]
+    else:
+     prompt_label.text = "Không thể đặt vào đây · %s ném" % [throw_key]
+  else:
+   prompt_label.text = throw_key + (" ném · Q đập · E thả" if held_pillow.get("prop_kind") == "hammer" else " ném · E thả")
+ else:
+  if target_zone and is_instance_valid(target_zone) and target_zone.has_method("highlight"):
+   target_zone.highlight(false)
+  target_zone = null
+  var nearest := 1.1
+  for item in get_tree().get_nodes_in_group("interactables"):
+   if not item.available(self): continue
+   var distance: float = global_position.distance_to(item.global_position)
+   if distance < nearest:
+    nearest = distance
+    target = item
+  if target: prompt_label.text = key + "  " + target.prompt(self)
+  else: prompt_label.text = "P%d" % player_id
 
 func update_animation(move: float, running: bool) -> void:
  animation_controller.apply_state(move, running, held_pillow != null, throw_anim > 0, resting != null, resting != null and resting.kind == "bed", reaction > 0, time)

@@ -97,7 +97,50 @@ func run() -> void:
  check(sofa_slot.is_full(), "sofa slot marked full with 1 pillow")
  check(pillow.global_position.distance_to(sofa_slot.global_position + sofa_slot.snap_position) < 0.05, "pillow snapped to designated slot position")
  
+ # 6. Test Direct Deposit via deposit_held_item
+ var player_script = load("res://scripts/player_controller.gd")
+ var player = player_script.new()
+ root.add_child(player)
+ player.global_position = Vector3(0, 0, 0.8) # near basket at (0, 0, 0)
+ 
+ var toy_held = PhysicsPropScript.new()
+ toy_held.prop_kind = "toy"
+ root.add_child(toy_held)
+ player.held_pillow = toy_held
+ toy_held.holder = player
+ toy_held.held = true
+ 
+ var dep_ok: bool = basket.deposit_held_item(toy_held, player)
+ check(dep_ok, "deposit_held_item into basket succeeded")
+ check(player.held_pillow == null, "player released held item after deposit")
+ check(basket.items_inside.has(toy_held), "deposited toy registered inside basket")
+ check(basket.get_item_count() == 1, "basket item count updated to 1")
+ 
+ # 7. Test Direct Deposit of invalid item into trash rejected
+ player.held_pillow = toy_held # pretend player is holding toy again
+ toy_held.holder = player
+ toy_held.held = true
+ basket.items_inside.erase(toy_held)
+ 
+ var trash_dep_fail: bool = trash.deposit_held_item(toy_held, player)
+ check(not trash_dep_fail, "deposit_held_item with invalid toy into trash returns false")
+ check(player.held_pillow == toy_held, "player still holds item after failed deposit")
+ check(not trash.items_inside.has(toy_held), "invalid item was not placed into trash")
+ 
+ # 8. Test Direct Deposit of valid trash (bottle) into trash
+ player.held_pillow = bottle
+ bottle.holder = player
+ bottle.held = true
+ trash.items_inside.erase(bottle)
+ 
+ var trash_dep_ok: bool = trash.deposit_held_item(bottle, player)
+ check(trash_dep_ok, "deposit_held_item with valid bottle into trash returns true")
+ check(player.held_pillow == null, "player released bottle after trash deposit")
+ check(trash.items_inside.has(bottle), "bottle registered inside trash")
+ 
  # Cleanup
+ player.queue_free()
+ toy_held.queue_free()
  basket.queue_free()
  trash.queue_free()
  sofa_slot.queue_free()

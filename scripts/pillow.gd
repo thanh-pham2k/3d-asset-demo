@@ -11,6 +11,7 @@ var pickup_timer := 0.0
 var spin := 0.0
 var trail_timer := 0.0
 var visual: Node3D
+var chain_level := 0
 
 func _ready() -> void:
  add_to_group("interactables")
@@ -84,14 +85,17 @@ func throw_from(player: Node3D) -> void:
  player.held_pillow = null
  thrower = player
  state = State.THROWN
+ chain_level = 1
  emit_feedback("throw")
  hit_once = false
  ignore_timer = 0.28
  pickup_timer = 0.5
  collision_layer = 4
  collision_mask = 7
- velocity = player.facing * 5.0 + Vector3.UP * 2.5
+ velocity = player.facing * 5.2 + Vector3.UP * 2.5
  add_collision_exception_with(player)
+ var camera = get_viewport().get_camera_3d()
+ if camera and camera.has_method("add_trauma"): camera.add_trauma(0.12)
  get_tree().create_timer(0.3).timeout.connect(func(): if is_instance_valid(player): remove_collision_exception_with(player))
 
 func drop_from(player: Node3D) -> void:
@@ -101,6 +105,7 @@ func drop_from(player: Node3D) -> void:
  player.held_pillow = null
  thrower = player
  state = State.THROWN
+ chain_level = 0
  pickup_timer = 0.5
  collision_layer = 4
  collision_mask = 7
@@ -129,8 +134,17 @@ func _physics_process(delta: float) -> void:
   if collision:
    var body = collision.get_collider()
    if body is RigidBody3D:
-    body.apply_central_impulse(velocity * 0.18)
+    var impulse_vec: Vector3 = velocity * (0.45 * body.mass)
+    body.apply_central_impulse(impulse_vec)
+    if body.has_method("receive_impact"):
+     body.receive_impact(impulse_vec, self)
+    var score_mgr = get_tree().get_first_node_in_group("score_manager")
+    if score_mgr:
+     score_mgr.register_prop_hit(body, velocity.length(), false, global_position)
+    var cam = get_viewport().get_camera_3d()
+    if cam and cam.has_method("add_trauma"): cam.add_trauma(0.2)
    if body.is_in_group("players") and body != thrower and not hit_once:
+
     hit_once = true
     emit_feedback("bonk" if prop_kind == "hammer" else "pillow_impact")
     body.hit(Vector3(velocity.x,0,velocity.z))

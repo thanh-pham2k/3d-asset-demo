@@ -113,6 +113,11 @@ func _physics_process(delta: float) -> void:
   dash_remaining = config.dash_duration
   dash_cooldown_remaining = config.dash_cooldown
   facing = dash_direction
+  visual.scale = Vector3(0.85, 0.85, 1.25)
+  var fx = get_tree().get_first_node_in_group("chaos_feedback")
+  if fx: fx.play_event("running_dust", global_position)
+  var cam = get_viewport().get_camera_3d()
+  if cam and cam.has_method("add_trauma"): cam.add_trauma(0.22)
  if dash_remaining > 0.0:
   dash_remaining = maxf(0.0, dash_remaining - delta)
   direction = dash_direction
@@ -130,6 +135,7 @@ func _physics_process(delta: float) -> void:
  if direction.length() > 0.08:
   facing = direction.normalized()
   visual.rotation.y = lerp_angle(visual.rotation.y, atan2(facing.x,facing.z), 1.0-exp(-12.0*delta))
+ visual.scale = visual.scale.lerp(Vector3.ONE, 1.0 - exp(-14.0 * delta))
  var pre_slide_velocity := velocity
  move_and_slide()
  for i in get_slide_collision_count():
@@ -138,7 +144,20 @@ func _physics_process(delta: float) -> void:
   if obstacle is RigidBody3D and not obstacle.freeze:
    var push := -contact.get_normal()
    push.y = 0.0
-   obstacle.apply_central_impulse(push.normalized() * minf(pre_slide_velocity.length(), 3.0) * 1.0)
+   if dash_remaining > 0.0:
+    var kick_force: Vector3 = push.normalized() * 5.5 * obstacle.mass
+    obstacle.apply_central_impulse(kick_force)
+    if obstacle.has_method("receive_impact"):
+     obstacle.receive_impact(push.normalized() * 4.5, self)
+    var score_mgr = get_tree().get_first_node_in_group("score_manager")
+    if score_mgr:
+     score_mgr.register_dash_impact(obstacle, contact.get_position())
+    var cam = get_viewport().get_camera_3d()
+    if cam and cam.has_method("add_trauma"): cam.add_trauma(0.25)
+    var fx = get_tree().get_first_node_in_group("chaos_feedback")
+    if fx: fx.play_event("bonk", contact.get_position())
+   else:
+    obstacle.apply_central_impulse(push.normalized() * minf(pre_slide_velocity.length(), 3.0) * 1.0)
  footstep_timer -= delta
  if direction.length() > 0.1 and is_on_floor() and footstep_timer <= 0.0:
   var fx = get_tree().get_first_node_in_group("chaos_feedback")
@@ -155,18 +174,31 @@ func _physics_process(delta: float) -> void:
    target.interact(self)
    interaction_cooldown = 0.25
  if Input.is_action_just_pressed(prefix + "swing") and held_pillow and held_pillow.prop_kind == "hammer" and hammer_cooldown <= 0.0:
-  hammer_cooldown = 0.6
+  hammer_cooldown = 0.55
   animation_controller.trigger_action("hammer", time)
+  visual.scale = Vector3(1.22, 0.78, 1.22)
   var fx = get_tree().get_first_node_in_group("chaos_feedback")
   if fx: fx.play_event("throw", global_position + facing * 0.8 + Vector3.UP * 0.5)
+  var hit_any := false
   for item in get_tree().get_nodes_in_group("interactables"):
    var delta_pos: Vector3 = item.global_position - global_position
-   if item != held_pillow and delta_pos.length() < 1.25 and delta_pos.dot(facing) > 0.0 and item.has_method("receive_impact"):
-    item.receive_impact(facing * 4.0)
+   if item != held_pillow and delta_pos.length() < 1.6 and delta_pos.dot(facing) > -0.2:
+    if item.has_method("receive_impact"):
+     item.receive_impact(facing * 4.5, self)
+     hit_any = true
+    elif item is RigidBody3D:
+     item.apply_central_impulse(facing * 4.5 * item.mass)
+     hit_any = true
     if fx: fx.play_event("bonk", item.global_position)
+  if hit_any:
+   var cam = get_viewport().get_camera_3d()
+   if cam and cam.has_method("add_trauma"): cam.add_trauma(0.38)
  if Input.is_action_just_pressed(prefix + "throw") and held_pillow:
   held_pillow.throw_from(self)
   throw_anim = 0.35
+  visual.scale = Vector3(0.9, 1.15, 0.9)
+  var cam = get_viewport().get_camera_3d()
+  if cam and cam.has_method("add_trauma"): cam.add_trauma(0.12)
  update_animation(direction.length(), running)
 
 func find_target() -> void:

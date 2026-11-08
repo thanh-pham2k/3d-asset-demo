@@ -1,16 +1,51 @@
+class_name GameUI
 extends CanvasLayer
 
 var player: Node
 var menu: Control
 var pause_panel: Control
+var results_panel: Control
 var hud: Control
 var dash_bar: ProgressBar
 var item_label: Label
+var timer_label: Label
+var score_label: Label
+var combo_badge: Label
+var combo_bar: ProgressBar
+var challenge_container: VBoxContainer
+var challenge_labels: Array[Label] = []
+var popup_container: Control
+
+var results_title: Label
+var results_rank: Label
+var results_score: Label
+var results_breakdown: Label
+
+var round_manager: Node
+var score_manager: Node
+var challenge_manager: Node
 
 func _ready() -> void:
  process_mode = Node.PROCESS_MODE_ALWAYS
  build_ui()
  show_main_menu()
+
+func setup(p_round: Node, p_score: Node, p_challenge: Node) -> void:
+ round_manager = p_round
+ score_manager = p_score
+ challenge_manager = p_challenge
+ 
+ if is_instance_valid(round_manager):
+  round_manager.time_tick.connect(_on_time_tick)
+  round_manager.round_ended.connect(_on_round_ended)
+ 
+ if is_instance_valid(score_manager):
+  score_manager.score_added.connect(_on_score_added)
+  score_manager.combo_changed.connect(_on_combo_changed)
+ 
+ if is_instance_valid(challenge_manager):
+  challenge_manager.challenge_updated.connect(_on_challenge_updated)
+  challenge_manager.challenge_completed.connect(_on_challenge_completed)
 
 func panel(title: String) -> VBoxContainer:
  var overlay := Control.new()
@@ -18,27 +53,28 @@ func panel(title: String) -> VBoxContainer:
  overlay.mouse_filter = Control.MOUSE_FILTER_STOP
  add_child(overlay)
  var shade := ColorRect.new()
- shade.color = Color(0.19,0.15,0.16,0.65)
+ shade.color = Color(0.12, 0.10, 0.12, 0.72)
  shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
  overlay.add_child(shade)
  var center := CenterContainer.new()
  center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
  overlay.add_child(center)
  var column := VBoxContainer.new()
- column.custom_minimum_size = Vector2(340,0)
- column.add_theme_constant_override("separation", 16)
+ column.custom_minimum_size = Vector2(380, 0)
+ column.add_theme_constant_override("separation", 14)
  center.add_child(column)
  var heading := Label.new()
  heading.text = title
  heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
- heading.add_theme_font_size_override("font_size", 40)
+ heading.add_theme_font_size_override("font_size", 36)
+ heading.add_theme_color_override("font_color", Color("fff3cf"))
  column.add_child(heading)
  return column
 
 func button(parent: Control, caption: String, callback: Callable) -> Button:
  var b := Button.new()
  b.text = caption
- b.custom_minimum_size = Vector2(250,48)
+ b.custom_minimum_size = Vector2(260, 46)
  b.pressed.connect(callback)
  parent.add_child(b)
  return b
@@ -48,82 +84,315 @@ func build_ui() -> void:
  hud.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
  hud.mouse_filter = Control.MOUSE_FILTER_IGNORE
  add_child(hud)
- var hints := Label.new()
- hints.text = "WASD di chuyển   Shift chạy   Space lướt   E nhặt/thả   F ném   Q đập   Esc tạm dừng"
- hints.position = Vector2(20,18)
- hints.add_theme_font_size_override("font_size",18)
- hints.add_theme_color_override("font_color",Color("543e3c"))
- hud.add_child(hints)
+ 
+ # Top-Left: Score
+ var score_box := VBoxContainer.new()
+ score_box.position = Vector2(24, 18)
+ hud.add_child(score_box)
+ 
+ score_label = Label.new()
+ score_label.text = "ĐIỂM: 0"
+ score_label.add_theme_font_size_override("font_size", 28)
+ score_label.add_theme_color_override("font_color", Color("ffd659"))
+ score_box.add_child(score_label)
+ 
+ # Top-Center: Timer & Combo
+ var center_hud := VBoxContainer.new()
+ center_hud.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+ center_hud.position = Vector2(360, 14)
+ center_hud.custom_minimum_size = Vector2(240, 0)
+ center_hud.alignment = BoxContainer.ALIGNMENT_CENTER
+ hud.add_child(center_hud)
+ 
+ timer_label = Label.new()
+ timer_label.text = "⏱ 60s"
+ timer_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+ timer_label.add_theme_font_size_override("font_size", 34)
+ timer_label.add_theme_color_override("font_color", Color("fff8e7"))
+ center_hud.add_child(timer_label)
+ 
+ combo_badge = Label.new()
+ combo_badge.text = "COMBO x1.0"
+ combo_badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+ combo_badge.add_theme_font_size_override("font_size", 20)
+ combo_badge.add_theme_color_override("font_color", Color("ff9e59"))
+ combo_badge.visible = false
+ center_hud.add_child(combo_badge)
+ 
+ combo_bar = ProgressBar.new()
+ combo_bar.custom_minimum_size = Vector2(160, 8)
+ combo_bar.show_percentage = false
+ combo_bar.visible = false
+ center_hud.add_child(combo_bar)
+ 
+ # Top-Right: Challenges
+ var chal_panel := PanelContainer.new()
+ chal_panel.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+ chal_panel.position = Vector2(680, 16)
+ chal_panel.custom_minimum_size = Vector2(280, 100)
+ hud.add_child(chal_panel)
+ 
+ challenge_container = VBoxContainer.new()
+ challenge_container.add_theme_constant_override("separation", 6)
+ chal_panel.add_child(challenge_container)
+ 
+ var chal_header := Label.new()
+ chal_header.text = "★ NHIỆM VỤ ROUND"
+ chal_header.add_theme_font_size_override("font_size", 16)
+ chal_header.add_theme_color_override("font_color", Color("e0c279"))
+ challenge_container.add_child(chal_header)
+ 
+ challenge_labels.clear()
+ for i in 3:
+  var l := Label.new()
+  l.text = "[ ] Đang tải..."
+  l.add_theme_font_size_override("font_size", 13)
+  l.add_theme_color_override("font_color", Color("fff0d4"))
+  challenge_container.add_child(l)
+  challenge_labels.append(l)
+ 
+ # Floating popups container
+ popup_container = Control.new()
+ popup_container.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+ popup_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
+ hud.add_child(popup_container)
+ 
+ # Bottom-Left: Held item, Dash meter, Hints
  item_label = Label.new()
- item_label.position = Vector2(22,48)
- item_label.add_theme_color_override("font_color",Color("543e3c"))
+ item_label.position = Vector2(24, 520)
+ item_label.add_theme_font_size_override("font_size", 16)
+ item_label.add_theme_color_override("font_color", Color("fff0db"))
  hud.add_child(item_label)
+ 
  dash_bar = ProgressBar.new()
- dash_bar.position = Vector2(22,78)
- dash_bar.size = Vector2(150,14)
+ dash_bar.position = Vector2(24, 545)
+ dash_bar.size = Vector2(160, 12)
  dash_bar.show_percentage = false
  hud.add_child(dash_bar)
- var menu_column := panel("Couple Chaos")
+ 
+ var hints := Label.new()
+ hints.text = "WASD di chuyển | Shift chạy | Space lướt | E nhặt/thả | F ném | Q đập búa | Esc tạm dừng"
+ hints.position = Vector2(24, 565)
+ hints.add_theme_font_size_override("font_size", 13)
+ hints.add_theme_color_override("font_color", Color("cfc0af"))
+ hud.add_child(hints)
+ 
+ # Main Menu Panel
+ var menu_column := panel("Couple Chaos: Rampage!")
  menu = menu_column.get_parent().get_parent()
  var sub := Label.new()
- sub.text = "Căn phòng nhỏ, niềm vui lớn!"
+ sub.text = "Quậy phá căn phòng trong 60 giây!\nĐập phá, tạo combo và hoàn thành thử thách!"
  sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+ sub.add_theme_font_size_override("font_size", 15)
+ sub.add_theme_color_override("font_color", Color("eed8c0"))
  menu_column.add_child(sub)
+ 
  var choices := HBoxContainer.new()
  choices.alignment = BoxContainer.ALIGNMENT_CENTER
  menu_column.add_child(choices)
+ 
  var choice_group := ButtonGroup.new()
  var boy := Button.new()
  boy.toggle_mode = true
  boy.button_group = choice_group
  boy.button_pressed = true
  boy.text = "Boy"
- boy.custom_minimum_size = Vector2(140,42)
- boy.pressed.connect(func(): player.select_character("boy"))
+ boy.custom_minimum_size = Vector2(130, 40)
+ boy.pressed.connect(func(): if is_instance_valid(player): player.select_character("boy"))
  choices.add_child(boy)
+ 
  var girl := Button.new()
  girl.toggle_mode = true
  girl.button_group = choice_group
  girl.text = "Girl"
- girl.custom_minimum_size = Vector2(140,42)
- girl.pressed.connect(func(): player.select_character("girl"))
+ girl.custom_minimum_size = Vector2(130, 40)
+ girl.pressed.connect(func(): if is_instance_valid(player): player.select_character("girl"))
  choices.add_child(girl)
- button(menu_column, "Bắt đầu", start_game)
+ 
+ button(menu_column, "BẮT ĐẦU ROUND", start_game)
+ 
+ # Pause Panel
  var pause_column := panel("Tạm dừng")
  pause_panel = pause_column.get_parent().get_parent()
  button(pause_column, "Tiếp tục", resume_game)
- button(pause_column, "Chơi lại", restart_game)
- button(pause_column, "Về menu", show_main_menu)
+ button(pause_column, "Chơi lại vòng này", restart_round)
+ button(pause_column, "Về Menu chính", show_main_menu)
+ 
+ # Results Panel
+ var results_col := panel("HẾT GIỜ!")
+ results_panel = results_col.get_parent().get_parent()
+ 
+ results_title = results_col.get_child(0) as Label
+ results_title.text = "HẾT GIỜ (TIME'S UP!)"
+ 
+ results_rank = Label.new()
+ results_rank.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+ results_rank.add_theme_font_size_override("font_size", 48)
+ results_rank.add_theme_color_override("font_color", Color("ffd740"))
+ results_col.add_child(results_rank)
+ 
+ results_score = Label.new()
+ results_score.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+ results_score.add_theme_font_size_override("font_size", 24)
+ results_score.add_theme_color_override("font_color", Color("ffffff"))
+ results_col.add_child(results_score)
+ 
+ results_breakdown = Label.new()
+ results_breakdown.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+ results_breakdown.add_theme_font_size_override("font_size", 14)
+ results_breakdown.add_theme_color_override("font_color", Color("dcd0c2"))
+ results_col.add_child(results_breakdown)
+ 
+ button(results_col, "Chơi lại vòng này", restart_round)
+ button(results_col, "Vòng tiếp theo >>", next_round)
+ button(results_col, "Về Menu chính", show_main_menu)
 
 func show_main_menu() -> void:
  menu.visible = true
  pause_panel.visible = false
+ results_panel.visible = false
  hud.visible = false
  get_tree().paused = true
 
 func start_game() -> void:
  menu.visible = false
  pause_panel.visible = false
+ results_panel.visible = false
  hud.visible = true
  get_tree().paused = false
+ if is_instance_valid(round_manager):
+  round_manager.start_round()
 
 func resume_game() -> void:
- start_game()
+ menu.visible = false
+ pause_panel.visible = false
+ results_panel.visible = false
+ hud.visible = true
+ if is_instance_valid(round_manager):
+  round_manager.resume_round()
+ else:
+  get_tree().paused = false
 
-func restart_game() -> void:
+func restart_round() -> void:
  get_tree().paused = false
  get_tree().reload_current_scene()
+
+func next_round() -> void:
+ get_tree().paused = false
+ get_tree().reload_current_scene()
+
+func _on_time_tick(time_remaining: float, _total: float) -> void:
+ var secs := int(ceilf(time_remaining))
+ timer_label.text = "⏱ %ds" % secs
+ if secs <= 10:
+  timer_label.add_theme_color_override("font_color", Color("ff4c4c"))
+  var pulse := 1.0 + 0.12 * sin(time_remaining * 8.0)
+  timer_label.scale = Vector2.ONE * pulse
+ else:
+  timer_label.add_theme_color_override("font_color", Color("fff8e7"))
+  timer_label.scale = Vector2.ONE
+
+func _on_score_added(points: int, total_score: int, reason: String, _world_pos: Vector3) -> void:
+ score_label.text = "ĐIỂM: %s" % _format_number(total_score)
+ _spawn_floating_text("+%d  %s" % [points, reason])
+
+func _spawn_floating_text(text: String) -> void:
+ if not is_instance_valid(popup_container): return
+ var pop := Label.new()
+ pop.text = text
+ pop.add_theme_font_size_override("font_size", 16)
+ pop.add_theme_color_override("font_color", Color("ffe082"))
+ pop.position = Vector2(randf_range(24, 180), randf_range(55, 95))
+ popup_container.add_child(pop)
+ 
+ var tween := create_tween()
+ tween.tween_property(pop, "position:y", pop.position.y - 30.0, 0.75)
+ tween.parallel().tween_property(pop, "modulate:a", 0.0, 0.75)
+ tween.tween_callback(pop.queue_free)
+
+func _on_combo_changed(multiplier: float, time_left: float, max_time: float) -> void:
+ if multiplier > 1.0:
+  combo_badge.visible = true
+  combo_bar.visible = true
+  combo_badge.text = "COMBO x%.1f!" % multiplier
+  combo_bar.value = 100.0 * (time_left / max_time)
+ else:
+  combo_badge.visible = false
+  combo_bar.visible = false
+
+func _on_challenge_updated(index: int, ch: Dictionary) -> void:
+ if index >= 0 and index < challenge_labels.size():
+  var l := challenge_labels[index]
+  if ch["completed"]:
+   l.text = "[✔] %s (HOÀN THÀNH!)" % ch["description"]
+   l.add_theme_color_override("font_color", Color("81c784"))
+  else:
+   if ch["id"] == "reach_combo":
+    l.text = "[ ] %s (%.1f / %.1f)" % [ch["description"], ch["current"], ch["target"]]
+   else:
+    l.text = "[ ] %s (%d / %d)" % [ch["description"], int(ch["current"]), int(ch["target"])]
+   l.add_theme_color_override("font_color", Color("fff0d4"))
+
+func _on_challenge_completed(index: int, ch: Dictionary) -> void:
+ _on_challenge_updated(index, ch)
+ _spawn_floating_text("★ NHIỆM VỤ XONG! +%d" % ch["reward"])
+
+func _on_round_ended(summary: Dictionary) -> void:
+ hud.visible = false
+ pause_panel.visible = false
+ menu.visible = false
+ results_panel.visible = true
+ 
+ var rank: String = summary.get("rank", "C")
+ results_rank.text = "XẾP HẠNG: %s" % rank
+ match rank:
+  "S": results_rank.add_theme_color_override("font_color", Color("ffd700"))
+  "A": results_rank.add_theme_color_override("font_color", Color("ff80ab"))
+  "B": results_rank.add_theme_color_override("font_color", Color("64b5f6"))
+  "C": results_rank.add_theme_color_override("font_color", Color("81c784"))
+  _: results_rank.add_theme_color_override("font_color", Color("b0bec5"))
+ 
+ var score_val: int = summary.get("score", 0)
+ var high_val: int = summary.get("high_score", score_val)
+ var is_new_high := (score_val >= high_val and score_val > 0)
+ results_score.text = "TỔNG ĐIỂM: %s%s" % [_format_number(score_val), "  ★ KỶ LỤC MỚI! ★" if is_new_high else ""]
+ 
+ var broken: int = summary.get("props_broken", 0)
+ var max_c: float = summary.get("max_combo", 1.0)
+ var chain: int = summary.get("chain_hits", 0)
+ var hammer: int = summary.get("hammer_hits", 0)
+ var ch_done: int = summary.get("challenges_completed", 0)
+ var ch_tot: int = summary.get("total_challenges", 3)
+ 
+ results_breakdown.text = "Đồ vỡ nát: %d  |  Combo cao nhất: x%.1f\nPhản ứng dây chuyền: %d  |  Đập búa: %d\nNhiệm vụ hoàn thành: %d / %d" % [
+  broken, max_c, chain, hammer, ch_done, ch_tot
+ ]
+
+func _format_number(n: int) -> String:
+ var s := str(n)
+ var res := ""
+ var cnt := 0
+ for i in range(s.length() - 1, -1, -1):
+  if cnt > 0 and cnt % 3 == 0:
+   res = "," + res
+  res = s[i] + res
+  cnt += 1
+ return res
 
 func _process(_delta: float) -> void:
  if not is_instance_valid(player): return
  dash_bar.value = 100.0 * (1.0 - clampf(player.dash_cooldown_remaining / player.config.dash_cooldown, 0.0, 1.0))
  var names := {"pillow":"gối", "hammer":"búa", "bear":"gấu", "box":"hộp", "book":"sách", "ball":"bóng", "chair":"ghế", "vase":"bình", "cup":"cốc", "bottle":"chai", "slipper":"dép", "toy":"đồ chơi", "container":"hộp", "stack_box":"thùng"}
- item_label.text = "Đang cầm: " + names.get(player.held_pillow.prop_kind, "đồ") if is_instance_valid(player.held_pillow) else "Lướt"
+ item_label.text = "Đang cầm: " + names.get(player.held_pillow.prop_kind, "đồ") if is_instance_valid(player.held_pillow) else "Lướt (Space)"
 
 func _unhandled_key_input(event: InputEvent) -> void:
- if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_ESCAPE and not menu.visible:
-  if pause_panel.visible: resume_game()
+ if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_ESCAPE and not menu.visible and not results_panel.visible:
+  if pause_panel.visible:
+   resume_game()
   else:
    pause_panel.visible = true
-   get_tree().paused = true
+   if is_instance_valid(round_manager):
+    round_manager.pause_round()
+   else:
+    get_tree().paused = true
   get_viewport().set_input_as_handled()

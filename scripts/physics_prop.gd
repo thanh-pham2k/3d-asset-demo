@@ -8,6 +8,8 @@ var broken := false
 var last_velocity := Vector3.ZERO
 var trail_timer := 0.0
 var feedback: Node
+var chain_level := 0
+var last_impulse_source: Node
 
 func _ready() -> void:
  add_to_group("interactables")
@@ -26,7 +28,6 @@ func _ready() -> void:
   "stack_box": shape.size = Vector3(0.42,0.42,0.42)
  col.shape = shape
  add_child(col)
- var brown := Color("bd8054")
  match prop_kind:
   "chair":
    Art.kenney(self, "chairCushion", Vector3(0,-0.35,0), 0.7)
@@ -55,7 +56,6 @@ func add_model(path: String, center: Vector3, factor: float) -> void:
  model.position = -center * factor
  add_child(model)
  if path.begins_with("res://assets/kenney_food/"):
-  # Godot's GLB import can omit external palette references; bind the CC0 atlas explicitly.
   var atlas: Texture2D = load("res://assets/kenney_food/Textures/colormap.png")
   for mesh in model.find_children("*", "MeshInstance3D", true, false):
    for i in mesh.mesh.get_surface_count():
@@ -100,7 +100,9 @@ func throw_from(player: Node3D) -> void:
  add_collision_exception_with(player)
  freeze = false
  sleeping = false
- linear_velocity = player.facing * (3.5 if prop_kind == "chair" else 5.0) + Vector3.UP * 2.4
+ chain_level = 1
+ last_impulse_source = player
+ linear_velocity = player.facing * (3.5 if prop_kind == "chair" else 5.2) + Vector3.UP * 2.4
  angular_velocity = Vector3(3,2,1)
  get_tree().create_timer(0.45).timeout.connect(func(): if is_instance_valid(player): remove_collision_exception_with(player))
 
@@ -116,6 +118,7 @@ func drop_from(player: Node3D) -> void:
  add_collision_exception_with(player)
  freeze = false
  sleeping = false
+ chain_level = 0
  linear_velocity = player.facing * 0.4
  angular_velocity = Vector3.ZERO
  get_tree().create_timer(0.3).timeout.connect(func(): if is_instance_valid(player): remove_collision_exception_with(player))
@@ -127,6 +130,12 @@ func _physics_process(delta: float) -> void:
   global_position = holder.hold_anchor.global_position
   global_rotation = Vector3(0,holder.visual.global_rotation.y,0)
  else:
+  # Out of bounds safety: keep within room bounds
+  if global_position.y < -1.0:
+   global_position = Vector3(clampf(global_position.x, -3.5, 3.5), 0.5, clampf(global_position.z, -2.5, 2.5))
+   linear_velocity = Vector3.ZERO
+   angular_velocity = Vector3.ZERO
+  
   last_velocity = linear_velocity
   if pickup_delay > 0.0 and linear_velocity.length() > 1.5:
    trail_timer -= delta
@@ -134,35 +143,94 @@ func _physics_process(delta: float) -> void:
     emit_feedback("throw_trail")
     trail_timer = 0.12
 
-func receive_impact(impulse: Vector3) -> void:
+func receive_impact(impulse: Vector3, source: Node = null) -> void:
  if held or broken: return
  sleeping = false
  apply_central_impulse(impulse * mass)
- if prop_kind == "vase" and impulse.length() > 2.4:
+ 
+ var prev_chain := 0
+ if is_instance_valid(source) and "chain_level" in source:
+  prev_chain = source.chain_level
+ elif is_instance_valid(source) and source.is_in_group("players"):
+  prev_chain = 1
+ 
+ if prev_chain > 0:
+  chain_level = prev_chain + 1
+ else:
+  chain_level = 1
+ 
+ last_impulse_source = source
+ 
+ var is_hammer: bool = (is_instance_valid(source) and source.is_in_group("players") and source.held_pillow and source.held_pillow.prop_kind == "hammer")
+ var score_mgr = get_tree().get_first_node_in_group("score_manager")
+ if score_mgr:
+  if chain_level >= 2:
+   score_mgr.register_chain_reaction(source, self, chain_level, global_position)
+  score_mgr.register_prop_hit(self, impulse.length(), is_hammer, global_position)
+ 
+ var camera = get_viewport().get_camera_3d()
+ if camera and camera.has_method("add_trauma"):
+  camera.add_trauma(0.2 if not is_hammer else 0.35)
+ 
+ if prop_kind in ["vase", "bottle", "cup"] and impulse.length() > 2.0:
   _break_apart()
 
 func _on_body_entered(body: Node) -> void:
  if broken or held: return
- if last_velocity.length() > 1.5: emit_feedback("landing" if body is StaticBody3D and last_velocity.y < -absf(last_velocity.x) - absf(last_velocity.z) else "collision")
- if body.is_in_group("players") and last_velocity.length() > 1.5 and body.has_method("hit"):
+ var speed := last_velocity.length()
+ if speed > 1.2:
+  emit_feedback("landing" if body is StaticBody3D and last_velocity.y < -absf(last_velocity.x) - absf(last_velocity.z) else "collision")
+  
+  var score_mgr = get_tree().get_first_node_in_group("score_manager")
+  if score_mgr:
+   score_mgr.register_prop_hit(self, speed, false, global_position)
+   if body is RigidBody3D and chain_level > 0:
+    score_mgr.register_chain_reaction(self, body, chain_level + 1, global_position)
+  
+  if body is RigidBody3D and not body.freeze:
+   var impact_force: Vector3 = last_velocity.normalized() * minf(speed * 0.8, 4.0)
+   body.apply_central_impulse(impact_force * body.mass)
+   if body.has_method("receive_impact"):
+    body.receive_impact(impact_force, self)
+ 
+ if body.is_in_group("players") and speed > 1.5 and body.has_method("hit"):
   body.hit(last_velocity)
- if prop_kind == "vase" and last_velocity.length() > 2.4:
+ 
+ if prop_kind in ["vase", "bottle", "cup"] and speed > 2.0:
   _break_apart()
 
 func _break_apart() -> void:
-  if broken: return
-  broken = true
-  remove_from_group("interactables")
-  for i in 5:
-   var fragment := RigidBody3D.new()
-   fragment.position = global_position + Vector3((i-2)*0.05,0.1,0)
-   var col := CollisionShape3D.new()
-   var shape := SphereShape3D.new()
-   shape.radius = 0.05
-   col.shape = shape
-   fragment.add_child(col)
-   Art.ball(fragment,Vector3.ZERO,0.05,Color("e9b7a8"))
-   get_parent().add_child.call_deferred(fragment)
-   fragment.linear_velocity = Vector3((i-2)*0.4,1.2,(i%2-0.5)*0.6)
-   get_tree().create_timer(4.0).timeout.connect(func(): if is_instance_valid(fragment): fragment.queue_free())
-  queue_free.call_deferred()
+ if broken: return
+ broken = true
+ remove_from_group("interactables")
+ 
+ var score_mgr = get_tree().get_first_node_in_group("score_manager")
+ if score_mgr:
+  score_mgr.register_prop_broken(self, prop_kind, global_position)
+ 
+ emit_feedback("bonk")
+ var camera = get_viewport().get_camera_3d()
+ if camera and camera.has_method("add_trauma"):
+  camera.add_trauma(0.35)
+ 
+ var frag_color := Color("e9b7a8")
+ if prop_kind == "bottle": frag_color = Color("68aa76")
+ elif prop_kind == "cup": frag_color = Color("e0e2e5")
+ 
+ var frag_count := 6 if prop_kind == "vase" else 4
+ for i in frag_count:
+  var fragment := RigidBody3D.new()
+  fragment.position = global_position + Vector3((i - frag_count * 0.5) * 0.05, 0.1, (i % 2 - 0.5) * 0.05)
+  fragment.collision_layer = 4
+  fragment.collision_mask = 3
+  var col := CollisionShape3D.new()
+  var shape := SphereShape3D.new()
+  shape.radius = 0.045
+  col.shape = shape
+  fragment.add_child(col)
+  Art.ball(fragment, Vector3.ZERO, 0.045, frag_color)
+  get_parent().add_child.call_deferred(fragment)
+  fragment.linear_velocity = Vector3((i - frag_count * 0.5) * 0.5, randf_range(1.0, 2.0), (i % 2 - 0.5) * 0.8)
+  get_tree().create_timer(2.5).timeout.connect(func(): if is_instance_valid(fragment): fragment.queue_free())
+ 
+ queue_free.call_deferred()

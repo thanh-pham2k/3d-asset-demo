@@ -10,4 +10,5 @@ extends Resource
 @export var visual_scale := Vector3.ONE
 @export var visual_offset := Vector3.ZERO
 @export var hold_offset := Vector3(0, 0.82, 0.47)
+@export var use_visual_hand_anchor := true
 @export var visual_scene: PackedScene

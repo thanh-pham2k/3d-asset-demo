@@ -14,6 +14,10 @@ var interaction_cooldown := 0.0
 var dash_remaining := 0.0
 var dash_cooldown_remaining := 0.0
 var dash_direction := Vector3.ZERO
+var footstep_timer := 0.0
+var hammer_cooldown := 0.0
+var knockback_fx_timer := 0.0
+var dizzy_fx_pending := false
 var target: Node3D
 var prompt_label: Label3D
 @export var config: PlayerConfig = PlayerConfig.new()
@@ -22,7 +26,7 @@ var animation_controller: Node
 func _ready() -> void:
  add_to_group("players")
  collision_layer = 2
- collision_mask = 3
+ collision_mask = 7
  var col = CollisionShape3D.new()
  var capsule = CapsuleShape3D.new()
  capsule.radius = 0.23
@@ -56,12 +60,38 @@ func _ready() -> void:
  prompt_label.modulate = Color("fff7e8")
  add_child(prompt_label)
 
+func select_character(variant: String) -> void:
+ # Replacing a visual never replaces the physics body or gameplay components.
+ if variant not in ["boy", "girl"]: return
+ var kenney := OS.get_environment("COUPLE_VISUAL") == "kenney"
+ var prefix := "kenney_" if kenney else ""
+ var scene: PackedScene = load("res://scenes/characters/%s%s_visual.tscn" % [prefix, variant])
+ var old_model = animation_controller.model
+ visual.remove_child(old_model)
+ old_model.queue_free()
+ var replacement = scene.instantiate()
+ visual.add_child(replacement)
+ visual.move_child(replacement, 0)
+ animation_controller.model = replacement
+ animation_controller.first_update = true
+ config.visual_scene = scene
+
 func _physics_process(delta: float) -> void:
  time += delta
  interaction_cooldown = max(0.0, interaction_cooldown - delta)
  reaction = max(0.0, reaction - delta)
+ if reaction > 0.0:
+  knockback_fx_timer -= delta
+  var reaction_fx = get_tree().get_first_node_in_group("chaos_feedback")
+  if reaction_fx and knockback_fx_timer <= 0.0:
+   reaction_fx.play_event("knockback_trail", global_position + Vector3.UP * 0.4)
+   knockback_fx_timer = 0.12
+  if reaction_fx and dizzy_fx_pending and reaction < 0.2:
+   reaction_fx.play_event("dizzy", global_position + Vector3.UP * 1.5)
+   dizzy_fx_pending = false
  throw_anim = max(0.0, throw_anim - delta)
  dash_cooldown_remaining = maxf(0.0, dash_cooldown_remaining - delta)
+ hammer_cooldown = maxf(0.0, hammer_cooldown - delta)
  var prefix = "p%d_" % player_id
  if resting:
   velocity = Vector3.ZERO
@@ -100,12 +130,40 @@ func _physics_process(delta: float) -> void:
  if direction.length() > 0.08:
   facing = direction.normalized()
   visual.rotation.y = lerp_angle(visual.rotation.y, atan2(facing.x,facing.z), 1.0-exp(-12.0*delta))
+ var pre_slide_velocity := velocity
  move_and_slide()
+ for i in get_slide_collision_count():
+  var contact := get_slide_collision(i)
+  var obstacle = contact.get_collider()
+  if obstacle is RigidBody3D and not obstacle.freeze:
+   var push := -contact.get_normal()
+   push.y = 0.0
+   obstacle.apply_central_impulse(push.normalized() * minf(pre_slide_velocity.length(), 3.0) * 1.0)
+ footstep_timer -= delta
+ if direction.length() > 0.1 and is_on_floor() and footstep_timer <= 0.0:
+  var fx = get_tree().get_first_node_in_group("chaos_feedback")
+  if fx:
+   fx.play_event("footstep", global_position)
+   if running: fx.play_event("running_dust", global_position)
+  footstep_timer = 0.26 if running else 0.4
  find_target()
  if Input.is_action_just_pressed(prefix + "interact") and interaction_cooldown <= 0:
-  if not held_pillow and target:
+  if held_pillow:
+   held_pillow.drop_from(self)
+   interaction_cooldown = 0.25
+  elif target:
    target.interact(self)
    interaction_cooldown = 0.25
+ if Input.is_action_just_pressed(prefix + "swing") and held_pillow and held_pillow.prop_kind == "hammer" and hammer_cooldown <= 0.0:
+  hammer_cooldown = 0.6
+  animation_controller.trigger_action("hammer", time)
+  var fx = get_tree().get_first_node_in_group("chaos_feedback")
+  if fx: fx.play_event("throw", global_position + facing * 0.8 + Vector3.UP * 0.5)
+  for item in get_tree().get_nodes_in_group("interactables"):
+   var delta_pos: Vector3 = item.global_position - global_position
+   if item != held_pillow and delta_pos.length() < 1.25 and delta_pos.dot(facing) > 0.0 and item.has_method("receive_impact"):
+    item.receive_impact(facing * 4.0)
+    if fx: fx.play_event("bonk", item.global_position)
  if Input.is_action_just_pressed(prefix + "throw") and held_pillow:
   held_pillow.throw_from(self)
   throw_anim = 0.35
@@ -121,12 +179,19 @@ func find_target() -> void:
    nearest = distance
    target = item
  var key = "E" if player_id == 1 else "Enter"
- if held_pillow: prompt_label.text = ("F" if player_id == 1 else "Right Ctrl") + "  Ném gối"
+ if held_pillow: prompt_label.text = ("F" if player_id == 1 else "Right Ctrl") + (" ném · Q đập · E thả" if held_pillow.prop_kind == "hammer" else " ném · E thả")
  elif target: prompt_label.text = key + "  " + target.prompt(self)
  else: prompt_label.text = "P%d" % player_id
 
 func update_animation(move: float, running: bool) -> void:
  animation_controller.apply_state(move, running, held_pillow != null, throw_anim > 0, resting != null, resting != null and resting.kind == "bed", reaction > 0, time)
+ # Optional visual adapter: unrelated models retain the configured gameplay anchor.
+ var model = animation_controller.model
+ if config.use_visual_hand_anchor and model.has_method("get_hand_anchor"):
+  var hand = model.get_hand_anchor()
+  if is_instance_valid(hand): hold_anchor.global_position = hand.global_position + facing * 0.10
+ else:
+  hold_anchor.position = config.hold_offset
 
 func enter_rest(item: Interactable, point: Vector3, lying: bool) -> void:
  resting = item
@@ -142,7 +207,7 @@ func leave_rest(point: Vector3) -> bool:
  shape.height = 1.15
  var query = PhysicsShapeQueryParameters3D.new()
  query.shape = shape
- query.collision_mask = 3
+ query.collision_mask = 7
  query.exclude = [get_rid()]
  for offset in [Vector3.ZERO, Vector3(0.5,0,0), Vector3(-0.5,0,0), Vector3(0,0,0.5), Vector3(0,0,-0.5)]:
   var candidate: Vector3 = point + offset
@@ -151,15 +216,21 @@ func leave_rest(point: Vector3) -> bool:
    global_position = candidate
    visual.rotation.x = 0
    collision_layer = 2
-   collision_mask = 3
+   collision_mask = 7
    resting = null
    return true
  return false
 
 func hit(direction: Vector3) -> void:
  if resting: return
+ var fx = get_tree().get_first_node_in_group("chaos_feedback")
+ if fx:
+  fx.play_event("hit", global_position + Vector3.UP)
+  fx.play_event("hit_stars", global_position + Vector3.UP * 1.4)
  impulse = direction.normalized() * 4.2
  reaction = 0.5
+ dizzy_fx_pending = true
+ knockback_fx_timer = 0.0
  var puff = GPUParticles3D.new()
  var process = ParticleProcessMaterial.new()
  process.direction = Vector3(0,1,0)

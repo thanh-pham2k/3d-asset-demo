@@ -42,3 +42,14 @@ static func solid(parent: Node3D, pos: Vector3, size: Vector3) -> StaticBody3D:
  body.add_child(collision)
  parent.add_child(body)
  return body
+
+# Kenney OBJ files have an off-center origin; normalize the pivot at the base.
+static func kenney(parent: Node3D, asset_name: String, pos: Vector3, target_height: float) -> MeshInstance3D:
+ var instance := MeshInstance3D.new()
+ instance.mesh = load("res://assets/furniture/%s.obj" % asset_name)
+ var bounds := instance.mesh.get_aabb()
+ var factor := target_height / bounds.size.y
+ instance.scale = Vector3.ONE * factor
+ instance.position = pos - Vector3(bounds.position.x + bounds.size.x * 0.5, bounds.position.y, bounds.position.z + bounds.size.z * 0.5) * factor
+ parent.add_child(instance)
+ return instance

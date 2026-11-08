@@ -1,6 +1,6 @@
 extends RigidBody3D
 
-@export_enum("chair", "vase", "cup", "bottle", "slipper", "toy", "container", "stack_box") var prop_kind := "cup"
+@export_enum("chair", "vase", "cup", "bottle", "slipper", "toy", "container", "stack_box", "pillow") var prop_kind := "cup"
 var held := false
 var holder: Node3D
 var pickup_delay := 0.0
@@ -26,6 +26,7 @@ func _ready() -> void:
   "bottle": shape.size = Vector3(0.18,0.42,0.18)
   "slipper": shape.size = Vector3(0.18,0.10,0.34)
   "stack_box": shape.size = Vector3(0.42,0.42,0.42)
+  "pillow": shape.size = Vector3(0.46,0.18,0.36)
  col.shape = shape
  add_child(col)
  match prop_kind:
@@ -49,6 +50,16 @@ func _ready() -> void:
    Art.box(self,Vector3(0,0.13,0),Vector3(0.32,0.05,0.32),Color("dce0b6"))
   "stack_box":
    add_model("res://assets/kenney_props/cardboardBoxClosed.glb", Vector3(0.10625,0.1405,-0.10625), 1.48)
+  "pillow":
+   var pivot := Node3D.new()
+   pivot.rotation.x = -PI / 2.0
+   add_child(pivot)
+   var model = load("res://assets/kenney_props/pillowBlue.glb").instantiate()
+   model.scale = Vector3.ONE * 2.0
+   model.position = -Vector3(0.115,0.064256,-0.031695) * 2.0
+   pivot.add_child(model)
+   for mesh in model.find_children("*", "MeshInstance3D", true, false):
+    mesh.material_override = Art.material(Color("efabb7"))
 
 func add_model(path: String, center: Vector3, factor: float) -> void:
  var model = load(path).instantiate()
@@ -68,7 +79,7 @@ func available(player: Node3D) -> bool:
  return not held and not broken and pickup_delay <= 0 and player.held_pillow == null
 
 func prompt(_player: Node3D) -> String:
- return "Nhặt " + {"chair":"ghế", "vase":"bình hoa", "cup":"cốc", "bottle":"chai", "slipper":"dép", "toy":"đồ chơi", "container":"hộp", "stack_box":"thùng"}.get(prop_kind,"đồ")
+ return "Nhặt " + {"chair":"ghế", "vase":"bình hoa", "cup":"cốc", "bottle":"chai", "slipper":"dép", "toy":"đồ chơi", "container":"hộp", "stack_box":"thùng", "pillow":"gối"}.get(prop_kind,"đồ")
 
 func interact(player: Node3D) -> void:
  if not available(player): return

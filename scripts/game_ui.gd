@@ -13,6 +13,7 @@ var score_label: Label
 var combo_badge: Label
 var combo_bar: ProgressBar
 var challenge_container: VBoxContainer
+var challenge_header: Label
 var challenge_labels: Array[Label] = []
 var popup_container: Control
 
@@ -24,6 +25,16 @@ var results_breakdown: Label
 var round_manager: Node
 var score_manager: Node
 var challenge_manager: Node
+var mission_manager: Node
+
+var game_mode: String = "cleaning"
+
+var cleaning_labels := {
+ "basket": null,
+ "trash": null,
+ "sofa": null,
+ "banana": null,
+}
 
 func _ready() -> void:
  process_mode = Node.PROCESS_MODE_ALWAYS
@@ -47,6 +58,14 @@ func setup(p_round: Node, p_score: Node, p_challenge: Node) -> void:
   challenge_manager.challenge_updated.connect(_on_challenge_updated)
   challenge_manager.challenge_completed.connect(_on_challenge_completed)
 
+func setup_cleaning(p_mission: Node) -> void:
+ mission_manager = p_mission
+ if is_instance_valid(mission_manager):
+  mission_manager.time_tick.connect(_on_cleaning_time_tick)
+  mission_manager.objective_updated.connect(_on_cleaning_objective_updated)
+  mission_manager.mission_won.connect(_on_mission_won)
+  mission_manager.mission_lost.connect(_on_mission_lost)
+
 func panel(title: String) -> VBoxContainer:
  var overlay := Control.new()
  overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -66,7 +85,7 @@ func panel(title: String) -> VBoxContainer:
  var heading := Label.new()
  heading.text = title
  heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
- heading.add_theme_font_size_override("font_size", 36)
+ heading.add_theme_font_size_override("font_size", 34)
  heading.add_theme_color_override("font_color", Color("fff3cf"))
  column.add_child(heading)
  return column
@@ -85,14 +104,14 @@ func build_ui() -> void:
  hud.mouse_filter = Control.MOUSE_FILTER_IGNORE
  add_child(hud)
  
- # Top-Left: Score
+ # Top-Left: Score / Mode
  var score_box := VBoxContainer.new()
  score_box.position = Vector2(24, 18)
  hud.add_child(score_box)
  
  score_label = Label.new()
- score_label.text = "ĐIỂM: 0"
- score_label.add_theme_font_size_override("font_size", 28)
+ score_label.text = "NHIỆM VỤ DỌN NHÀ"
+ score_label.add_theme_font_size_override("font_size", 24)
  score_label.add_theme_color_override("font_color", Color("ffd659"))
  score_box.add_child(score_label)
  
@@ -105,7 +124,7 @@ func build_ui() -> void:
  hud.add_child(center_hud)
  
  timer_label = Label.new()
- timer_label.text = "⏱ 60s"
+ timer_label.text = "⏱ 120s"
  timer_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
  timer_label.add_theme_font_size_override("font_size", 34)
  timer_label.add_theme_color_override("font_color", Color("fff8e7"))
@@ -125,29 +144,56 @@ func build_ui() -> void:
  combo_bar.visible = false
  center_hud.add_child(combo_bar)
  
- # Top-Right: Challenges
+ # Top-Right: Challenges / Mission Checklist
  var chal_panel := PanelContainer.new()
  chal_panel.set_anchors_preset(Control.PRESET_TOP_RIGHT)
- chal_panel.position = Vector2(680, 16)
- chal_panel.custom_minimum_size = Vector2(280, 100)
+ chal_panel.position = Vector2(660, 16)
+ chal_panel.custom_minimum_size = Vector2(300, 120)
  hud.add_child(chal_panel)
  
  challenge_container = VBoxContainer.new()
  challenge_container.add_theme_constant_override("separation", 6)
  chal_panel.add_child(challenge_container)
  
- var chal_header := Label.new()
- chal_header.text = "★ NHIỆM VỤ ROUND"
- chal_header.add_theme_font_size_override("font_size", 16)
- chal_header.add_theme_color_override("font_color", Color("e0c279"))
- challenge_container.add_child(chal_header)
+ challenge_header = Label.new()
+ challenge_header.text = "★ MỤC TIÊU DỌN DẸP"
+ challenge_header.add_theme_font_size_override("font_size", 16)
+ challenge_header.add_theme_color_override("font_color", Color("e0c279"))
+ challenge_container.add_child(challenge_header)
  
+ # Labels for Cleaning mode
+ cleaning_labels["basket"] = Label.new()
+ cleaning_labels["basket"].text = "[ ] Giỏ đồ chơi: 0 / 5"
+ cleaning_labels["basket"].add_theme_font_size_override("font_size", 13)
+ cleaning_labels["basket"].add_theme_color_override("font_color", Color("fff0d4"))
+ challenge_container.add_child(cleaning_labels["basket"])
+ 
+ cleaning_labels["trash"] = Label.new()
+ cleaning_labels["trash"].text = "[ ] Bỏ rác vào thùng: 0 / 4"
+ cleaning_labels["trash"].add_theme_font_size_override("font_size", 13)
+ cleaning_labels["trash"].add_theme_color_override("font_color", Color("fff0d4"))
+ challenge_container.add_child(cleaning_labels["trash"])
+ 
+ cleaning_labels["sofa"] = Label.new()
+ cleaning_labels["sofa"].text = "[ ] Xếp 3 gối lên sofa: 0 / 3"
+ cleaning_labels["sofa"].add_theme_font_size_override("font_size", 13)
+ cleaning_labels["sofa"].add_theme_color_override("font_color", Color("fff0d4"))
+ challenge_container.add_child(cleaning_labels["sofa"])
+ 
+ cleaning_labels["banana"] = Label.new()
+ cleaning_labels["banana"].text = "[ ] Thu gom vỏ chuối: 0 / 2"
+ cleaning_labels["banana"].add_theme_font_size_override("font_size", 13)
+ cleaning_labels["banana"].add_theme_color_override("font_color", Color("fff0d4"))
+ challenge_container.add_child(cleaning_labels["banana"])
+ 
+ # 3 Labels for Chaos mode
  challenge_labels.clear()
  for i in 3:
   var l := Label.new()
   l.text = "[ ] Đang tải..."
   l.add_theme_font_size_override("font_size", 13)
   l.add_theme_color_override("font_color", Color("fff0d4"))
+  l.visible = false
   challenge_container.add_child(l)
   challenge_labels.append(l)
  
@@ -171,19 +217,19 @@ func build_ui() -> void:
  hud.add_child(dash_bar)
  
  var hints := Label.new()
- hints.text = "WASD di chuyển | Shift chạy | Space lướt | E nhặt/thả | F ném | Q đập búa | Esc tạm dừng"
+ hints.text = "WASD di chuyển | Shift chạy | Space lướt | E nhặt/thả | F ném | Q đập | Esc tạm dừng"
  hints.position = Vector2(24, 565)
  hints.add_theme_font_size_override("font_size", 13)
  hints.add_theme_color_override("font_color", Color("cfc0af"))
  hud.add_child(hints)
  
  # Main Menu Panel
- var menu_column := panel("Couple Chaos: Rampage!")
+ var menu_column := panel("Couple Chaos: Dọn Nhà Hỗn Loạn")
  menu = menu_column.get_parent().get_parent()
  var sub := Label.new()
- sub.text = "Quậy phá căn phòng trong 60 giây!\nĐập phá, tạo combo và hoàn thành thử thách!"
+ sub.text = "Căn phòng đang bừa bộn! Dọn dẹp trước khi khách đến trong 120s!\nCẩn thận trượt vỏ chuối hoặc làm vỡ đồ!"
  sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
- sub.add_theme_font_size_override("font_size", 15)
+ sub.add_theme_font_size_override("font_size", 14)
  sub.add_theme_color_override("font_color", Color("eed8c0"))
  menu_column.add_child(sub)
  
@@ -209,7 +255,8 @@ func build_ui() -> void:
  girl.pressed.connect(func(): if is_instance_valid(player): player.select_character("girl"))
  choices.add_child(girl)
  
- button(menu_column, "BẮT ĐẦU ROUND", start_game)
+ button(menu_column, "★ CHƠI: DỌN NHÀ (120s)", start_cleaning_mode)
+ button(menu_column, "⚡ QUẬY PHÁ: CHAOS (60s)", start_chaos_mode)
  
  # Pause Panel
  var pause_column := panel("Tạm dừng")
@@ -219,21 +266,21 @@ func build_ui() -> void:
  button(pause_column, "Về Menu chính", show_main_menu)
  
  # Results Panel
- var results_col := panel("HẾT GIỜ!")
+ var results_col := panel("KẾT QUẢ")
  results_panel = results_col.get_parent().get_parent()
  
  results_title = results_col.get_child(0) as Label
- results_title.text = "HẾT GIỜ (TIME'S UP!)"
+ results_title.text = "KẾT QUẢ"
  
  results_rank = Label.new()
  results_rank.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
- results_rank.add_theme_font_size_override("font_size", 48)
+ results_rank.add_theme_font_size_override("font_size", 42)
  results_rank.add_theme_color_override("font_color", Color("ffd740"))
  results_col.add_child(results_rank)
  
  results_score = Label.new()
  results_score.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
- results_score.add_theme_font_size_override("font_size", 24)
+ results_score.add_theme_font_size_override("font_size", 22)
  results_score.add_theme_color_override("font_color", Color("ffffff"))
  results_col.add_child(results_score)
  
@@ -243,8 +290,7 @@ func build_ui() -> void:
  results_breakdown.add_theme_color_override("font_color", Color("dcd0c2"))
  results_col.add_child(results_breakdown)
  
- button(results_col, "Chơi lại vòng này", restart_round)
- button(results_col, "Vòng tiếp theo >>", next_round)
+ button(results_col, "Chơi lại ngay", restart_round)
  button(results_col, "Về Menu chính", show_main_menu)
 
 func show_main_menu() -> void:
@@ -254,12 +300,50 @@ func show_main_menu() -> void:
  hud.visible = false
  get_tree().paused = true
 
-func start_game() -> void:
+func start_game(mode: String = "chaos") -> void:
+ if mode == "cleaning":
+  start_cleaning_mode()
+ else:
+  start_chaos_mode()
+
+func start_cleaning_mode() -> void:
+ game_mode = "cleaning"
  menu.visible = false
  pause_panel.visible = false
  results_panel.visible = false
  hud.visible = true
  get_tree().paused = false
+ 
+ score_label.text = "DỌN NHÀ TRƯỚC KHI KHÁCH ĐẾN"
+ challenge_header.text = "★ MỤC TIÊU DỌN DẸP"
+ 
+ for k in cleaning_labels:
+  cleaning_labels[k].visible = true
+ for l in challenge_labels:
+  l.visible = false
+ 
+ combo_badge.visible = false
+ combo_bar.visible = false
+ 
+ if is_instance_valid(mission_manager):
+  mission_manager.start_mission()
+
+func start_chaos_mode() -> void:
+ game_mode = "chaos"
+ menu.visible = false
+ pause_panel.visible = false
+ results_panel.visible = false
+ hud.visible = true
+ get_tree().paused = false
+ 
+ score_label.text = "ĐIỂM: 0"
+ challenge_header.text = "★ NHIỆM VỤ ROUND"
+ 
+ for k in cleaning_labels:
+  cleaning_labels[k].visible = false
+ for l in challenge_labels:
+  l.visible = true
+ 
  if is_instance_valid(round_manager):
   round_manager.start_round()
 
@@ -268,20 +352,78 @@ func resume_game() -> void:
  pause_panel.visible = false
  results_panel.visible = false
  hud.visible = true
- if is_instance_valid(round_manager):
-  round_manager.resume_round()
- else:
-  get_tree().paused = false
+ get_tree().paused = false
 
 func restart_round() -> void:
  get_tree().paused = false
  get_tree().reload_current_scene()
 
-func next_round() -> void:
- get_tree().paused = false
- get_tree().reload_current_scene()
+func _on_cleaning_time_tick(time_remaining: float, _total: float) -> void:
+ if game_mode != "cleaning": return
+ var secs := int(ceilf(time_remaining))
+ timer_label.text = "⏱ %ds" % secs
+ if secs <= 15:
+  timer_label.add_theme_color_override("font_color", Color("ff4c4c"))
+  var pulse := 1.0 + 0.12 * sin(time_remaining * 8.0)
+  timer_label.scale = Vector2.ONE * pulse
+ else:
+  timer_label.add_theme_color_override("font_color", Color("fff8e7"))
+  timer_label.scale = Vector2.ONE
+
+func _on_cleaning_objective_updated(id: String, current: int, target: int, completed: bool) -> void:
+ if not cleaning_labels.has(id): return
+ var l: Label = cleaning_labels[id]
+ var names := {
+  "basket": "Giỏ đồ chơi",
+  "trash": "Bỏ rác vào thùng",
+  "sofa": "Xếp 3 gối lên sofa",
+  "banana": "Thu gom vỏ chuối",
+ }
+ var title: String = names.get(id, id)
+ if completed:
+  l.text = "[✔] %s: %d / %d (XONG!)" % [title, current, target]
+  l.add_theme_color_override("font_color", Color("81c784"))
+ else:
+  l.text = "[ ] %s: %d / %d" % [title, current, target]
+  l.add_theme_color_override("font_color", Color("fff0d4"))
+
+func _on_mission_won(summary: Dictionary) -> void:
+ hud.visible = false
+ pause_panel.visible = false
+ menu.visible = false
+ results_panel.visible = true
+ 
+ results_title.text = "CHIẾN THẮNG!"
+ results_rank.text = "★ NHÀ CỬA SẠCH BÓNG! ★"
+ results_rank.add_theme_color_override("font_color", Color("ffd700"))
+ 
+ var time_left: float = summary.get("time_left", 0.0)
+ results_score.text = "Khách đến đúng lúc và căn phòng thật ngăn nắp!\nThời gian còn lại: %d giây" % int(time_left)
+ 
+ var p: Dictionary = summary.get("progress", {})
+ results_breakdown.text = "Giỏ đồ: %d/5  |  Thùng rác: %d/4\nGối sofa: %d/3  |  Vỏ chuối: %d/2" % [
+  p.get("basket", 5), p.get("trash", 4), p.get("sofa", 3), p.get("banana", 2)
+ ]
+
+func _on_mission_lost(summary: Dictionary) -> void:
+ hud.visible = false
+ pause_panel.visible = false
+ menu.visible = false
+ results_panel.visible = true
+ 
+ results_title.text = "THẤT BẠI!"
+ results_rank.text = "HẾT GIỜ!"
+ results_rank.add_theme_color_override("font_color", Color("ef5350"))
+ 
+ results_score.text = "Khách đã đến trước khi bạn kịp dọn xong!\nCăn phòng vẫn còn bừa bộn!"
+ 
+ var p: Dictionary = summary.get("progress", {})
+ results_breakdown.text = "Tiến độ đạt được:\nGiỏ đồ: %d/5  |  Thùng rác: %d/4\nGối sofa: %d/3  |  Vỏ chuối: %d/2" % [
+  p.get("basket", 0), p.get("trash", 0), p.get("sofa", 0), p.get("banana", 0)
+ ]
 
 func _on_time_tick(time_remaining: float, _total: float) -> void:
+ if game_mode != "chaos": return
  var secs := int(ceilf(time_remaining))
  timer_label.text = "⏱ %ds" % secs
  if secs <= 10:
@@ -293,7 +435,8 @@ func _on_time_tick(time_remaining: float, _total: float) -> void:
   timer_label.scale = Vector2.ONE
 
 func _on_score_added(points: int, total_score: int, reason: String, _world_pos: Vector3) -> void:
- score_label.text = "ĐIỂM: %s" % _format_number(total_score)
+ if game_mode == "chaos":
+  score_label.text = "ĐIỂM: %s" % _format_number(total_score)
  _spawn_floating_text("+%d  %s" % [points, reason])
 
 func _spawn_floating_text(text: String) -> void:
@@ -311,6 +454,7 @@ func _spawn_floating_text(text: String) -> void:
  tween.tween_callback(pop.queue_free)
 
 func _on_combo_changed(multiplier: float, time_left: float, max_time: float) -> void:
+ if game_mode != "chaos": return
  if multiplier > 1.0:
   combo_badge.visible = true
   combo_bar.visible = true
@@ -321,6 +465,7 @@ func _on_combo_changed(multiplier: float, time_left: float, max_time: float) -> 
   combo_bar.visible = false
 
 func _on_challenge_updated(index: int, ch: Dictionary) -> void:
+ if game_mode != "chaos": return
  if index >= 0 and index < challenge_labels.size():
   var l := challenge_labels[index]
   if ch["completed"]:
@@ -334,16 +479,19 @@ func _on_challenge_updated(index: int, ch: Dictionary) -> void:
    l.add_theme_color_override("font_color", Color("fff0d4"))
 
 func _on_challenge_completed(index: int, ch: Dictionary) -> void:
+ if game_mode != "chaos": return
  _on_challenge_updated(index, ch)
  _spawn_floating_text("★ NHIỆM VỤ XONG! +%d" % ch["reward"])
 
 func _on_round_ended(summary: Dictionary) -> void:
+ if game_mode != "chaos": return
  hud.visible = false
  pause_panel.visible = false
  menu.visible = false
  results_panel.visible = true
  
  var rank: String = summary.get("rank", "C")
+ results_title.text = "HẾT GIỜ (TIME'S UP!)"
  results_rank.text = "XẾP HẠNG: %s" % rank
  match rank:
   "S": results_rank.add_theme_color_override("font_color", Color("ffd700"))
@@ -382,7 +530,7 @@ func _format_number(n: int) -> String:
 func _process(_delta: float) -> void:
  if not is_instance_valid(player): return
  dash_bar.value = 100.0 * (1.0 - clampf(player.dash_cooldown_remaining / player.config.dash_cooldown, 0.0, 1.0))
- var names := {"pillow":"gối", "hammer":"búa", "bear":"gấu", "box":"hộp", "book":"sách", "ball":"bóng", "chair":"ghế", "vase":"bình", "cup":"cốc", "bottle":"chai", "slipper":"dép", "toy":"đồ chơi", "container":"hộp", "stack_box":"thùng"}
+ var names := {"pillow":"gối", "hammer":"búa", "bear":"gấu", "box":"hộp", "book":"sách", "ball":"bóng", "chair":"ghế", "vase":"bình", "cup":"cốc", "bottle":"chai", "slipper":"dép", "toy":"đồ chơi", "container":"hộp", "stack_box":"thùng", "banana":"vỏ chuối"}
  item_label.text = "Đang cầm: " + names.get(player.held_pillow.prop_kind, "đồ") if is_instance_valid(player.held_pillow) else "Lướt (Space)"
 
 func _unhandled_key_input(event: InputEvent) -> void:
@@ -391,8 +539,5 @@ func _unhandled_key_input(event: InputEvent) -> void:
    resume_game()
   else:
    pause_panel.visible = true
-   if is_instance_valid(round_manager):
-    round_manager.pause_round()
-   else:
-    get_tree().paused = true
+   get_tree().paused = true
   get_viewport().set_input_as_handled()

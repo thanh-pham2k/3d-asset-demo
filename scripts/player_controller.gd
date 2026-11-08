@@ -14,6 +14,9 @@ var interaction_cooldown := 0.0
 var dash_remaining := 0.0
 var dash_cooldown_remaining := 0.0
 var dash_direction := Vector3.ZERO
+var slip_timer := 0.0
+var slip_cooldown := 0.0
+var slip_direction := Vector3.ZERO
 var footstep_timer := 0.0
 var hammer_cooldown := 0.0
 var knockback_fx_timer := 0.0
@@ -92,6 +95,8 @@ func _physics_process(delta: float) -> void:
  throw_anim = max(0.0, throw_anim - delta)
  dash_cooldown_remaining = maxf(0.0, dash_cooldown_remaining - delta)
  hammer_cooldown = maxf(0.0, hammer_cooldown - delta)
+ slip_timer = maxf(0.0, slip_timer - delta)
+ slip_cooldown = maxf(0.0, slip_cooldown - delta)
  var prefix = "p%d_" % player_id
  if resting:
   velocity = Vector3.ZERO
@@ -123,7 +128,11 @@ func _physics_process(delta: float) -> void:
   direction = dash_direction
   speed = config.dash_speed
  var desired := direction * speed
- if dash_remaining > 0.0:
+ if slip_timer > 0.0:
+  desired = slip_direction * (7.5 * (slip_timer / 0.65))
+  velocity.x = desired.x
+  velocity.z = desired.z
+ elif dash_remaining > 0.0:
   velocity.x = desired.x
   velocity.z = desired.z
  else:
@@ -132,9 +141,10 @@ func _physics_process(delta: float) -> void:
  impulse = impulse.move_toward(Vector3.ZERO, 9.0 * delta)
  if not is_on_floor(): velocity.y -= 18.0 * delta
  else: velocity.y = -0.1
- if direction.length() > 0.08:
+ if direction.length() > 0.08 and slip_timer <= 0.0:
   facing = direction.normalized()
   visual.rotation.y = lerp_angle(visual.rotation.y, atan2(facing.x,facing.z), 1.0-exp(-12.0*delta))
+ visual.rotation.x = lerp_angle(visual.rotation.x, 0.0, 1.0 - exp(-8.0 * delta))
  visual.scale = visual.scale.lerp(Vector3.ONE, 1.0 - exp(-14.0 * delta))
  var pre_slide_velocity := velocity
  move_and_slide()
@@ -144,7 +154,14 @@ func _physics_process(delta: float) -> void:
   if obstacle is RigidBody3D and not obstacle.freeze:
    var push := -contact.get_normal()
    push.y = 0.0
-   if dash_remaining > 0.0:
+   if slip_timer > 0.0:
+    var kick_force: Vector3 = push.normalized() * 5.0 * obstacle.mass
+    obstacle.apply_central_impulse(kick_force)
+    if obstacle.has_method("receive_impact"):
+     obstacle.receive_impact(push.normalized() * 4.0, self)
+    var cam = get_viewport().get_camera_3d()
+    if cam and cam.has_method("add_trauma"): cam.add_trauma(0.2)
+   elif dash_remaining > 0.0:
     var kick_force: Vector3 = push.normalized() * 5.5 * obstacle.mass
     obstacle.apply_central_impulse(kick_force)
     if obstacle.has_method("receive_impact"):
@@ -252,6 +269,32 @@ func leave_rest(point: Vector3) -> bool:
    resting = null
    return true
  return false
+
+func slip(direction: Vector3) -> bool:
+ if resting != null: return false
+ if slip_cooldown > 0.0 or slip_timer > 0.0: return false
+ slip_direction = direction.normalized() if direction.length() > 0.1 else facing
+ slip_timer = 0.65
+ slip_cooldown = 1.2
+ reaction = 0.65
+ dizzy_fx_pending = true
+ visual.rotation.x = -0.55
+ visual.scale = Vector3(1.15, 0.8, 1.15)
+ var cam = get_viewport().get_camera_3d()
+ if cam and cam.has_method("add_trauma"): cam.add_trauma(0.35)
+ var fx = get_tree().get_first_node_in_group("chaos_feedback")
+ if fx:
+  fx.play_event("bonk", global_position)
+  fx.play_event("hit_stars", global_position + Vector3.UP * 1.3)
+  fx.play_event("running_dust", global_position)
+ if held_pillow:
+  var item = held_pillow
+  item.drop_from(self)
+  if item is RigidBody3D:
+   item.apply_central_impulse(slip_direction * 2.5 + Vector3.UP * 3.5)
+  elif item is CharacterBody3D and "velocity" in item:
+   item.velocity = slip_direction * 3.0 + Vector3.UP * 3.5
+ return true
 
 func hit(direction: Vector3) -> void:
  if resting: return

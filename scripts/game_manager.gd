@@ -3,6 +3,7 @@ extends Node3D
 var score_manager: Node
 var challenge_manager: Node
 var round_manager: Node
+var mission_manager: Node
 
 func _ready() -> void:
  setup_input()
@@ -13,6 +14,9 @@ func _ready() -> void:
  const ScoreManagerScript = preload("res://scripts/score_manager.gd")
  const ChallengeManagerScript = preload("res://scripts/challenge_manager.gd")
  const RoundManagerScript = preload("res://scripts/round_manager.gd")
+ const MissionManagerScript = preload("res://scripts/cleaning/mission_manager.gd")
+ const PlacementZoneScript = preload("res://scripts/cleaning/placement_zone.gd")
+ const HazardBananaScript = preload("res://scripts/cleaning/hazard_banana.gd")
  const GameUIScript = preload("res://scripts/game_ui.gd")
  
  score_manager = ScoreManagerScript.new()
@@ -28,6 +32,10 @@ func _ready() -> void:
  round_manager.round_duration = 60.0
  add_child(round_manager)
  round_manager.call("setup", score_manager, challenge_manager)
+ 
+ mission_manager = MissionManagerScript.new()
+ mission_manager.name = "MissionManager"
+ add_child(mission_manager)
  
  var env = WorldEnvironment.new()
  var environment = Environment.new()
@@ -74,12 +82,56 @@ func _ready() -> void:
   ["container", Vector3(1.4,0.25,2.8)],
   ["stack_box", Vector3(2.1,0.23,2.8)],
   ["stack_box", Vector3(2.1,0.68,2.8)],
+  # Additional props for cleaning mission (sofa pillows & trash items)
+  ["pillow", Vector3(-5.5,0.55,2.4)], # Pillow 2 on bed
+  ["pillow", Vector3(-2.35,0.45,-1.75)], # Pillow 3 on coffee table
+  ["bottle", Vector3(-5.2,0.85,-3.85)], # Trash bottle on desk
+  ["cup", Vector3(3.9,0.3,2.8)], # Trash cup on kitchen counter
  ]
  for data in physics_props_data:
   var prop = preload("res://scripts/physics_prop.gd").new()
   prop.prop_kind = data[0]
   prop.position = data[1]
   add_child(prop)
+ 
+ # Banana peel hazards
+ for b_pos in [Vector3(-0.6, 0.05, 0.6), Vector3(-1.8, 0.05, 1.3)]:
+  var banana = HazardBananaScript.new()
+  banana.position = b_pos
+  add_child(banana)
+ 
+ # Placement Zones: Basket, Trash Bin, and 3 Sofa Pillow Slots
+ var basket_zone = PlacementZoneScript.new()
+ basket_zone.name = "BasketZone"
+ basket_zone.zone_type = "basket"
+ basket_zone.accepted_prop_kinds = ["toy", "bear", "book", "ball", "slipper", "container", "box"]
+ basket_zone.capacity = 7
+ basket_zone.position = Vector3(-0.7, 0.0, -1.2)
+ add_child(basket_zone)
+ 
+ var trash_zone = PlacementZoneScript.new()
+ trash_zone.name = "TrashZone"
+ trash_zone.zone_type = "trash"
+ trash_zone.accepted_prop_kinds = ["bottle", "cup", "banana"]
+ trash_zone.capacity = 8
+ trash_zone.position = Vector3(1.8, 0.0, 2.6)
+ add_child(trash_zone)
+ 
+ var sofa_slots := []
+ var sofa_slot_x := [-2.95, -2.35, -1.75]
+ for i in 3:
+  var slot = PlacementZoneScript.new()
+  slot.name = "SofaSlot%d" % (i + 1)
+  slot.zone_type = "sofa_slot"
+  slot.accepted_prop_kinds = ["pillow"]
+  slot.capacity = 1
+  slot.snap_items = true
+  slot.snap_rotation = Vector3(0.12, 0, 0)
+  slot.position = Vector3(sofa_slot_x[i], 0.45, -0.42)
+  add_child(slot)
+  sofa_slots.append(slot)
+ 
+ mission_manager.call("setup_zones", basket_zone, trash_zone, sofa_slots)
  
  var camera = Camera3D.new()
  camera.set_script(load("res://scripts/shared_camera.gd"))
@@ -91,6 +143,7 @@ func _ready() -> void:
  ui.player = p1
  add_child(ui)
  ui.call("setup", round_manager, score_manager, challenge_manager)
+ ui.call("setup_cleaning", mission_manager)
 
 func setup_input() -> void:
  var bindings = {

@@ -1,0 +1,25 @@
+[gd_scene format=3]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_mabyg"]
+albedo_color = Color(0.32557082, 0.34021112, 0.31121075, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_i7njt"]
+size = Vector3(10, 0.04, 8)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ot2c2"]
+albedo_color = Color(0.930762, 0.80621016, 0.46781063, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_wqr3r"]
+size = Vector3(3, 0.02, 0.15)
+
+[node name="RoadSegment" type="Node3D" unique_id=1193238483]
+
+[node name="_MeshInstance3D_378" type="MeshInstance3D" parent="." unique_id=673683289]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.02, 0)
+material_override = SubResource("StandardMaterial3D_mabyg")
+mesh = SubResource("BoxMesh_i7njt")
+
+[node name="_MeshInstance3D_379" type="MeshInstance3D" parent="." unique_id=190116663]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, 0)
+material_override = SubResource("StandardMaterial3D_ot2c2")
+mesh = SubResource("BoxMesh_wqr3r")

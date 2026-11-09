@@ -258,6 +258,7 @@ func build_ui() -> void:
  
  button(menu_column, "★ CHƠI: DỌN NHÀ (120s)", start_cleaning_mode)
  button(menu_column, "⚡ QUẬY PHÁ: CHAOS (60s)", start_chaos_mode)
+ button(menu_column, "KHÁM PHÁ KHU PHỐ", open_neighborhood)
  
  # Pause Panel
  var pause_column := panel("Tạm dừng")
@@ -553,3 +554,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
    pause_panel.visible = true
    get_tree().paused = true
   get_viewport().set_input_as_handled()
+
+func open_neighborhood() -> void:
+ get_tree().paused = false
+ get_tree().change_scene_to_file("res://scenes/neighborhood.tscn")

@@ -15,6 +15,10 @@ Game mở trong cửa sổ; nhấn F11 để bật/tắt toàn màn hình và Es
 
 Đến gần vật dụng để xem gợi ý. Sofa và giường dùng cùng phím để ngồi/nằm và đứng dậy; đèn và cửa bật/tắt. Nhặt gối, búa đồ chơi, gấu, hộp, sách hoặc bóng bằng E và ném bằng F; sau khi vật rơi có thể nhặt lại. Restart đặt lại scene.
 
+## Khu phố
+
+Chọn **KHÁM PHÁ KHU PHỐ** tại menu chính để khám phá bản đồ. Tab đổi giữa camera theo nhân vật và toàn cảnh; Esc trở về menu. Xem [hướng dẫn khu phố](docs/neighborhood.md) để biết bố cục, giới hạn và lệnh kiểm tra.
+
 ## Thay model
 
 `scenes/player.tscn` dùng `PlayerConfig` (`scripts/player_config.gd`) để chọn `visual_scene`, `visual_scale`, `visual_offset`, `hold_offset`, tốc độ và gia tốc. Gán một PackedScene khác vào `visual_scene` trước khi player vào scene tree (hoặc cấu hình resource trên instance). Scene có root Node3D và pivot tại chân; GLB có thể được bọc trong một scene Node3D để điều chỉnh pivot. Visual nằm dưới `VisualRoot`; collision và HoldPoint thuộc player, không phụ thuộc mesh. Điều chỉnh scale/offset/hold offset cho từng model; nếu cần gắn tay theo xương, cung cấp adapter/attachment cho model đó.

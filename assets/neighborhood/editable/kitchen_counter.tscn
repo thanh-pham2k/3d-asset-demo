@@ -1,0 +1,45 @@
+[gd_scene format=3]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_6658l"]
+albedo_color = Color(0.864286, 0.7613399, 0.6200707, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_24li8"]
+size = Vector3(1.55, 0.88, 0.75)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_6r75f"]
+size = Vector3(1.55, 0.88, 0.75)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_brkm1"]
+albedo_color = Color(0.52975017, 0.6250289, 0.5859405, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_08d8j"]
+size = Vector3(1.6, 0.1, 0.8)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_83udn"]
+albedo_color = Color(0.76687205, 0.8005245, 0.7503407, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_141uu"]
+size = Vector3(0.52, 0.03, 0.45)
+
+[node name="KitchenCounter" type="Node3D" unique_id=324439523]
+
+[node name="_MeshInstance3D_272" type="MeshInstance3D" parent="." unique_id=890972034]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.44, 0)
+material_override = SubResource("StandardMaterial3D_6658l")
+mesh = SubResource("BoxMesh_24li8")
+
+[node name="_StaticBody3D_274" type="StaticBody3D" parent="." unique_id=487009779]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.44, 0)
+
+[node name="_CollisionShape3D_273" type="CollisionShape3D" parent="_StaticBody3D_274" unique_id=1040418494]
+shape = SubResource("BoxShape3D_6r75f")
+
+[node name="_MeshInstance3D_275" type="MeshInstance3D" parent="." unique_id=737166656]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.92, 0)
+material_override = SubResource("StandardMaterial3D_brkm1")
+mesh = SubResource("BoxMesh_08d8j")
+
+[node name="_MeshInstance3D_276" type="MeshInstance3D" parent="." unique_id=1555419199]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0.98, 0)
+material_override = SubResource("StandardMaterial3D_83udn")
+mesh = SubResource("BoxMesh_141uu")

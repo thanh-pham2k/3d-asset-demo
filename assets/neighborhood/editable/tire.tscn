@@ -1,0 +1,15 @@
+[gd_scene format=3]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_7a8cn"]
+albedo_color = Color(0.15665191, 0.17933713, 0.17645022, 1)
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_xjkne"]
+height = 0.35
+radial_segments = 8
+
+[node name="Tire" type="Node3D" unique_id=254788905]
+
+[node name="_MeshInstance3D_457" type="MeshInstance3D" parent="." unique_id=1876831846]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.18, 0)
+material_override = SubResource("StandardMaterial3D_7a8cn")
+mesh = SubResource("CylinderMesh_xjkne")

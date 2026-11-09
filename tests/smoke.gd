@@ -60,14 +60,25 @@ func run() -> void:
  var dash_key = InputEventKey.new()
  dash_key.physical_keycode = KEY_SPACE
  check(InputMap.action_has_event("p1_interact", interact_key) and InputMap.action_has_event("p1_dash", dash_key), "E and Space bindings")
- p1.global_position = Vector3(-8.5,0,-3.8)
- await create_timer(0.1).timeout
+ # Use a clear stretch of the left wall. The old corner start overlapped
+ # the cabinet and could launch the character before reaching the wall.
+ p1.global_position = Vector3(-8.2,0,2.8)
+ p1.velocity = Vector3.ZERO
+ p1.impulse = Vector3.ZERO
+ p1.dash_remaining = 0.0
+ await physics_frame
+ var wall_probe := PhysicsShapeQueryParameters3D.new()
+ wall_probe.shape = collider.shape
+ wall_probe.transform = Transform3D(Basis.IDENTITY, p1.global_position + collider.position)
+ wall_probe.collision_mask = p1.collision_mask
+ wall_probe.exclude = [p1.get_rid()]
+ check(p1.get_world_3d().direct_space_state.intersect_shape(wall_probe, 1).is_empty(), "wall test starts without overlapping obstacles")
+ var wall_start: Vector3 = p1.global_position
  Input.action_press("p1_left")
- Input.action_press("p1_up")
- await create_timer(1.0).timeout
+ for frame in range(60): await physics_frame
  Input.action_release("p1_left")
- Input.action_release("p1_up")
- check(p1.global_position.x >= -8.74 and p1.global_position.z >= -4.24, "wall collision keeps player in room")
+ var wall_end: Vector3 = p1.global_position
+ check(wall_start.x > -8.6 and wall_end.x < wall_start.x - 0.2 and wall_end.x >= -8.74 and wall_end.y < 0.5, "wall collision keeps player in room")
  p1.global_position = Vector3(-0.6,0,0)
  p1.facing = Vector3.RIGHT
  pillow.global_position = Vector3(-0.4,0.2,0)
@@ -93,9 +104,25 @@ func run() -> void:
  check(p1.held_pillow == hammer, "alternate prop pickup")
  hammer.throw_from(p1)
  check(hammer.state == hammer.State.THROWN and p1.held_pillow == null, "alternate prop throw")
- p1.global_position = sofa.global_position + Vector3(0,0,0.2)
+ # Thrown and dynamic objects from earlier checks can overlap the teleported
+ # player or become the nearest target. Isolate the furniture-input checks
+ # after pickup/throw behavior has already been verified.
+ for item in items:
+  if item is Interactable: continue
+  item.remove_from_group("interactables")
+  if item is PhysicsBody3D:
+   item.collision_layer = 0
+   item.collision_mask = 0
+  if item is RigidBody3D: item.freeze = true
+  item.set_physics_process(false)
+ p1.global_position = sofa.stand_point
+ p1.velocity = Vector3.ZERO
+ p1.impulse = Vector3.ZERO
+ p1.slip_timer = 0.0
  p1.interaction_cooldown = 0
- await create_timer(0.15).timeout
+ for frame in range(3): await physics_frame
+ p1.find_target()
+ check(p1.target == sofa, "sofa is nearest available interaction target")
  Input.action_press("p1_interact")
  await create_timer(0.05).timeout
  Input.action_release("p1_interact")
@@ -105,9 +132,13 @@ func run() -> void:
  await create_timer(0.05).timeout
  Input.action_release("p1_interact")
  check(p1.resting == null and p1.collision_layer == 2, "sofa stand restores collision")
- p1.global_position = bed.global_position + Vector3(0,0,0.1)
+ p1.global_position = bed.stand_point
+ p1.velocity = Vector3.ZERO
+ p1.impulse = Vector3.ZERO
  p1.interaction_cooldown = 0
- await create_timer(0.15).timeout
+ for frame in range(3): await physics_frame
+ p1.find_target()
+ check(p1.target == bed, "bed is nearest available interaction target")
  Input.action_press("p1_interact")
  await create_timer(0.05).timeout
  Input.action_release("p1_interact")
@@ -118,7 +149,12 @@ func run() -> void:
  Input.action_release("p1_interact")
  check(p1.resting == null, "bed wake")
  p1.global_position = lamp.global_position + Vector3(0,0,0.6)
+ p1.velocity = Vector3.ZERO
+ p1.impulse = Vector3.ZERO
  p1.interaction_cooldown = 0
+ for frame in range(3): await physics_frame
+ p1.find_target()
+ check(p1.target == lamp, "lamp is nearest available interaction target")
  var old_lamp = lamp.toggle
  Input.action_press("p1_interact")
  await physics_frame

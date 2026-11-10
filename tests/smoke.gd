@@ -34,7 +34,8 @@ func run() -> void:
  var lamp = null
  var door = null
  for item in items:
-  if item is CharacterBody3D:
+  if not is_instance_valid(item): continue
+  if item is CharacterBody3D and "prop_kind" in item:
    if item.prop_kind == "pillow": pillow = item
   elif item is RigidBody3D: continue
   elif item.kind == "sofa": sofa = item
@@ -62,7 +63,7 @@ func run() -> void:
  check(InputMap.action_has_event("p1_interact", interact_key) and InputMap.action_has_event("p1_dash", dash_key), "E and Space bindings")
  # Use a clear stretch of the left wall. The old corner start overlapped
  # the cabinet and could launch the character before reaching the wall.
- p1.global_position = Vector3(-8.2,0,2.8)
+ p1.global_position = scene.to_global(Vector3(-8.2,0,2.8))
  p1.velocity = Vector3.ZERO
  p1.impulse = Vector3.ZERO
  p1.dash_remaining = 0.0
@@ -78,10 +79,10 @@ func run() -> void:
  for frame in range(60): await physics_frame
  Input.action_release("p1_left")
  var wall_end: Vector3 = p1.global_position
- check(wall_start.x > -8.6 and wall_end.x < wall_start.x - 0.2 and wall_end.x >= -8.74 and wall_end.y < 0.5, "wall collision keeps player in room")
- p1.global_position = Vector3(-0.6,0,0)
+ check(wall_start.x > scene.global_position.x - 8.6 and wall_end.x < wall_start.x - 0.2 and wall_end.x >= scene.global_position.x - 8.74 and wall_end.y < 0.5, "wall collision keeps player in room")
+ p1.global_position = scene.to_global(Vector3(-0.6,0,0))
  p1.facing = Vector3.RIGHT
- pillow.global_position = Vector3(-0.4,0.2,0)
+ pillow.global_position = scene.to_global(Vector3(-0.4,0.2,0))
  pillow.interact(p1)
  check(pillow.holder == p1, "pillow pickup")
  await process_frame
@@ -97,9 +98,10 @@ func run() -> void:
  pillow.throw_from(p1)
  var kinds = []
  for item in items:
-  if item is CharacterBody3D: kinds.append(item.prop_kind)
+  if not is_instance_valid(item): continue
+  if item is CharacterBody3D and "prop_kind" in item: kinds.append(item.prop_kind)
  check(kinds.size() == 6 and "hammer" in kinds and "ball" in kinds and "bear" in kinds and "box" in kinds and "book" in kinds, "six reusable prop variants")
- var hammer = items.filter(func(item): return item is CharacterBody3D and item.prop_kind == "hammer")[0]
+ var hammer = items.filter(func(item): return is_instance_valid(item) and item is CharacterBody3D and "prop_kind" in item and item.prop_kind == "hammer")[0]
  hammer.interact(p1)
  check(p1.held_pillow == hammer, "alternate prop pickup")
  hammer.throw_from(p1)
@@ -108,6 +110,7 @@ func run() -> void:
  # player or become the nearest target. Isolate the furniture-input checks
  # after pickup/throw behavior has already been verified.
  for item in items:
+  if not is_instance_valid(item): continue
   if item is Interactable: continue
   item.remove_from_group("interactables")
   if item is PhysicsBody3D:
@@ -115,7 +118,7 @@ func run() -> void:
    item.collision_mask = 0
   if item is RigidBody3D: item.freeze = true
   item.set_physics_process(false)
- p1.global_position = sofa.stand_point
+ p1.global_position = sofa.get_parent().to_global(sofa.stand_point)
  p1.velocity = Vector3.ZERO
  p1.impulse = Vector3.ZERO
  p1.slip_timer = 0.0
@@ -132,7 +135,7 @@ func run() -> void:
  await create_timer(0.05).timeout
  Input.action_release("p1_interact")
  check(p1.resting == null and p1.collision_layer == 2, "sofa stand restores collision")
- p1.global_position = bed.stand_point
+ p1.global_position = bed.get_parent().to_global(bed.stand_point)
  p1.velocity = Vector3.ZERO
  p1.impulse = Vector3.ZERO
  p1.interaction_cooldown = 0

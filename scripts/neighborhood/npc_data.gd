@@ -39,7 +39,7 @@ static func create_default_database() -> Array[NPCData]:
 	chu_ba.pants_color = Color("2c3e50")
 	chu_ba.accessory = "cap"
 	chu_ba.home_position = Vector3(-39, 0.2, -72)
-	chu_ba.work_position = Vector3(-105, 0.2, -14) # Garage
+	chu_ba.work_position = Vector3(-63, 0.2, -14) # Garage
 	chu_ba.lunch_position = Vector3(-50, 0.2, -22) # Hu Tieu stall
 	chu_ba.leisure_position = Vector3(-100, 0.2, 22) # Food street cafe
 	chu_ba.dialogues = {

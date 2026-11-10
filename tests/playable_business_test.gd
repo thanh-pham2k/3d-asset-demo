@@ -21,12 +21,14 @@ func _initialize() -> void:
 func run() -> void:
 	print("--- Running Playable Businesses Test Suite ---")
 	
-	if FileAccess.file_exists(EconomySaveSystem.DEFAULT_SAVE_PATH):
-		DirAccess.remove_absolute(EconomySaveSystem.DEFAULT_SAVE_PATH)
+	var test_save_path := "user://test_playable_business_world.json"
+	if FileAccess.file_exists(test_save_path):
+		DirAccess.remove_absolute(test_save_path)
 	
 	# Instantiate neighborhood world
 	var world_scene: PackedScene = load("res://scenes/neighborhood.tscn")
 	var world: Node = world_scene.instantiate()
+	world.economy_save_path = test_save_path
 	root.add_child(world)
 	current_scene = world
 	
@@ -283,4 +285,6 @@ func run() -> void:
 	
 	print("\nBUSINESS_PLAYABLE_RESULT failures=", failures)
 	world.free()
+	if FileAccess.file_exists(test_save_path):
+		DirAccess.remove_absolute(test_save_path)
 	quit(1 if failures else 0)

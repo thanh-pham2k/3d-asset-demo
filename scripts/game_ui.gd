@@ -228,7 +228,7 @@ func build_ui() -> void:
  var menu_column := panel("Couple Chaos: Dọn Nhà Hỗn Loạn")
  menu = menu_column.get_parent().get_parent()
  var sub := Label.new()
- sub.text = "Căn phòng đang bừa bộn! Dọn dẹp trước khi khách đến trong 120s!\nCẩn thận trượt vỏ chuối hoặc làm vỡ đồ!"
+ sub.text = "Chọn nhân vật và khám phá khu phố cùng nhau."
  sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
  sub.add_theme_font_size_override("font_size", 14)
  sub.add_theme_color_override("font_color", Color("eed8c0"))
@@ -256,16 +256,12 @@ func build_ui() -> void:
  girl.pressed.connect(func(): if is_instance_valid(player): player.select_character("girl"))
  choices.add_child(girl)
  
- button(menu_column, "★ CHƠI: DỌN NHÀ (120s)", start_cleaning_mode)
- button(menu_column, "⚡ QUẬY PHÁ: CHAOS (60s)", start_chaos_mode)
- button(menu_column, "👥 CHẾ ĐỘ CO-OP 2 NGƯỜI", start_coop_mode)
- button(menu_column, "KHÁM PHÁ KHU PHỐ", open_neighborhood)
+ button(menu_column, "Start Game", start_open_world)
  
  # Pause Panel
  var pause_column := panel("Tạm dừng")
  pause_panel = pause_column.get_parent().get_parent()
  button(pause_column, "Tiếp tục", resume_game)
- button(pause_column, "Chơi lại vòng này", restart_round)
  button(pause_column, "Về Menu chính", show_main_menu)
  
  # Results Panel
@@ -303,11 +299,15 @@ func show_main_menu() -> void:
  hud.visible = false
  get_tree().paused = true
 
-func start_game(mode: String = "chaos") -> void:
- if mode == "cleaning":
-  start_cleaning_mode()
- else:
-  start_chaos_mode()
+func start_game(_mode: String = "chaos") -> void:
+ start_open_world()
+
+func start_open_world() -> void:
+ menu.visible = false
+ pause_panel.visible = false
+ results_panel.visible = false
+ hud.visible = false
+ get_tree().paused = false
 
 func start_cleaning_mode() -> void:
  game_mode = "cleaning"

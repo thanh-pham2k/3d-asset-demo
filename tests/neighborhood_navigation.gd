@@ -63,7 +63,7 @@ func run() -> void:
     queue.append(next)
  print("Reachable 2 m cells: ", reachable.size())
  var targets := {
-  "starter house interior":Vector2i(-22,44), "garage interior":Vector2i(-52,-9),
+  "starter house interior":Vector2i(-22,44), "garage interior":Vector2i(-31,-9),
   "noodle shop":Vector2i(-25,-6), "wet market":Vector2i(19,-7),
   "food street":Vector2i(-50,6), "grocery interior":Vector2i(-52,17),
   "furniture store interior":Vector2i(52,-10), "park":Vector2i(21,13),

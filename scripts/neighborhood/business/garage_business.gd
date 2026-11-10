@@ -153,7 +153,7 @@ func _try_spawn_customer() -> void:
 	)
 	order.customer_name = cust_name
 	order.table_index = free_bay
-	order.target_spot = bay_positions[free_bay]
+	order.target_spot = bay_positions[free_bay] + position
 	
 	bay_orders[free_bay] = order
 	active_orders.append(order)

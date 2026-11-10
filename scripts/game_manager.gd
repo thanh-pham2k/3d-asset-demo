@@ -11,6 +11,7 @@ var main_camera: Camera3D
 var is_coop: bool = false
 
 func _ready() -> void:
+ position = Vector3(-45, 0, 88)
  setup_input()
  var feedback = preload("res://scripts/effects/chaos_feedback.gd").new()
  feedback.add_to_group("chaos_feedback")
@@ -42,21 +43,6 @@ func _ready() -> void:
  mission_manager.name = "MissionManager"
  add_child(mission_manager)
  
- var env = WorldEnvironment.new()
- var environment = Environment.new()
- environment.background_mode = Environment.BG_COLOR
- environment.background_color = Color("bdd1c9")
- environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
- environment.ambient_light_color = Color("fff0dd")
- environment.ambient_light_energy = 0.4
- environment.tonemap_mode = Environment.TONE_MAPPER_LINEAR
- env.environment = environment
- add_child(env)
- var sun = DirectionalLight3D.new()
- sun.rotation_degrees = Vector3(-55,-35,0)
- sun.light_energy = 0.45
- sun.shadow_enabled = true
- add_child(sun)
  var room = preload("res://scenes/room.tscn").instantiate()
  add_child(room)
  p1 = preload("res://scenes/player.tscn").instantiate()
@@ -66,6 +52,12 @@ func _ready() -> void:
   p1.config.visual_scene = load("res://scenes/characters/kenney_boy_visual.tscn")
  p1.position = Vector3(0,0,1.0)
  add_child(p1)
+ p1.select_character("boy")
+ var neighborhood = preload("res://scenes/neighborhood.tscn").instantiate()
+ neighborhood.name = "Neighborhood"
+ neighborhood.integrated = true
+ neighborhood.position = -position
+ add_child(neighborhood)
  
  var pillow = preload("res://scenes/pillow.tscn").instantiate()
  pillow.position = Vector3(1.2,0.2,0.8)
@@ -147,6 +139,11 @@ func _ready() -> void:
  ui.name = "GameUI"
  ui.player = p1
  add_child(ui)
+ var guidance = preload("res://scripts/workplace_guidance.gd").new()
+ guidance.name = "WorkplaceGuidance"
+ guidance.player = p1
+ guidance.camera = main_camera
+ add_child(guidance)
  ui.call("setup", round_manager, score_manager, challenge_manager)
  ui.call("setup_cleaning", mission_manager)
 

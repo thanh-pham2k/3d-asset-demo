@@ -430,11 +430,11 @@ static func create_placed_instance(id: String, pos: Vector3, rot_y: float) -> No
 		item.furniture_id = id
 		item.is_furniture = true
 		
-		# Local stand and seat points transformed to global
+		# Stand and seat offsets are relative to the furniture container.
 		var stand_local: Vector3 = def.get("stand_offset", Vector3(0, 0, 0.8))
 		var seat_local: Vector3 = def.get("seat_offset", Vector3(0, 0.4, 0))
-		item.stand_point = pos + stand_local.rotated(Vector3.UP, rot_y)
-		item.seat_point = pos + seat_local.rotated(Vector3.UP, rot_y)
+		item.stand_point = stand_local
+		item.seat_point = seat_local
 		
 		if interact_kind == "lamp":
 			item.toggle = true

@@ -1,6 +1,8 @@
 extends Node3D
 
 const MODULE = preload("res://scripts/neighborhood/module.gd")
+@export var integrated := false
+@export var economy_save_path := EconomySaveSystem.DEFAULT_SAVE_PATH
 var camera: Camera3D
 var player: CharacterBody3D
 var player_2: CharacterBody3D
@@ -65,7 +67,17 @@ func _ready() -> void:
     key.location = KEY_LOCATION_LEFT
    InputMap.action_add_event(action,key)
  var ground := zone("GroundAndRoads")
- slab(ground,Vector3(0,-0.35,0),Vector3(250,0.7,250),Color("a9c893"),true)
+ slab(ground,Vector3(0,-0.45,0),Vector3(250,0.7,250),Color("a9c893"))
+ # Keep the walkable collision flush with the house floor while the visual
+ # ground sits below it, avoiding overlapping surfaces inside the house.
+ var ground_body := StaticBody3D.new()
+ var ground_shape := CollisionShape3D.new()
+ var ground_box := BoxShape3D.new()
+ ground_box.size = Vector3(250, 0.7, 250)
+ ground_shape.shape = ground_box
+ ground_body.position = Vector3(0, -0.35, 0)
+ ground_body.add_child(ground_shape)
+ ground.add_child(ground_body)
  # Invisible perimeter prevents falling from the terrain, including during a dash.
  var boundaries := zone("MapBoundaries")
  for spec in [[Vector3(-125.5,2,0),Vector3(1,4,252)],[Vector3(125.5,2,0),Vector3(1,4,252)],[Vector3(0,2,-125.5),Vector3(250,4,1)],[Vector3(0,2,125.5),Vector3(250,4,1)]]:
@@ -121,16 +133,17 @@ func _ready() -> void:
    slab(ground,Vector3((span[0]+span[1])/2.0,0.03,z),Vector3(span[1]-span[0],0.1,2),Color("e0d3b9"))
  for z in [46.0,54.0]: slab(ground,Vector3(-40,0.03,z),Vector3(72,0.1,2),Color("e0d3b9"))
  var house := zone("01_StarterHouse")
- slab(house,Vector3(-43,0.04,85),Vector3(46,0.08,45),Color("c4d6a6"))
- add_piece(house,"house",Vector3(-45,0,88),Color("f3dfaa"))
+ slab(house,Vector3(-43,-0.06,85),Vector3(46,0.08,45),Color("c4d6a6"))
+ if not integrated: add_piece(house,"house",Vector3(-45,0,88),Color("f3dfaa"))
  # Starter-home floor and simple furnishings leave the central doorway clear.
- slab(house,Vector3(-45,0.17,88),Vector3(8.4,0.04,7.4),Color("bd8c69"))
+ if not integrated: slab(house,Vector3(-45,0.17,88),Vector3(8.4,0.04,7.4),Color("bd8c69"))
  # The kitchen floor is a separate decorative surface, above the wooden floor.
- slab(house,Vector3(-42.4,0.205,89.8),Vector3(2.5,0.035,2.7),Color("e6e0c9"))
+ if not integrated: slab(house,Vector3(-42.4,0.205,89.8),Vector3(2.5,0.035,2.7),Color("e6e0c9"))
  for x in [-43.4,-42.6,-41.8]:
-  for z in [89.0,89.8,90.6]: slab(house,Vector3(x,0.23,z),Vector3(0.74,0.02,0.74),Color("c5d4c6"))
- add_piece(house,"sofa",Vector3(-47.5,0.2,90),Color("799c7b"))
- add_piece(house,"kitchen_counter",Vector3(-42.4,0.2,90))
+  for z in [89.0,89.8,90.6]:
+   if not integrated: slab(house,Vector3(x,0.23,z),Vector3(0.74,0.02,0.74),Color("c5d4c6"))
+ if not integrated: add_piece(house,"sofa",Vector3(-47.5,0.2,90),Color("799c7b"))
+ if not integrated: add_piece(house,"kitchen_counter",Vector3(-42.4,0.2,90))
  for p in [Vector3(-56,0,76),Vector3(-35,0,78),Vector3(-54,0,97)]: add_piece(house,"planter",p)
  slab(house,Vector3(-45,0.06,76),Vector3(3,0.1,15),Color("d7b999"))
  # Front and side openings keep the yard connected to the surrounding streets.
@@ -152,6 +165,7 @@ func _ready() -> void:
  # Scooters remain separate scene instances from the garage and terrain.
  add_piece(garage,"scooter",Vector3(-109,0,-11),Color("9ac0b8"),PI/2)
  add_piece(garage,"scooter",Vector3(-106,0,-11),Color("e0a180"),PI/2)
+ garage.position.x = 42.0
  var noodle := zone("03_HuTieu")
  var noodle_paving := add_piece(noodle,"paved_court",Vector3(-50,0,-20.5))
  noodle_paving.scale = Vector3(2.0,1.0,2.1)
@@ -270,7 +284,7 @@ func _ready() -> void:
    add_piece(street,"tree",Vector3(x,0,z),Color("86ae7c"))
    add_piece(street,"lamp",Vector3(x+4,0,z))
  for p in [Vector3(-70,0,-10),Vector3(10,0,10),Vector3(70,0,-10),Vector3(35,0,28)]: add_piece(street,"trash_bin",p)
- for p in [Vector3(-70,0,-15),Vector3(-20,0,-15),Vector3(20,0,-15),Vector3(70,0,-15),Vector3(-70,0,15),Vector3(70,0,15)]:
+ for p in [Vector3(-20,0,-15),Vector3(20,0,-15),Vector3(70,0,-15),Vector3(-70,0,15),Vector3(70,0,15)]:
   add_piece(street,"utility_pole",p)
  var routes := zone("NPCWalkingRoutes")
  # Named guide paths follow sidewalk centres, crossing the roads at intersections.
@@ -317,14 +331,15 @@ func _ready() -> void:
   for point in points: path.curve.add_point(point)
   routes.add_child(path)
  var spawns := zone("NPCSpawnPoints")
- for spec in [["StarterHouse",Vector3(-45,0,70)],["Garage",Vector3(-105,0,-10)],["Noodle",Vector3(-50,0,-12)],["Market",Vector3(37,0,-14)],["FoodStreet",Vector3(-100,0,12)],["Furniture",Vector3(105,0,-12)],["Park",Vector3(42,0,26)],["School",Vector3(105,0,-50)],["Residential",Vector3(10,0,-58)],["Expansion",Vector3(105,0,30)]]:
+ for spec in [["StarterHouse",Vector3(-45,0,70)],["Garage",Vector3(-63,0,-10)],["Noodle",Vector3(-50,0,-12)],["Market",Vector3(37,0,-14)],["FoodStreet",Vector3(-100,0,12)],["Furniture",Vector3(105,0,-12)],["Park",Vector3(42,0,26)],["School",Vector3(105,0,-50)],["Residential",Vector3(10,0,-58)],["Expansion",Vector3(105,0,30)]]:
   var marker := Marker3D.new()
   marker.name = spec[0]
   marker.position = spec[1]
   spawns.add_child(marker)
- player = preload("res://scenes/player.tscn").instantiate()
- player.position = Vector3(-45,0.2,70)
- add_child(player)
+ if not integrated:
+  player = preload("res://scenes/player.tscn").instantiate()
+  player.position = Vector3(-45,0.2,70)
+  add_child(player)
  var light := DirectionalLight3D.new()
  light.rotation_degrees = Vector3(-55,-35,0)
  light.light_energy = 0.55
@@ -355,12 +370,14 @@ func _ready() -> void:
  add_child(npc_manager)
  var garage_business := GarageBusiness.new()
  garage_business.name = "GarageBusiness"
+ garage_business.position.x = 42.0
  add_child(garage_business)
  var hutieu_business := HuTieuBusiness.new()
  hutieu_business.name = "HuTieuBusiness"
  add_child(hutieu_business)
  economy_manager = EconomyManager.new()
  economy_manager.name = "EconomyManager"
+ economy_manager.save_file_path = economy_save_path
  economy_manager.garage_business = garage_business
  economy_manager.hutieu_business = hutieu_business
  add_child(economy_manager)
@@ -380,13 +397,13 @@ func _ready() -> void:
  tool_kiosk.name = "Kiosk_Tools"
  tool_kiosk.kiosk_title = "Phụ Tùng Sửa Xe"
  tool_kiosk.product_category = "repair_tool"
- tool_kiosk.position = Vector3(-101, 0, -18)
+ tool_kiosk.position = Vector3(-59, 0, -18)
  add_child(tool_kiosk)
  var house_kiosk := ShopKiosk.new()
  house_kiosk.name = "Kiosk_House"
  house_kiosk.kiosk_title = "Nâng Cấp Nhà Cửa"
  house_kiosk.product_category = "house_upgrade"
- house_kiosk.position = Vector3(-45, 0, 85)
+ house_kiosk.position = Vector3(-47, 0, 84)
  add_child(house_kiosk)
  coop_obstacle = CoopHeavyObstacle.new()
  coop_obstacle.name = "CoopHeavyObstacle"
@@ -396,6 +413,9 @@ func _ready() -> void:
  coop_bench.name = "CoopAssemblyBench"
  coop_bench.position = Vector3(95, 0, -18)
  add_child(coop_bench)
+ if integrated:
+  add_help()
+  return
  camera = Camera3D.new()
  camera.projection = Camera3D.PROJECTION_ORTHOGONAL
  camera.size = 20
@@ -406,7 +426,7 @@ func _ready() -> void:
  add_help()
 
 func _unhandled_key_input(event: InputEvent) -> void:
- if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_TAB:
+ if not integrated and event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_TAB:
   overview = not overview
   camera.size = 330 if overview else 20
 
@@ -439,7 +459,7 @@ func add_help() -> void:
  wallet_label.modulate = Color("a7ffeb")
  box.add_child(wallet_label)
  var text := Label.new()
- text.text = "WASD: move   Shift: run   Space: dash   E: tương tác / mua sắm\nF2: Bật Co-op 2 người   Tab: map   Esc: menu"
+ text.text = "WASD: di chuyển · Shift: chạy · Space: lướt\nE: tương tác · F: ném · Esc: menu"
  box.add_child(text)
 
 func enable_neighborhood_coop() -> void:
@@ -462,7 +482,7 @@ func enable_neighborhood_coop() -> void:
  coop_manager.initialize_coop(player, player_2, self, get_viewport().world_3d, false)
 
 func _input(event: InputEvent) -> void:
- if event is InputEventKey and event.pressed and not event.echo:
+ if not integrated and event is InputEventKey and event.pressed and not event.echo:
   if event.keycode == KEY_ESCAPE:
    get_tree().paused = false
    get_tree().change_scene_to_file("res://scenes/main.tscn")

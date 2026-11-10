@@ -151,8 +151,10 @@ func _build_base_architecture() -> void:
 	# Left wall: at x = -8.98 (MUST match smoke test wall check at (-8.2, 0, 2.8) moving left)
 	wall(structure_root, Vector3(-8.98, 1.35, 0), Vector3(0.16, 2.7, 9))
 	
-	# Back wall (solid continuous)
-	wall(structure_root, Vector3(0, 1.35, -4.48), Vector3(18, 2.7, 0.16))
+	# Back wall with a walkable doorway.
+	wall(structure_root, Vector3(-4.8, 1.35, -4.48), Vector3(8.4, 2.7, 0.16))
+	wall(structure_root, Vector3(4.8, 1.35, -4.48), Vector3(8.4, 2.7, 0.16))
+	wall(structure_root, Vector3(0, 2.4, -4.48), Vector3(1.2, 0.6, 0.16))
 	
 	# Front open cutaway invisible collision barrier
 	Art.solid(structure_root, Vector3(0, 1, 4.48), Vector3(18, 2, 0.16))
@@ -188,8 +190,19 @@ func _build_base_architecture() -> void:
 	for y in [0.62, 1.52]:
 		Art.box(hinge, Vector3(0.47, y, 0.075), Vector3(0.62, 0.62, 0.035), Color("ad6742"))
 		Art.box(hinge, Vector3(0.47, y, 0.10), Vector3(0.50, 0.50, 0.02), Color("995332"))
-	current_door = make_interaction("door", Vector3(0, 0, -3.73), Vector3.ZERO, Vector3.ZERO)
+	current_door = make_interaction("door", Vector3(0, 0, -4.4), Vector3.ZERO, Vector3.ZERO)
 	current_door.moving_part = hinge
+	var door_hint := Label3D.new()
+	door_hint.name = "DoorHint"
+	door_hint.text = "E — Mở cửa"
+	door_hint.position = Vector3(0, 1.85, 0.8)
+	door_hint.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	door_hint.font_size = 48
+	door_hint.pixel_size = 0.007
+	door_hint.outline_size = 8
+	current_door.add_child(door_hint)
+	var door_body := Art.solid(structure_root, Vector3(0, 1.05, -4.48), Vector3(1.1, 2.1, 0.16))
+	current_door.set_meta("door_body", door_body)
 	structure_root.add_child(current_door)
 	
 	# Lamp on rear wall
@@ -454,8 +467,9 @@ func _on_placement_started(furniture_id: String) -> void:
 
 func _on_placement_confirmed(furniture_id: String, placed_node: Node3D) -> void:
 	placement_hud.visible = false
+	placed_node.position -= global_position
 	custom_furniture_root.add_child(placed_node)
-	progression_manager.register_placed_furniture(furniture_id, placed_node.global_position, placed_node.rotation.y)
+	progression_manager.register_placed_furniture(furniture_id, to_local(placed_node.global_position), placed_node.rotation.y)
 	_save_state()
 
 func _on_placement_cancelled(furniture_id: String) -> void:
@@ -471,6 +485,7 @@ func _process(_delta: float) -> void:
 		var target_pos: Vector3 = player.global_position + player.facing * 1.5
 		var space_state := get_world_3d().direct_space_state
 		var bounds := progression_manager.get_room_bounds()
+		bounds.position += global_position
 		placement_manager.update_placement(target_pos, space_state, bounds, player)
 		
 		# Update banner text status
@@ -491,6 +506,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			var target_pos: Vector3 = player.global_position + player.facing * 1.5
 			var space_state := get_world_3d().direct_space_state
 			var bounds := progression_manager.get_room_bounds()
+			bounds.position += global_position
 			var placed := placement_manager.confirm_placement(target_pos, space_state, bounds, player)
 			if placed:
 				get_viewport().set_input_as_handled()
@@ -504,7 +520,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			if nearest_node:
 				progression_manager.unregister_placed_furniture(
 					nearest_node.get_meta("furniture_id", ""),
-					nearest_node.global_position
+					to_local(nearest_node.global_position)
 				)
 				placement_manager.start_rearrange(nearest_node)
 				get_viewport().set_input_as_handled()

@@ -1,6 +1,7 @@
 extends CharacterBody3D
 
 var player_id := 1
+var selected_character := "boy"
 var visual: Node3D
 var hold_anchor: Node3D
 var held_pillow: Node3D
@@ -71,6 +72,7 @@ func _ready() -> void:
 func select_character(variant: String) -> void:
  # Replacing a visual never replaces the physics body or gameplay components.
  if variant not in ["boy", "girl"]: return
+ selected_character = variant
  var kenney := OS.get_environment("COUPLE_VISUAL") == "kenney"
  var prefix := "kenney_" if kenney else ""
  var scene: PackedScene = load("res://scenes/characters/%s%s_visual.tscn" % [prefix, variant])

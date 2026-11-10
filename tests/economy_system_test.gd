@@ -199,10 +199,11 @@ func run() -> void:
 	# Test 8: Full Neighborhood World Integration
 	# -------------------------------------------------------------
 	# Clean any default save file before testing world integration
-	if FileAccess.file_exists(EconomySaveSystem.DEFAULT_SAVE_PATH):
-		DirAccess.remove_absolute(EconomySaveSystem.DEFAULT_SAVE_PATH)
+	if FileAccess.file_exists(temp_save_path):
+		DirAccess.remove_absolute(temp_save_path)
 	
 	var world: Node = load("res://scenes/neighborhood.tscn").instantiate()
+	world.economy_save_path = temp_save_path
 	root.add_child(world)
 	current_scene = world
 	
@@ -237,8 +238,8 @@ func run() -> void:
 	check(HouseholdWallet.format_money(world_econ.wallet.balance) in world_wallet_lbl.text, "HUD wallet label updated with new balance: '%s'" % world_wallet_lbl.text)
 	
 	# Clean up default save file created during test run
-	if FileAccess.file_exists(EconomySaveSystem.DEFAULT_SAVE_PATH):
-		DirAccess.remove_absolute(EconomySaveSystem.DEFAULT_SAVE_PATH)
+	if FileAccess.file_exists(temp_save_path):
+		DirAccess.remove_absolute(temp_save_path)
 	
 	print("\nECONOMY_SYSTEM_RESULT failures=", failures)
 	world.free()

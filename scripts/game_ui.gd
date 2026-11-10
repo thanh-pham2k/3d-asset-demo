@@ -258,6 +258,7 @@ func build_ui() -> void:
  
  button(menu_column, "★ CHƠI: DỌN NHÀ (120s)", start_cleaning_mode)
  button(menu_column, "⚡ QUẬY PHÁ: CHAOS (60s)", start_chaos_mode)
+ button(menu_column, "👥 CHẾ ĐỘ CO-OP 2 NGƯỜI", start_coop_mode)
  button(menu_column, "KHÁM PHÁ KHU PHỐ", open_neighborhood)
  
  # Pause Panel
@@ -348,6 +349,12 @@ func start_chaos_mode() -> void:
  
  if is_instance_valid(round_manager):
   round_manager.start_round()
+
+func start_coop_mode() -> void:
+ var gm = get_parent()
+ if gm and gm.has_method("enable_coop_mode"):
+  gm.enable_coop_mode()
+ start_chaos_mode()
 
 func resume_game() -> void:
  menu.visible = false

@@ -4,6 +4,11 @@ var score_manager: Node
 var challenge_manager: Node
 var round_manager: Node
 var mission_manager: Node
+var p1: CharacterBody3D
+var p2: CharacterBody3D
+var coop_manager: CoopManager
+var main_camera: Camera3D
+var is_coop: bool = false
 
 func _ready() -> void:
  setup_input()
@@ -54,7 +59,7 @@ func _ready() -> void:
  add_child(sun)
  var room = preload("res://scenes/room.tscn").instantiate()
  add_child(room)
- var p1 = preload("res://scenes/player.tscn").instantiate()
+ p1 = preload("res://scenes/player.tscn").instantiate()
  p1.player_id = 1
  # Optional visual preview uses the same player and gameplay interface.
  if OS.get_environment("COUPLE_VISUAL") == "kenney":
@@ -133,10 +138,10 @@ func _ready() -> void:
  
  mission_manager.call("setup_zones", basket_zone, trash_zone, sofa_slots)
  
- var camera = Camera3D.new()
- camera.set_script(load("res://scripts/shared_camera.gd"))
- camera.players = [p1]
- add_child(camera)
+ main_camera = Camera3D.new()
+ main_camera.set_script(load("res://scripts/shared_camera.gd"))
+ main_camera.players = [p1]
+ add_child(main_camera)
  
  var ui = GameUIScript.new()
  ui.name = "GameUI"
@@ -161,6 +166,25 @@ func setup_input() -> void:
   event.keycode = KEY_SHIFT
   event.location = KEY_LOCATION_LEFT if i == 1 else KEY_LOCATION_RIGHT
   InputMap.action_add_event(action,event)
+
+func enable_coop_mode() -> void:
+ if is_coop: return
+ is_coop = true
+ p2 = preload("res://scenes/player.tscn").instantiate()
+ p2.name = "Player2"
+ p2.player_id = 2
+ p2.position = Vector3(1.0, 0, 1.0)
+ add_child(p2)
+ p2.select_character("girl")
+ 
+ if is_instance_valid(main_camera):
+  main_camera.current = false
+  main_camera.visible = false
+ 
+ coop_manager = CoopManager.new()
+ coop_manager.name = "CoopManager"
+ add_child(coop_manager)
+ coop_manager.initialize_coop(p1, p2, self, get_viewport().world_3d, true)
 
 func _unhandled_key_input(event: InputEvent) -> void:
  if event is InputEventKey and event.pressed and not event.echo:

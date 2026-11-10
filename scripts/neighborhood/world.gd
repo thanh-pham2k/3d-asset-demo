@@ -3,7 +3,18 @@ extends Node3D
 const MODULE = preload("res://scripts/neighborhood/module.gd")
 var camera: Camera3D
 var player: CharacterBody3D
+var player_2: CharacterBody3D
+var coop_manager: CoopManager
+var is_coop: bool = false
+var coop_obstacle: Node3D
+var coop_bench: Node3D
 var overview := false
+var time_manager: NeighborhoodTimeManager
+var npc_manager: NPCManager
+var nav_region: NavigationRegion3D
+var clock_label: Label
+var economy_manager: EconomyManager
+var wallet_label: Label
 
 func slab(parent: Node, pos: Vector3, size: Vector3, color: Color, collision := false) -> void:
  var mesh := MeshInstance3D.new()
@@ -328,6 +339,63 @@ func _ready() -> void:
  e.ambient_light_energy = 0.3
  env.environment = e
  add_child(env)
+ nav_region = NavigationRegion3D.new()
+ nav_region.name = "NavigationRegion3D"
+ if ResourceLoader.exists("res://assets/neighborhood/neighborhood_navmesh.tres"):
+  nav_region.navigation_mesh = load("res://assets/neighborhood/neighborhood_navmesh.tres")
+ add_child(nav_region)
+ time_manager = NeighborhoodTimeManager.new()
+ time_manager.name = "TimeManager"
+ time_manager.directional_light = light
+ time_manager.world_environment = env
+ add_child(time_manager)
+ npc_manager = NPCManager.new()
+ npc_manager.name = "NPCManager"
+ npc_manager.time_manager = time_manager
+ add_child(npc_manager)
+ var garage_business := GarageBusiness.new()
+ garage_business.name = "GarageBusiness"
+ add_child(garage_business)
+ var hutieu_business := HuTieuBusiness.new()
+ hutieu_business.name = "HuTieuBusiness"
+ add_child(hutieu_business)
+ economy_manager = EconomyManager.new()
+ economy_manager.name = "EconomyManager"
+ economy_manager.garage_business = garage_business
+ economy_manager.hutieu_business = hutieu_business
+ add_child(economy_manager)
+ var furn_kiosk := ShopKiosk.new()
+ furn_kiosk.name = "Kiosk_Furniture"
+ furn_kiosk.kiosk_title = "Tiệm Nội Thất"
+ furn_kiosk.product_category = "furniture"
+ furn_kiosk.position = Vector3(105, 0, -18)
+ add_child(furn_kiosk)
+ var market_kiosk := ShopKiosk.new()
+ market_kiosk.name = "Kiosk_Market"
+ market_kiosk.kiosk_title = "Chợ & Tạp Hóa"
+ market_kiosk.product_category = "food_ingredient"
+ market_kiosk.position = Vector3(-105, 0, 32)
+ add_child(market_kiosk)
+ var tool_kiosk := ShopKiosk.new()
+ tool_kiosk.name = "Kiosk_Tools"
+ tool_kiosk.kiosk_title = "Phụ Tùng Sửa Xe"
+ tool_kiosk.product_category = "repair_tool"
+ tool_kiosk.position = Vector3(-101, 0, -18)
+ add_child(tool_kiosk)
+ var house_kiosk := ShopKiosk.new()
+ house_kiosk.name = "Kiosk_House"
+ house_kiosk.kiosk_title = "Nâng Cấp Nhà Cửa"
+ house_kiosk.product_category = "house_upgrade"
+ house_kiosk.position = Vector3(-45, 0, 85)
+ add_child(house_kiosk)
+ coop_obstacle = CoopHeavyObstacle.new()
+ coop_obstacle.name = "CoopHeavyObstacle"
+ coop_obstacle.position = Vector3(15, 0, -54)
+ add_child(coop_obstacle)
+ coop_bench = CoopAssemblyBench.new()
+ coop_bench.name = "CoopAssemblyBench"
+ coop_bench.position = Vector3(95, 0, -18)
+ add_child(coop_bench)
  camera = Camera3D.new()
  camera.projection = Camera3D.PROJECTION_ORTHOGONAL
  camera.size = 20
@@ -343,12 +411,16 @@ func _unhandled_key_input(event: InputEvent) -> void:
   camera.size = 330 if overview else 20
 
 func _process(_delta: float) -> void:
- if not overview and is_instance_valid(player):
+ if not overview and is_instance_valid(player) and is_instance_valid(camera):
   camera.position = player.position + Vector3(0,25,22)
   camera.look_at(player.position)
- elif overview:
+ elif overview and is_instance_valid(camera):
   camera.position = Vector3(185,230,185)
   camera.look_at(Vector3.ZERO)
+ if is_instance_valid(clock_label) and is_instance_valid(time_manager):
+  clock_label.text = "🕒 " + time_manager.get_time_formatted()
+ if is_instance_valid(wallet_label) and is_instance_valid(economy_manager):
+  wallet_label.text = "💰 Ví Gia Đình: " + HouseholdWallet.format_money(economy_manager.wallet.balance)
 
 func add_help() -> void:
  var layer := CanvasLayer.new()
@@ -357,15 +429,45 @@ func add_help() -> void:
  var panel := PanelContainer.new()
  panel.position = Vector2(16,16)
  layer.add_child(panel)
+ var box := VBoxContainer.new()
+ panel.add_child(box)
+ clock_label = Label.new()
+ clock_label.text = "🕒 08:00 (sáng)"
+ box.add_child(clock_label)
+ wallet_label = Label.new()
+ wallet_label.text = "💰 Ví Gia Đình: 100,000 đ"
+ wallet_label.modulate = Color("a7ffeb")
+ box.add_child(wallet_label)
  var text := Label.new()
- text.text = "WASD: move   Shift: run   Space: dash\nTab: map / follow   Esc: room menu"
- panel.add_child(text)
+ text.text = "WASD: move   Shift: run   Space: dash   E: tương tác / mua sắm\nF2: Bật Co-op 2 người   Tab: map   Esc: menu"
+ box.add_child(text)
+
+func enable_neighborhood_coop() -> void:
+ if is_coop: return
+ is_coop = true
+ player_2 = preload("res://scenes/player.tscn").instantiate()
+ player_2.name = "Player2"
+ player_2.player_id = 2
+ player_2.position = player.position + Vector3(2.0, 0, 0)
+ add_child(player_2)
+ player_2.select_character("girl")
+ 
+ if is_instance_valid(camera):
+  camera.current = false
+  camera.visible = false
+ 
+ coop_manager = CoopManager.new()
+ coop_manager.name = "CoopManager"
+ add_child(coop_manager)
+ coop_manager.initialize_coop(player, player_2, self, get_viewport().world_3d, false)
 
 func _input(event: InputEvent) -> void:
  if event is InputEventKey and event.pressed and not event.echo:
   if event.keycode == KEY_ESCAPE:
    get_tree().paused = false
    get_tree().change_scene_to_file("res://scenes/main.tscn")
+  elif event.keycode == KEY_F2:
+   enable_neighborhood_coop()
   elif event.keycode == KEY_F11:
    var fullscreen := DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN
    DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED if fullscreen else DisplayServer.WINDOW_MODE_FULLSCREEN)

@@ -13,6 +13,8 @@ var display_name := "Nội thất"
 var item_category := "furniture"
 var interaction_type := "interact"
 var valid_destinations: Array = []
+var furniture_id := ""
+var is_furniture := false
 
 func _ready() -> void:
  add_to_group("interactables")
@@ -22,6 +24,9 @@ func _ready() -> void:
    interaction_type = "rest"
   "bed":
    display_name = "Giường"
+   interaction_type = "rest"
+  "chair":
+   display_name = "Ghế ngồi"
    interaction_type = "rest"
   "lamp":
    display_name = "Đèn phòng"
@@ -34,8 +39,9 @@ func available(player: Node3D) -> bool:
  return enabled and (user == null or user == player)
 
 func prompt(player: Node3D) -> String:
- if kind == "sofa": return "Đứng dậy" if user == player else "Ngồi sofa"
- if kind == "bed": return "Thức dậy" if user == player else "Nằm nghỉ"
+ if kind == "sofa": return "Đứng dậy" if (user != null and user == player) else "Ngồi sofa"
+ if kind == "bed": return "Thức dậy" if (user != null and user == player) else "Nằm nghỉ"
+ if kind == "chair": return "Đứng dậy" if (user != null and user == player) else "Ngồi ghế"
  if kind == "lamp": return "Tắt đèn" if toggle else "Bật đèn"
  if kind == "door": return "Đóng cửa" if toggle else "Mở cửa"
  return "Tương tác"
@@ -43,7 +49,7 @@ func prompt(player: Node3D) -> String:
 func interact(player: Node3D) -> void:
  if not available(player): return
  match kind:
-  "sofa", "bed":
+  "sofa", "bed", "chair":
    if user == player:
     if player.leave_rest(stand_point):
      user = null

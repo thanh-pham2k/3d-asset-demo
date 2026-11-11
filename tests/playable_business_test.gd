@@ -283,6 +283,182 @@ func run() -> void:
 	var dup_hutieu_reward := hutieu.complete_order(noodle_order)
 	check(not dup_hutieu_reward, "Duplicate food order reward prevented")
 	
+	# -------------------------------------------------------------
+	# Test 7: Motorcycle Repair - Tool Storing & Prevention
+	# -------------------------------------------------------------
+	print("\n--- Testing Motorcycle Repair: Tool Storing & Safety ---")
+	workbench_station.interact(player)
+	check(garage.get_holding_tool(player) == "patch_kit", "Player picked up patch kit")
+	workbench_station.interact(player)
+	check(garage.get_holding_tool(player) == "", "Player returned patch kit back to workbench")
+	
+	tire_rack.interact(player)
+	check(garage.get_holding_tool(player) == "new_tire", "Player picked up new tire")
+	tire_rack.interact(player)
+	check(garage.get_holding_tool(player) == "", "Player stored new tire back on rack")
+	
+	# -------------------------------------------------------------
+	# Test 8: Motorcycle Repair - Multiple Concurrent Bays
+	# -------------------------------------------------------------
+	print("\n--- Testing Motorcycle Repair: Multiple Concurrent Bays ---")
+	garage.active_orders.clear()
+	garage.bay_orders.clear()
+	
+	var bay0_order := BusinessOrder.new("concurrent_bay0", "inflate", "Bơm lốp xe", 20000, ["pump_air"], 60.0)
+	bay0_order.table_index = 0
+	bay0_order.customer_name = "Anh Hải"
+	bay0_order.target_spot = garage.bay_positions[0]
+	garage.bay_orders[0] = bay0_order
+	garage.active_orders.append(bay0_order)
+	
+	var bay1_order := BusinessOrder.new("concurrent_bay1", "patch", "Vá săm xe", 35000, ["patch_kit", "pump_air"], 60.0)
+	bay1_order.table_index = 1
+	bay1_order.customer_name = "Chị Thu"
+	bay1_order.target_spot = garage.bay_positions[1]
+	garage.bay_orders[1] = bay1_order
+	garage.active_orders.append(bay1_order)
+	
+	check(garage.bay_orders.size() == 2, "Both Bay 0 and Bay 1 have active orders simultaneously")
+	var garage_rev_before_concurrent := garage.total_earnings
+	
+	# Service Bay 1 first (patch kit + pump)
+	var bay1_station = garage.get_node_or_null("BikeBay_1")
+	check(is_instance_valid(bay1_station), "BikeBay_1 exists")
+	
+	workbench_station.interact(player)
+	bay1_station.interact(player) # Apply patch
+	check(bay1_order.current_step_index == 1, "Bay 1 patch applied")
+	
+	bay1_station.interact(player) # Pump air
+	check(bay1_order.status == BusinessOrder.Status.PAID, "Bay 1 order completed and paid")
+	check(garage.total_earnings == garage_rev_before_concurrent + 35000, "Bay 1 revenue awarded (+35,000đ)")
+	
+	# Service Bay 0 next (pump air)
+	bay0_station.interact(player)
+	check(bay0_order.status == BusinessOrder.Status.PAID, "Bay 0 order completed and paid")
+	check(garage.total_earnings == garage_rev_before_concurrent + 55000, "Both bays paid total +55,000đ")
+	
+	# -------------------------------------------------------------
+	# Test 9: Hu Tieu - Multiple Concurrent Tables & Wrong Dish Rejection
+	# -------------------------------------------------------------
+	print("\n--- Testing Hu Tieu Shop: Multiple Tables & Wrong Dish Handling ---")
+	hutieu.active_orders.clear()
+	hutieu.table_orders.clear()
+	hutieu.current_bowl_state = HuTieuBusiness.BowlState.EMPTY
+	hutieu.current_bowl_dish = ""
+	
+	var order_t0 := BusinessOrder.new("concurrent_t0", "noodle_nam_vang", "Hủ tiếu Nam Vang", 45000, ["boil_noodles", "add_broth", "add_toppings", "serve_table"], 60.0)
+	order_t0.table_index = 0
+	order_t0.customer_name = "Bác Năm"
+	hutieu.table_orders[0] = order_t0
+	hutieu.active_orders.append(order_t0)
+	
+	var order_t1 := BusinessOrder.new("concurrent_t1", "noodle_xuong", "Hủ tiếu sườn heo", 40000, ["boil_noodles", "add_broth", "add_toppings", "serve_table"], 60.0)
+	order_t1.table_index = 1
+	order_t1.customer_name = "Cô Lan"
+	hutieu.table_orders[1] = order_t1
+	hutieu.active_orders.append(order_t1)
+	
+	check(hutieu.table_orders.size() == 2, "Both Table 0 and Table 1 seated with concurrent orders")
+	
+	# Girl cooks "Hủ tiếu sườn heo"
+	blanch_pot.interact(player)
+	hutieu.blanch_timer = 0.0
+	hutieu._process(0.1)
+	broth_pot.interact(player)
+	hutieu.set_recipe_by_title("Hủ tiếu sườn heo")
+	topping_counter.interact(player)
+	check(hutieu.current_bowl_dish == "Hủ tiếu sườn heo", "Cooked dish is 'Hủ tiếu sườn heo'")
+	
+	# Attempt to serve to Table 0 (which ordered Nam Vang) -> MUST BE REJECTED
+	var rev_before_multi := hutieu.total_earnings
+	table0.interact(player)
+	check(order_t0.status == BusinessOrder.Status.PENDING, "Table 0 rejected incorrect dish; remains PENDING")
+	check(order_t0.mistake_count == 1, "Order recorded mistake for wrong dish delivery")
+	check(hutieu.current_bowl_state == HuTieuBusiness.BowlState.FULLY_PREPARED, "Bowl was NOT consumed on rejected table")
+	check(hutieu.total_earnings == rev_before_multi, "No earnings awarded on rejected dish")
+	
+	# Deliver bowl to matching Table 1 (which ordered Sườn heo) -> ACCEPTED
+	var table1 = hutieu.get_node_or_null("DiningTable_1")
+	check(is_instance_valid(table1), "DiningTable_1 exists")
+	table1.interact(player)
+	check(order_t1.status == BusinessOrder.Status.PAID, "Table 1 accepted matching dish and paid")
+	check(hutieu.total_earnings == rev_before_multi + 40000, "Awarded 40,000đ for Table 1")
+	check(hutieu.current_bowl_state == HuTieuBusiness.BowlState.EMPTY, "Bowl cleared after successful delivery")
+	
+	# Now cook "Hủ tiếu Nam Vang" for Table 0
+	blanch_pot.interact(player)
+	hutieu.blanch_timer = 0.0
+	hutieu._process(0.1)
+	broth_pot.interact(player)
+	hutieu.set_recipe_by_title("Hủ tiếu Nam Vang")
+	topping_counter.interact(player)
+	
+	table0.interact(player)
+	check(order_t0.status == BusinessOrder.Status.PAID, "Table 0 accepted correct Nam Vang dish")
+	check(hutieu.total_earnings == rev_before_multi + 85000, "Both concurrent tables completed; +85,000đ total")
+	
+	# -------------------------------------------------------------
+	# Test 10: Hu Tieu - Expired Order Handling & Bowl Preservation
+	# -------------------------------------------------------------
+	print("\n--- Testing Hu Tieu Shop: Expired Order & Bowl Preservation ---")
+	var order_t2 := BusinessOrder.new("test_expire_t2", "noodle_tom_thit", "Hủ tiếu tôm thịt tươi", 45000, ["boil_noodles", "add_broth", "add_toppings", "serve_table"], 0.5)
+	order_t2.table_index = 2
+	order_t2.customer_name = "Khách Nóng Tính"
+	hutieu.table_orders[2] = order_t2
+	hutieu.active_orders.append(order_t2)
+	
+	# Cook bowl for Table 2
+	blanch_pot.interact(player)
+	hutieu.blanch_timer = 0.0
+	hutieu._process(0.1)
+	broth_pot.interact(player)
+	hutieu.set_recipe_by_title("Hủ tiếu tôm thịt tươi")
+	topping_counter.interact(player)
+	check(hutieu.current_bowl_state == HuTieuBusiness.BowlState.FULLY_PREPARED, "Bowl ready for customer")
+	
+	# Let customer patience expire
+	await create_timer(0.6).timeout
+	hutieu._process(0.2)
+	check(order_t2.status == BusinessOrder.Status.FAILED, "Customer patience expired; order marked FAILED")
+	
+	# Attempt to interact with expired table
+	var table2 = hutieu.get_node_or_null("DiningTable_2")
+	check(is_instance_valid(table2), "DiningTable_2 exists")
+	table2.interact(player)
+	check(hutieu.current_bowl_state == HuTieuBusiness.BowlState.FULLY_PREPARED, "Bowl preserved! Not wasted on departed customer")
+	
+	# Discard bowl at blanch pot
+	blanch_pot.interact(player)
+	check(hutieu.current_bowl_state == HuTieuBusiness.BowlState.EMPTY, "Bowl discarded cleanly at pot for remaking")
+	
+	# -------------------------------------------------------------
+	# Test 11: Business Progression, Peak Hours & Ratings
+	# -------------------------------------------------------------
+	print("\n--- Testing Progression, Peak Hours & Ratings ---")
+	# Peak hour detection:
+	time_mgr.set_hour(8.0) # 8:00 AM is peak hour for both shops
+	garage._process(0.1)
+	hutieu._process(0.1)
+	check(garage.is_peak_hour, "Garage detects morning rush peak hour (8:00)")
+	check(hutieu.is_peak_hour, "Hu Tieu detects breakfast rush peak hour (8:00)")
+	
+	time_mgr.set_hour(15.0) # 3:00 PM is regular non-peak hour
+	garage._process(0.1)
+	hutieu._process(0.1)
+	check(not garage.is_peak_hour, "Garage in regular hours at 15:00")
+	check(not hutieu.is_peak_hour, "Hu Tieu in regular hours at 15:00")
+	
+	# Star rating calculation:
+	var perfect_order := BusinessOrder.new("rating_perf", "inflate", "Bơm lốp xe", 20000, ["pump_air"], 60.0)
+	check(perfect_order.get_star_rating() == 5, "Order with 100% patience and 0 mistakes achieves 5 stars")
+	check("Tuyệt vời" in perfect_order.get_satisfaction_label(), "Label reflects 5-star rating")
+	
+	perfect_order.record_mistake()
+	perfect_order.record_mistake()
+	check(perfect_order.mistake_count == 2, "Mistakes properly counted")
+	check(perfect_order.get_star_rating() < 5, "Mistakes lower customer satisfaction rating")
+	
 	print("\nBUSINESS_PLAYABLE_RESULT failures=", failures)
 	world.free()
 	if FileAccess.file_exists(test_save_path):

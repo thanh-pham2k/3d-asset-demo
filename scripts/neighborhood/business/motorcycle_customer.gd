@@ -36,6 +36,8 @@ var final_bay_rotation: float = PI / 2.0
 var departure_waypoints: Array[Vector3] = []
 var wait_timer: float = 0.0
 var wheels: Array[Node3D] = []
+var movement_watchdog: float = 0.0
+const MAX_MOVEMENT_TIME: float = 25.0
 
 func setup(
 	p_bay_index: int,
@@ -85,13 +87,13 @@ func _build_visuals() -> void:
 	# Position driver on scooter seat
 	_seat_driver_on_scooter()
 	
-	# 3. Speech bubble
+	# 3. Speech bubble (positioned high to avoid overlapping bay status label)
 	speech_label = Label3D.new()
-	speech_label.position = Vector3(0, 2.1, 0)
+	speech_label.position = Vector3(0, 2.9, 0)
 	speech_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	speech_label.font_size = 22
 	speech_label.pixel_size = 0.004
-	speech_label.outline_size = 6
+	speech_label.outline_size = 8
 	speech_label.modulate = Color("fff9c4")
 	speech_label.outline_modulate = Color("212121")
 	speech_label.visible = false
@@ -115,16 +117,16 @@ func _build_visuals() -> void:
 
 func _seat_driver_on_scooter() -> void:
 	if not is_instance_valid(driver): return
-	driver.position = Vector3(0, 0.45, 0.20)
+	driver.position = Vector3(0, 0.46, 0.18)
 	driver.rotation = Vector3.ZERO
 	driver.visible = true
 	
-	# Sitting pose
+	# Natural motorcycle riding pose with hands on handlebars and feet on footboard
 	if driver.has_method("_pose_joint"):
-		driver._pose_joint("left_leg", Vector3(-1.1, 0, 0.2))
-		driver._pose_joint("right_leg", Vector3(-1.1, 0, -0.2))
-		driver._pose_joint("left_arm", Vector3(-0.6, 0, 0.2))
-		driver._pose_joint("right_arm", Vector3(-0.6, 0, -0.2))
+		driver._pose_joint("left_leg", Vector3(-1.15, 0.15, 0.10))
+		driver._pose_joint("right_leg", Vector3(-1.15, -0.15, -0.10))
+		driver._pose_joint("left_arm", Vector3(-0.95, 0.16, -0.20))
+		driver._pose_joint("right_arm", Vector3(-0.95, -0.16, 0.20))
 
 func _stand_driver_beside_scooter() -> void:
 	if not is_instance_valid(driver): return
@@ -149,7 +151,19 @@ func _process(delta: float) -> void:
 			_process_movement(delta, departure_waypoints, false)
 
 func _process_movement(delta: float, path: Array[Vector3], is_arriving: bool) -> void:
+	movement_watchdog += delta
+	if movement_watchdog > MAX_MOVEMENT_TIME:
+		# Safety watchdog: prevent customer getting stuck
+		movement_watchdog = 0.0
+		if is_arriving:
+			position = final_bay_position
+			_on_arrived_at_bay()
+		else:
+			_on_departed()
+		return
+	
 	if current_waypoint_idx >= path.size():
+		movement_watchdog = 0.0
 		if is_arriving:
 			_on_arrived_at_bay()
 		else:

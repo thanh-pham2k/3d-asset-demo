@@ -34,6 +34,8 @@ var move_speed: float = 3.5
 var departure_waypoints: Array[Vector3] = []
 var state_timer: float = 0.0
 var anim_time: float = 0.0
+var movement_watchdog: float = 0.0
+const MAX_MOVEMENT_TIME: float = 25.0
 
 func setup(
 	p_table_index: int,
@@ -110,7 +112,18 @@ func _process(delta: float) -> void:
 			_process_walking(delta, departure_waypoints, false)
 
 func _process_walking(delta: float, path: Array[Vector3], is_arriving: bool) -> void:
+	movement_watchdog += delta
+	if movement_watchdog > MAX_MOVEMENT_TIME:
+		movement_watchdog = 0.0
+		if is_arriving:
+			position = chair_position
+			_on_reached_table()
+		else:
+			_on_departed()
+		return
+	
 	if current_waypoint_idx >= path.size():
+		movement_watchdog = 0.0
 		if is_arriving:
 			_on_reached_table()
 		else:
@@ -140,10 +153,10 @@ func _process_walking(delta: float, path: Array[Vector3], is_arriving: bool) -> 
 
 func _on_reached_table() -> void:
 	position = chair_position
-	# Face toward table (+X direction)
+	# Face squarely toward the dining table (+X direction)
 	rotation.y = PI / 2.0
 	
-	# Sit down on chair
+	# Sit down neatly on chair
 	_sit_down_pose()
 	current_state = State.SEATED_ORDERING
 	_show_speech("Cô Bảy ơi, cho một tô hủ tiếu nóng nhé!", 2.5)
@@ -152,13 +165,16 @@ func _on_reached_table() -> void:
 
 func _sit_down_pose() -> void:
 	if not is_instance_valid(diner): return
-	# Lower body to chair height
-	diner.position = Vector3(0, -0.05, 0)
+	# Align hips flush with chair seat (seat height 0.45m, hips pivot at 0.48m)
+	diner.position = Vector3(0, 0.02, 0)
 	if diner.has_method("_pose_joint"):
-		diner._pose_joint("left_leg", Vector3(-1.4, 0, 0.1))
-		diner._pose_joint("right_leg", Vector3(-1.4, 0, -0.1))
-		diner._pose_joint("left_arm", Vector3(-0.6, 0, 0.2))
-		diner._pose_joint("right_arm", Vector3(-0.6, 0, -0.2))
+		# Legs bent forward and feet on the ground in front of chair
+		diner._pose_joint("left_leg", Vector3(-1.35, 0.06, 0.06))
+		diner._pose_joint("right_leg", Vector3(-1.35, -0.06, -0.06))
+		# Arms resting politely on table surface
+		diner._pose_joint("left_arm", Vector3(-0.75, 0.16, 0.12))
+		diner._pose_joint("right_arm", Vector3(-0.75, -0.16, -0.12))
+		diner._pose_joint("head", Vector3(0.04, 0, 0))
 
 func _stand_up_pose() -> void:
 	if not is_instance_valid(diner): return
@@ -168,11 +184,13 @@ func _stand_up_pose() -> void:
 		diner._pose_joint("right_leg", Vector3.ZERO)
 		diner._pose_joint("left_arm", Vector3.ZERO)
 		diner._pose_joint("right_arm", Vector3.ZERO)
+		diner._pose_joint("head", Vector3.ZERO)
 
 func _process_seated(delta: float) -> void:
 	state_timer += delta
 	if is_instance_valid(diner):
-		diner.skeleton.position.y = sin(state_timer * 2.0) * 0.015
+		# Gentle seated breathing
+		diner.skeleton.position.y = sin(state_timer * 2.0) * 0.012
 
 func notify_food_served() -> void:
 	current_state = State.EATING
@@ -183,10 +201,11 @@ func notify_food_served() -> void:
 func _process_eating(delta: float) -> void:
 	state_timer += delta
 	if is_instance_valid(diner):
-		# Eating hand motion
-		var slurp := sin(state_timer * 6.0)
-		diner._pose_joint("right_arm", Vector3(-0.8 + slurp * 0.2, 0, -0.1))
-		diner._pose_joint("head", Vector3(slurp * 0.1, 0, 0))
+		# Left hand rests on table, right hand enjoys the hot noodle bowl
+		diner._pose_joint("left_arm", Vector3(-0.75, 0.16, 0.12))
+		var slurp := sin(state_timer * 5.0)
+		diner._pose_joint("right_arm", Vector3(-0.95 + slurp * 0.22, -0.14, 0.08))
+		diner._pose_joint("head", Vector3(0.08 + slurp * 0.10, 0, 0))
 	
 	# Eat for 2.4 seconds then stand up and depart
 	if state_timer >= 2.4:

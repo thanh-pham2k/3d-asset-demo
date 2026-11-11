@@ -3,6 +3,10 @@ extends Node3D
 const MODULE = preload("res://scripts/neighborhood/module.gd")
 const WorkplaceGuidance = preload("res://scripts/workplace_guidance.gd")
 const PlayerScooter = preload("res://scripts/neighborhood/player_scooter.gd")
+const DailyLoopManager = preload("res://scripts/neighborhood/daily_loop_manager.gd")
+const EconomyManager = preload("res://scripts/economy/economy_manager.gd")
+const EconomySaveSystem = preload("res://scripts/economy/economy_save_system.gd")
+const CoopManager = preload("res://scripts/coop/coop_manager.gd")
 @export var integrated := false
 @export var economy_save_path := EconomySaveSystem.DEFAULT_SAVE_PATH
 var camera: Camera3D
@@ -21,7 +25,9 @@ var npc_manager: NPCManager
 var nav_region: NavigationRegion3D
 var clock_label: Label
 var economy_manager: EconomyManager
+var daily_loop_manager: Node
 var wallet_label: Label
+var goal_label: Label
 
 func slab(parent: Node, pos: Vector3, size: Vector3, color: Color, collision := false) -> void:
  var mesh := MeshInstance3D.new()
@@ -428,6 +434,13 @@ func _ready() -> void:
  economy_manager.garage_business = garage_business
  economy_manager.hutieu_business = hutieu_business
  add_child(economy_manager)
+ daily_loop_manager = DailyLoopManager.new()
+ daily_loop_manager.name = "DailyLoopManager"
+ daily_loop_manager.time_manager = time_manager
+ daily_loop_manager.economy_manager = economy_manager
+ daily_loop_manager.garage_business = garage_business
+ daily_loop_manager.hutieu_business = hutieu_business
+ add_child(daily_loop_manager)
  var furn_kiosk := ShopKiosk.new()
  furn_kiosk.name = "Kiosk_Furniture"
  furn_kiosk.kiosk_title = "Tiệm Nội Thất"
@@ -452,6 +465,20 @@ func _ready() -> void:
  house_kiosk.product_category = "house_upgrade"
  house_kiosk.position = Vector3(-47, 0, 84)
  add_child(house_kiosk)
+ var garage_upg_kiosk := ShopKiosk.new()
+ garage_upg_kiosk.name = "Kiosk_GarageUpgrades"
+ garage_upg_kiosk.kiosk_title = "Nâng Cấp Tiệm Sửa Xe"
+ garage_upg_kiosk.product_category = "business_upgrade"
+ garage_upg_kiosk.target_system = "garage"
+ garage_upg_kiosk.position = Vector3(-65, 0, -18)
+ add_child(garage_upg_kiosk)
+ var hutieu_upg_kiosk := ShopKiosk.new()
+ hutieu_upg_kiosk.name = "Kiosk_HuTieuUpgrades"
+ hutieu_upg_kiosk.kiosk_title = "Nâng Cấp Quán Hủ Tiếu"
+ hutieu_upg_kiosk.product_category = "business_upgrade"
+ hutieu_upg_kiosk.target_system = "hutieu"
+ hutieu_upg_kiosk.position = Vector3(-43, 0, -18)
+ add_child(hutieu_upg_kiosk)
  coop_obstacle = CoopHeavyObstacle.new()
  coop_obstacle.name = "CoopHeavyObstacle"
  coop_obstacle.position = Vector3(15, 0, -54)
@@ -501,6 +528,11 @@ func _ready() -> void:
  guidance.player = player
  guidance.camera = camera
  add_child(guidance)
+ var minimap = preload("res://scripts/ui/interactive_minimap.gd").new()
+ minimap.name = "InteractiveMinimap"
+ minimap.player = player
+ minimap.guidance = guidance
+ add_child(minimap)
  add_help()
 
 func _unhandled_key_input(event: InputEvent) -> void:
@@ -519,6 +551,22 @@ func _process(_delta: float) -> void:
   clock_label.text = "🕒 " + time_manager.get_time_formatted()
  if is_instance_valid(wallet_label) and is_instance_valid(economy_manager):
   wallet_label.text = "💰 Ví Gia Đình: " + HouseholdWallet.format_money(economy_manager.wallet.balance)
+ if is_instance_valid(goal_label) and is_instance_valid(economy_manager):
+  var goal := economy_manager.get_goal_info()
+  if goal.get("is_ready_to_buy", false):
+   goal_label.text = "🎯 Mục tiêu: %s [%s] — %s" % [goal["title"], HouseholdWallet.format_money(goal.get("next_upgrade_cost", 0)), goal["hint"]]
+   goal_label.modulate = Color("b9f6ca")
+  elif goal.get("id") == "goal_mastery":
+   goal_label.text = "🌟 %s: %s" % [goal["title"], goal["hint"]]
+   goal_label.modulate = Color("ffd54f")
+  else:
+   goal_label.text = "🎯 Mục tiêu: %s — %s (%s / %s)" % [
+    goal["title"],
+    goal["description"],
+    HouseholdWallet.format_money(goal["current"]),
+    HouseholdWallet.format_money(goal["target"])
+   ]
+   goal_label.modulate = Color("fff59d")
 
 func add_help() -> void:
  var layer := CanvasLayer.new()
@@ -536,6 +584,10 @@ func add_help() -> void:
  wallet_label.text = "💰 Ví Gia Đình: 100,000 đ"
  wallet_label.modulate = Color("a7ffeb")
  box.add_child(wallet_label)
+ goal_label = Label.new()
+ goal_label.text = "🎯 Mục tiêu: Đang tải..."
+ goal_label.modulate = Color("fff59d")
+ box.add_child(goal_label)
  var text := Label.new()
  text.text = "WASD: di chuyển · Shift: chạy · Space: lướt\nE: tương tác · F: ném · Esc: menu"
  box.add_child(text)

@@ -12,14 +12,14 @@ albedo_color = Color(0.15665191, 0.17933713, 0.17645022, 1)
 [sub_resource type="BoxMesh" id="BoxMesh_si5d4"]
 size = Vector3(0.12, 0.74, 0.12)
 
-[node name="Table" type="Node3D" unique_id=1788964081]
+[node name="Table" type="Node3D" unique_id=744815965]
 
-[node name="_MeshInstance3D_449" type="MeshInstance3D" parent="." unique_id=852137967]
+[node name="_MeshInstance3D_462" type="MeshInstance3D" parent="." unique_id=2106577359]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.75, 0)
 material_override = SubResource("StandardMaterial3D_rnnea")
 mesh = SubResource("BoxMesh_j5sqy")
 
-[node name="_MeshInstance3D_450" type="MeshInstance3D" parent="." unique_id=887270844]
+[node name="_MeshInstance3D_463" type="MeshInstance3D" parent="." unique_id=468937314]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.37, 0)
 material_override = SubResource("StandardMaterial3D_vwost")
 mesh = SubResource("BoxMesh_si5d4")

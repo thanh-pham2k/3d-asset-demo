@@ -27,19 +27,19 @@ bottom_radius = 0.1
 height = 0.1
 radial_segments = 8
 
-[node name="Umbrella" type="Node3D" unique_id=544818542]
+[node name="Umbrella" type="Node3D" unique_id=184885648]
 
-[node name="_MeshInstance3D_506" type="MeshInstance3D" parent="." unique_id=1432613715]
+[node name="_MeshInstance3D_519" type="MeshInstance3D" parent="." unique_id=531203333]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.4, 0)
 material_override = SubResource("StandardMaterial3D_25edt")
 mesh = SubResource("CylinderMesh_ado1j")
 
-[node name="_MeshInstance3D_507" type="MeshInstance3D" parent="." unique_id=1194988763]
+[node name="_MeshInstance3D_520" type="MeshInstance3D" parent="." unique_id=1565619376]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.8, 0)
 material_override = SubResource("StandardMaterial3D_dfod4")
 mesh = SubResource("CylinderMesh_cwnw3")
 
-[node name="_MeshInstance3D_508" type="MeshInstance3D" parent="." unique_id=1561996276]
+[node name="_MeshInstance3D_521" type="MeshInstance3D" parent="." unique_id=558890116]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.17, 0)
 material_override = SubResource("StandardMaterial3D_lfdjj")
 mesh = SubResource("CylinderMesh_dve62")

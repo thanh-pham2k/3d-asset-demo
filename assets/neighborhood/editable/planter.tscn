@@ -18,20 +18,20 @@ bottom_radius = 0.45
 height = 0.7
 radial_segments = 8
 
-[node name="Planter" type="Node3D" unique_id=1361166203]
+[node name="Planter" type="Node3D" unique_id=1146662834]
 
-[node name="_MeshInstance3D_344" type="MeshInstance3D" parent="." unique_id=817720771]
+[node name="_MeshInstance3D_357" type="MeshInstance3D" parent="." unique_id=213391304]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.35, 0)
 material_override = SubResource("StandardMaterial3D_hvpf0")
 mesh = SubResource("BoxMesh_5llge")
 
-[node name="_StaticBody3D_346" type="StaticBody3D" parent="." unique_id=1865245895]
+[node name="_StaticBody3D_359" type="StaticBody3D" parent="." unique_id=1655707819]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.35, 0)
 
-[node name="_CollisionShape3D_345" type="CollisionShape3D" parent="_StaticBody3D_346" unique_id=148973648]
+[node name="_CollisionShape3D_358" type="CollisionShape3D" parent="_StaticBody3D_359" unique_id=287534846]
 shape = SubResource("BoxShape3D_mbcd7")
 
-[node name="_MeshInstance3D_347" type="MeshInstance3D" parent="." unique_id=1795576337]
+[node name="_MeshInstance3D_360" type="MeshInstance3D" parent="." unique_id=1036947766]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.95, 0)
 material_override = SubResource("StandardMaterial3D_dm66d")
 mesh = SubResource("CylinderMesh_iykpx")

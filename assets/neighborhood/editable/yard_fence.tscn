@@ -63,60 +63,60 @@ albedo_color = Color(0.864286, 0.7724261, 0.63000786, 1)
 [sub_resource type="BoxMesh" id="BoxMesh_0fji0"]
 size = Vector3(0.1, 0.75, 0.1)
 
-[node name="YardFence" type="Node3D" unique_id=557147020]
+[node name="YardFence" type="Node3D" unique_id=1105625856]
 
-[node name="_MeshInstance3D_520" type="MeshInstance3D" parent="." unique_id=109508189]
+[node name="_MeshInstance3D_533" type="MeshInstance3D" parent="." unique_id=1941669272]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.95, 0.55, 0)
 material_override = SubResource("StandardMaterial3D_uk6y8")
 mesh = SubResource("BoxMesh_cj0iy")
 
-[node name="_MeshInstance3D_521" type="MeshInstance3D" parent="." unique_id=119941698]
+[node name="_MeshInstance3D_534" type="MeshInstance3D" parent="." unique_id=1117620782]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.95, 1.14, 0)
 material_override = SubResource("StandardMaterial3D_b48aj")
 mesh = SubResource("BoxMesh_yh0m8")
 
-[node name="_MeshInstance3D_522" type="MeshInstance3D" parent="." unique_id=1877689113]
+[node name="_MeshInstance3D_535" type="MeshInstance3D" parent="." unique_id=1832053777]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.95, 0.55, 0)
 material_override = SubResource("StandardMaterial3D_vcibe")
 mesh = SubResource("BoxMesh_3n54e")
 
-[node name="_MeshInstance3D_523" type="MeshInstance3D" parent="." unique_id=927742066]
+[node name="_MeshInstance3D_536" type="MeshInstance3D" parent="." unique_id=1374762579]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.95, 1.14, 0)
 material_override = SubResource("StandardMaterial3D_ne64p")
 mesh = SubResource("BoxMesh_j5ti1")
 
-[node name="_MeshInstance3D_524" type="MeshInstance3D" parent="." unique_id=1629135788]
+[node name="_MeshInstance3D_537" type="MeshInstance3D" parent="." unique_id=484156897]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.35, 0)
 material_override = SubResource("StandardMaterial3D_unabi")
 mesh = SubResource("BoxMesh_77a2h")
 
-[node name="_StaticBody3D_526" type="StaticBody3D" parent="." unique_id=2107268494]
+[node name="_StaticBody3D_539" type="StaticBody3D" parent="." unique_id=1068247070]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.35, 0)
 
-[node name="_CollisionShape3D_525" type="CollisionShape3D" parent="_StaticBody3D_526" unique_id=1454431730]
+[node name="_CollisionShape3D_538" type="CollisionShape3D" parent="_StaticBody3D_539" unique_id=1433086672]
 shape = SubResource("BoxShape3D_qb5tp")
 
-[node name="_MeshInstance3D_527" type="MeshInstance3D" parent="." unique_id=2044276593]
+[node name="_MeshInstance3D_540" type="MeshInstance3D" parent="." unique_id=2120945365]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.82, 0)
 material_override = SubResource("StandardMaterial3D_nte4t")
 mesh = SubResource("BoxMesh_saaex")
 
-[node name="_MeshInstance3D_528" type="MeshInstance3D" parent="." unique_id=1691077198]
+[node name="_MeshInstance3D_541" type="MeshInstance3D" parent="." unique_id=1193552580]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.35, 0.57, 0)
 material_override = SubResource("StandardMaterial3D_teohj")
 mesh = SubResource("BoxMesh_njm53")
 
-[node name="_MeshInstance3D_529" type="MeshInstance3D" parent="." unique_id=1163686481]
+[node name="_MeshInstance3D_542" type="MeshInstance3D" parent="." unique_id=560948905]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 0.57, 0)
 material_override = SubResource("StandardMaterial3D_exh4y")
 mesh = SubResource("BoxMesh_hroo2")
 
-[node name="_MeshInstance3D_530" type="MeshInstance3D" parent="." unique_id=1907952046]
+[node name="_MeshInstance3D_543" type="MeshInstance3D" parent="." unique_id=766559190]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.45, 0.57, 0)
 material_override = SubResource("StandardMaterial3D_eifs0")
 mesh = SubResource("BoxMesh_p1d7l")
 
-[node name="_MeshInstance3D_531" type="MeshInstance3D" parent="." unique_id=2129275610]
+[node name="_MeshInstance3D_544" type="MeshInstance3D" parent="." unique_id=648289213]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.35, 0.57, 0)
 material_override = SubResource("StandardMaterial3D_4ye7f")
 mesh = SubResource("BoxMesh_0fji0")

@@ -157,11 +157,36 @@ func build() -> void:
    for item in [[-1.05,Color("e8b1a1")],[-0.25,Color("f5e5cb")],[0.55,Color("9fbfba")],[1.22,Color("d9be8e")]]:
     box(Vector3(item[0],2.05,0),Vector3(0.55,0.65,0.05),item[1])
   "garage":
-   building(12,9,4.5,true)
-   box(Vector3(0,0.5,2.8),Vector3(4,1,0.8),wood,true)
-   for x in [-4.0,-3.0]:
-    for y in [0.25,0.7,1.15]: round_shape(Vector3(x,y,2.8),0.48,0.25,dark)
-   box(Vector3(3,0.8,3),Vector3(1.5,1.6,0.5),Color("b95d4e"))
+   # Compact cozy roadside repair shack ("Chòi sửa xe máy Chú Ba")
+   var gw := 6.2
+   var gd := 4.2
+   var gh := 3.0
+   box(Vector3(0, 0.05, 0), Vector3(gw, 0.1, gd), Color("90a4ae"), true)
+   for x in [-gw/2 + 0.15, gw/2 - 0.15]:
+    for z in [-gd/2 + 0.15, gd/2 - 0.15]:
+     box(Vector3(x, gh/2, z), Vector3(0.16, gh, 0.16), wood)
+   box(Vector3(0, 1.4, gd/2 - 0.08), Vector3(gw - 0.2, 2.7, 0.14), wood, true)
+   box(Vector3(0, 1.7, gd/2 - 0.18), Vector3(4.0, 1.2, 0.06), Color("37474f"))
+   for tx in [-1.5, -0.9, -0.3, 0.3, 0.9, 1.5]:
+    box(Vector3(tx, 1.8, gd/2 - 0.23), Vector3(0.18, 0.35, 0.05), Color("cfd8dc"))
+    box(Vector3(tx, 1.45, gd/2 - 0.23), Vector3(0.14, 0.22, 0.05), Color("d32f2f"))
+   var roof := box(Vector3(0, gh + 0.1, -0.1), Vector3(gw + 0.6, 0.14, gd + 0.8), tint)
+   roof.rotation.x = -0.06
+   cutaway_meshes.append(roof)
+   var fascia := box(Vector3(0, gh - 0.15, -gd/2 - 0.45), Vector3(gw + 0.7, 0.32, 0.08), Color("8d6e63"))
+   cutaway_meshes.append(fascia)
+   var signboard := box(Vector3(0, gh - 0.15, -gd/2 - 0.50), Vector3(4.5, 0.55, 0.06), Color("fff9c4"))
+   cutaway_meshes.append(signboard)
+   var red_stripe := box(Vector3(0, gh - 0.15, -gd/2 - 0.54), Vector3(4.2, 0.12, 0.02), Color("c62828"))
+   cutaway_meshes.append(red_stripe)
+   box(Vector3(gw/2 - 1.1, 0.45, 0.2), Vector3(1.8, 0.9, 0.8), wood, true)
+   box(Vector3(gw/2 - 1.1, 0.98, 0.2), Vector3(0.5, 0.22, 0.35), red)
+   box(Vector3(gw/2 - 0.5, 0.96, 0.2), Vector3(0.35, 0.18, 0.25), Color("fbc02d"))
+   box(Vector3(gw/2 - 1.1, 0.24, -0.8), Vector3(0.4, 0.48, 0.4), wood)
+   for y in [0.22, 0.62, 1.02]:
+    round_shape(Vector3(-gw/2 + 0.9, y, 0.4), 0.46, 0.32, dark)
+   round_shape(Vector3(-gw/2 + 0.9, 0.22, -0.6), 0.46, 0.32, dark)
+   round_shape(Vector3(0.3, 0.38, 0.8), 0.26, 0.7, Color("e53935"))
   "noodle", "market_stall", "fruit_stall", "meat_stall", "ingredient_stall", "cafe", "banh_mi", "juice":
    box(Vector3(0,0.55,0),Vector3(3.2,1.1,1.3),wood,true)
    for x in [-1.4,1.4]:

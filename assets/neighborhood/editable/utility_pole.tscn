@@ -45,35 +45,35 @@ bottom_radius = 0.12
 height = 0.18
 radial_segments = 8
 
-[node name="UtilityPole" type="Node3D" unique_id=1937385280]
+[node name="UtilityPole" type="Node3D" unique_id=1294409061]
 
-[node name="_MeshInstance3D_509" type="MeshInstance3D" parent="." unique_id=1401863131]
+[node name="_MeshInstance3D_522" type="MeshInstance3D" parent="." unique_id=195492199]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
 material_override = SubResource("StandardMaterial3D_w1d85")
 mesh = SubResource("CylinderMesh_hj3rg")
 
-[node name="CollisionBody" type="StaticBody3D" parent="." unique_id=1255907553]
+[node name="CollisionBody" type="StaticBody3D" parent="." unique_id=337212725]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
 
-[node name="_CollisionShape3D_510" type="CollisionShape3D" parent="CollisionBody" unique_id=649311640]
+[node name="_CollisionShape3D_523" type="CollisionShape3D" parent="CollisionBody" unique_id=1060803614]
 shape = SubResource("CylinderShape3D_1dbbh")
 
-[node name="_MeshInstance3D_511" type="MeshInstance3D" parent="." unique_id=913713184]
+[node name="_MeshInstance3D_524" type="MeshInstance3D" parent="." unique_id=1290263309]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 4.8, 0)
 material_override = SubResource("StandardMaterial3D_cisjs")
 mesh = SubResource("BoxMesh_1n52s")
 
-[node name="_MeshInstance3D_512" type="MeshInstance3D" parent="." unique_id=1113970847]
+[node name="_MeshInstance3D_525" type="MeshInstance3D" parent="." unique_id=460355023]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.8, 4.92, 0)
 material_override = SubResource("StandardMaterial3D_i7c75")
 mesh = SubResource("CylinderMesh_n4rqa")
 
-[node name="_MeshInstance3D_513" type="MeshInstance3D" parent="." unique_id=1674307244]
+[node name="_MeshInstance3D_526" type="MeshInstance3D" parent="." unique_id=185458259]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 4.92, 0)
 material_override = SubResource("StandardMaterial3D_p2451")
 mesh = SubResource("CylinderMesh_qglct")
 
-[node name="_MeshInstance3D_514" type="MeshInstance3D" parent="." unique_id=1290654186]
+[node name="_MeshInstance3D_527" type="MeshInstance3D" parent="." unique_id=1109300119]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.8, 4.92, 0)
 material_override = SubResource("StandardMaterial3D_pi66q")
 mesh = SubResource("CylinderMesh_7krwg")

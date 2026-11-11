@@ -42,39 +42,39 @@ albedo_color = Color(0.3292045, 0.53432226, 0.5716202, 1)
 [sub_resource type="BoxMesh" id="BoxMesh_ksx81"]
 size = Vector3(0.7, 0.12, 0.5)
 
-[node name="Playground" type="Node3D" unique_id=46807711]
+[node name="Playground" type="Node3D" unique_id=1277138594]
 
-[node name="_MeshInstance3D_348" type="MeshInstance3D" parent="." unique_id=1158542248]
+[node name="_MeshInstance3D_361" type="MeshInstance3D" parent="." unique_id=1398679419]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 1.5, 0)
 material_override = SubResource("StandardMaterial3D_qu66v")
 mesh = SubResource("BoxMesh_k3dw8")
 
-[node name="_MeshInstance3D_349" type="MeshInstance3D" parent="." unique_id=944105219]
+[node name="_MeshInstance3D_362" type="MeshInstance3D" parent="." unique_id=373741024]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 1.5, 0)
 material_override = SubResource("StandardMaterial3D_8cmoy")
 mesh = SubResource("BoxMesh_0e4u3")
 
-[node name="_MeshInstance3D_350" type="MeshInstance3D" parent="." unique_id=1657690354]
+[node name="_MeshInstance3D_363" type="MeshInstance3D" parent="." unique_id=759398537]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3, 0)
 material_override = SubResource("StandardMaterial3D_kdmgk")
 mesh = SubResource("BoxMesh_t8p2x")
 
-[node name="_MeshInstance3D_351" type="MeshInstance3D" parent="." unique_id=945437231]
+[node name="_MeshInstance3D_364" type="MeshInstance3D" parent="." unique_id=458190420]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.8, 1.6, 0)
 material_override = SubResource("StandardMaterial3D_6qmww")
 mesh = SubResource("BoxMesh_agttr")
 
-[node name="_MeshInstance3D_352" type="MeshInstance3D" parent="." unique_id=1862451511]
+[node name="_MeshInstance3D_365" type="MeshInstance3D" parent="." unique_id=616236363]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.8, 0.4, 0)
 material_override = SubResource("StandardMaterial3D_yukxw")
 mesh = SubResource("BoxMesh_1nnh0")
 
-[node name="_MeshInstance3D_353" type="MeshInstance3D" parent="." unique_id=1775860824]
+[node name="_MeshInstance3D_366" type="MeshInstance3D" parent="." unique_id=1019559404]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.8, 1.6, 0)
 material_override = SubResource("StandardMaterial3D_wwhiq")
 mesh = SubResource("BoxMesh_ktg66")
 
-[node name="_MeshInstance3D_354" type="MeshInstance3D" parent="." unique_id=1531845511]
+[node name="_MeshInstance3D_367" type="MeshInstance3D" parent="." unique_id=1310590465]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.8, 0.4, 0)
 material_override = SubResource("StandardMaterial3D_608cy")
 mesh = SubResource("BoxMesh_ksx81")

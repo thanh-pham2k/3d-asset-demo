@@ -1,9 +1,27 @@
 class_name HuTieuBusiness
 extends BusinessShop
 
+const HuTieuCustomer = preload("res://scripts/neighborhood/business/hutieu_customer.gd")
+
 ## Girl's Hu Tieu Shop gameplay controller.
-## Manages customer seating at dining tables, food orders, interactive cooking stations
-## (blanching noodles, hot bone broth, fresh toppings), dish assembly, serving, and patience.
+## Manages preparation & opening phases, customer seating at dining tables, food orders,
+## interactive cooking stations, dish assembly, serving, and customer satisfaction.
+
+enum PrepState {
+	CLOSED,
+	PREPARING,
+	READY,
+	OPEN
+}
+
+var prep_state: PrepState = PrepState.CLOSED
+var prep_progress: float = 0.0 # 0 to 100
+var prep_station: NoodleStation
+var prep_billboard: Label3D
+const PREP_SPEED: float = 30.0 # ~3.3s to prepare
+
+var table_occupied: Dictionary = {} # table_index -> bool
+var table_customers: Dictionary = {} # table_index -> HuTieuCustomer
 
 class NoodleStation extends Interactable:
 	var hutieu: HuTieuBusiness
@@ -125,9 +143,64 @@ func _create_kitchen_and_table_stations() -> void:
 	toppings.station_type = "topping_counter"
 	toppings.position = Vector3(-48.2, 0, -17.2)
 	add_child(toppings)
+	
+	# 5. Preparation & Opening Station
+	prep_station = NoodleStation.new()
+	prep_station.name = "PrepStation"
+	prep_station.hutieu = self
+	prep_station.station_type = "prep_station"
+	prep_station.position = Vector3(-46.0, 0, -17.2)
+	add_child(prep_station)
+	
+	prep_billboard = Label3D.new()
+	prep_billboard.name = "PrepBillboard"
+	prep_billboard.position = Vector3(-50.0, 3.2, -17.2)
+	prep_billboard.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	prep_billboard.font_size = 24
+	prep_billboard.pixel_size = 0.005
+	prep_billboard.outline_size = 8
+	prep_billboard.modulate = Color("fff59d")
+	prep_billboard.outline_modulate = Color("1a1a1a")
+	add_child(prep_billboard)
+	_update_prep_billboard()
+
+func _update_prep_billboard() -> void:
+	if not is_instance_valid(prep_billboard): return
+	match prep_state:
+		PrepState.CLOSED:
+			prep_billboard.text = "%s\n[CHƯA MỞ CỬA]\n[E] Chuẩn bị mở quán" % shop_name
+			prep_billboard.modulate = Color("ffcc80")
+		PrepState.PREPARING:
+			var stage := "Sơ chế nguyên liệu & hầm nước lèo..."
+			if prep_progress > 60.0: stage = "Trụng hủ tiếu & sắp xếp bàn ghế..."
+			var bar_blocks := int(prep_progress / 10.0)
+			var bar_str := "█".repeat(bar_blocks) + "░".repeat(10 - bar_blocks)
+			prep_billboard.text = "⏳ Đang chuẩn bị quán... %d%%\n[%s]\n%s" % [int(prep_progress), bar_str, stage]
+			prep_billboard.modulate = Color("80deea")
+		PrepState.READY:
+			prep_billboard.text = "✅ Chuẩn bị hoàn tất (100%)!\n[E] Sẵn sàng bán - Mở cửa quán"
+			prep_billboard.modulate = Color("69f0ae")
+		PrepState.OPEN:
+			prep_billboard.text = "🍜 %s\nĐang Mở Cửa Đón Khách!" % shop_name
+			prep_billboard.modulate = Color("fff59d")
+
+func set_shop_open_ready() -> void:
+	prep_state = PrepState.OPEN
+	prep_progress = 100.0
+	is_open = true
+	_update_prep_billboard()
 
 func _process(delta: float) -> void:
 	super._process(delta)
+	
+	# Update preparation progression
+	if prep_state == PrepState.PREPARING:
+		prep_progress = minf(100.0, prep_progress + PREP_SPEED * delta)
+		if prep_progress >= 100.0:
+			prep_state = PrepState.READY
+			_show_feedback(Vector3(-50.0, 0, -17.2), "✅ Chuẩn bị hoàn tất! Nhấn E để sẵn sàng bán!", Color("ffd54f"))
+	
+	_update_prep_billboard()
 	
 	if current_bowl_state == BowlState.BLANCHING:
 		blanch_timer -= delta
@@ -139,13 +212,17 @@ func _process(delta: float) -> void:
 		_update_table_display(table)
 
 func _try_spawn_customer() -> void:
+	if prep_state != PrepState.OPEN or not is_open:
+		return # Customers cannot arrive before opening
+	
 	var free_table := -1
 	for i in range(table_positions.size()):
-		if not table_orders.has(i):
+		if not table_occupied.get(i, false) and not table_orders.has(i):
 			free_table = i
 			break
 	if free_table == -1: return # All tables occupied
 	
+	table_occupied[free_table] = true
 	var dish: Dictionary = menu_catalog[randi() % menu_catalog.size()]
 	var cust_name: String = customer_names[randi() % customer_names.size()]
 	var order_id := "hutieu_%d_%d" % [free_table, Time.get_ticks_msec()]
@@ -162,17 +239,63 @@ func _try_spawn_customer() -> void:
 	order.table_index = free_table
 	order.target_spot = table_positions[free_table]
 	
-	table_orders[free_table] = order
-	active_orders.append(order)
-	order_received.emit(order)
-	_update_table_display(free_table)
+	# Spawn customer walking from sidewalk to chair
+	var chair_target := table_positions[free_table] + Vector3(-0.95, 0, 0)
+	var approach_path: Array[Vector3] = [
+		Vector3(-50, 0, -5),
+		Vector3(-50, 0, -12),
+		chair_target
+	]
+	var departure_path: Array[Vector3] = [
+		chair_target,
+		Vector3(-50, 0, -12),
+		Vector3(-70, 0, -5)
+	]
+	
+	var customer := HuTieuCustomer.new()
+	customer.name = "HuTieuCustomer_%d" % free_table
+	add_child(customer)
+	customer.setup(free_table, cust_name, table_positions[free_table], approach_path, departure_path)
+	table_customers[free_table] = customer
+	
+	customer.arrived_at_table.connect(func(tbl_idx: int):
+		if not is_instance_valid(self): return
+		table_orders[tbl_idx] = order
+		active_orders.append(order)
+		order_received.emit(order)
+		_update_table_display(tbl_idx)
+	)
+	
+	customer.departed_from_table.connect(func(tbl_idx: int):
+		if not is_instance_valid(self): return
+		table_occupied.erase(tbl_idx)
+		table_customers.erase(tbl_idx)
+		table_orders.erase(tbl_idx)
+		if table_status_labels.has(tbl_idx):
+			table_status_labels[tbl_idx].visible = false
+	)
+
+func complete_order(order: BusinessOrder) -> bool:
+	var tbl := order.table_index
+	if table_customers.has(tbl) and is_instance_valid(table_customers[tbl]):
+		table_customers[tbl].notify_food_served()
+	return super.complete_order(order)
 
 func _on_customer_depart(order: BusinessOrder) -> void:
 	var tbl := order.table_index
-	if table_orders.has(tbl) and table_orders[tbl] == order:
-		table_orders.erase(tbl)
-		if table_status_labels.has(tbl):
-			table_status_labels[tbl].visible = false
+	if table_customers.has(tbl) and is_instance_valid(table_customers[tbl]):
+		var cust: HuTieuCustomer = table_customers[tbl]
+		# If order was completed/paid, customer is enjoying the food and will leave after eating.
+		# Only force immediate departure on failed/cancelled orders.
+		if order.status != BusinessOrder.Status.COMPLETED and order.status != BusinessOrder.Status.PAID:
+			if cust.current_state != HuTieuCustomer.State.LEAVING and cust.current_state != HuTieuCustomer.State.DESPAWNED:
+				cust._start_leaving()
+	else:
+		if table_orders.has(tbl) and table_orders[tbl] == order:
+			table_orders.erase(tbl)
+			table_occupied.erase(tbl)
+			if table_status_labels.has(tbl):
+				table_status_labels[tbl].visible = false
 
 func _update_table_display(table_index: int) -> void:
 	if not table_status_labels.has(table_index): return
@@ -200,6 +323,17 @@ func _update_table_display(table_index: int) -> void:
 
 func get_station_prompt(station: NoodleStation, _player: Node3D) -> String:
 	match station.station_type:
+		"prep_station":
+			match prep_state:
+				PrepState.CLOSED:
+					return "Chuẩn bị mở quán"
+				PrepState.PREPARING:
+					return "Đang chuẩn bị quán... (%d%%)" % int(prep_progress)
+				PrepState.READY:
+					return "Sẵn sàng bán (Nhấn E để mở cửa)"
+				PrepState.OPEN:
+					return "Quán hủ tiếu đang mở cửa"
+		
 		"blanch_pot":
 			if current_bowl_state == BowlState.EMPTY:
 				return "Trụng hủ tiếu tươi vào nồi nước sôi"
@@ -240,6 +374,22 @@ func get_station_prompt(station: NoodleStation, _player: Node3D) -> String:
 
 func on_station_interacted(station: NoodleStation, player_node: Node3D) -> void:
 	match station.station_type:
+		"prep_station":
+			match prep_state:
+				PrepState.CLOSED:
+					prep_state = PrepState.PREPARING
+					prep_progress = 0.0
+					_show_feedback(station.global_position, "Bắt đầu chuẩn bị nguyên liệu & nấu nước lèo!", Color("80deea"))
+				PrepState.PREPARING:
+					_show_feedback(station.global_position, "Đang chuẩn bị: %d%%..." % int(prep_progress), Color("ffe082"))
+				PrepState.READY:
+					prep_state = PrepState.OPEN
+					is_open = true
+					_show_feedback(station.global_position, "🎉 Quán hủ tiếu chính thức MỞ CỬA đón khách!", Color("69f0ae"))
+					shop_status_changed.emit(true)
+				PrepState.OPEN:
+					_show_feedback(station.global_position, "Quán đang mở cửa đón khách tấp nập!", Color("69f0ae"))
+		
 		"blanch_pot":
 			if current_bowl_state == BowlState.EMPTY:
 				current_bowl_state = BowlState.BLANCHING

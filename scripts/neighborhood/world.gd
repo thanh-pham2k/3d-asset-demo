@@ -1,6 +1,7 @@
 extends Node3D
 
 const MODULE = preload("res://scripts/neighborhood/module.gd")
+const WorkplaceGuidance = preload("res://scripts/workplace_guidance.gd")
 @export var integrated := false
 @export var economy_save_path := EconomySaveSystem.DEFAULT_SAVE_PATH
 var camera: Camera3D
@@ -10,6 +11,7 @@ var coop_manager: CoopManager
 var is_coop: bool = false
 var coop_obstacle: Node3D
 var coop_bench: Node3D
+var guidance: WorkplaceGuidance
 var overview := false
 var time_manager: NeighborhoodTimeManager
 var npc_manager: NPCManager
@@ -423,6 +425,11 @@ func _ready() -> void:
  add_child(camera)
  camera.look_at(player.position)
  camera.current = true
+ guidance = WorkplaceGuidance.new()
+ guidance.name = "WorkplaceGuidance"
+ guidance.player = player
+ guidance.camera = camera
+ add_child(guidance)
  add_help()
 
 func _unhandled_key_input(event: InputEvent) -> void:

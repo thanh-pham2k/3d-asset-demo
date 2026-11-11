@@ -246,6 +246,9 @@ func build() -> void:
     m.material_override = mat(tint)
     m.position = p
     add_child(m)
+    cutaway_meshes.append(m)
+   visual_occlusion_bounds = AABB(Vector3(-2.4, 2.0, -2.4), Vector3(4.8, 3.8, 4.8))
+   interior_half_size = Vector2(2.4, 2.4)
   "bench":
    box(Vector3(0,0.55,0),Vector3(2,0.18,0.65),wood)
    box(Vector3(0,1,0.25),Vector3(2,0.8,0.12),wood)
@@ -363,6 +366,9 @@ func build() -> void:
     leaf.position = Vector3(0,0.18,1.0)
     leaf.rotation.x = -0.28
     holder.add_child(leaf)
+    cutaway_meshes.append(leaf)
+   visual_occlusion_bounds = AABB(Vector3(-2.2, 1.8, -2.2), Vector3(4.4, 3.0, 4.4))
+   interior_half_size = Vector2(2.2, 2.2)
   "gazebo":
    for x in [-2.0,2.0]:
     for z in [-2.0,2.0]: box(Vector3(x,1.6,z),Vector3(0.2,3.2,0.2),Color("9b7657"),true)

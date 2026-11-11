@@ -1,6 +1,8 @@
 class_name GarageBusiness
 extends BusinessShop
 
+const MotorcycleCustomer = preload("res://scripts/neighborhood/business/motorcycle_customer.gd")
+
 ## Boy's Motorcycle Repair Shop gameplay controller.
 ## Manages arriving customers with scooters, repair requests (inflate, patch, replace),
 ## interactive tool stations, sequential validation, and customer patience.
@@ -29,6 +31,8 @@ var bay_positions: Array[Vector3] = [
 var bay_orders: Dictionary = {}
 var bay_scooters: Dictionary = {}
 var bay_status_labels: Dictionary = {}
+var bay_reserved: Dictionary = {} # bay_index -> bool
+var bay_customers: Dictionary = {} # bay_index -> MotorcycleCustomer
 
 # Inventory/holding state of player at garage
 var player_holding_tool: String = "" # "", "patch_kit", "new_tire", "worn_tire"
@@ -133,10 +137,12 @@ func _create_work_stations() -> void:
 func _try_spawn_customer() -> void:
 	var free_bay := -1
 	for i in range(bay_positions.size()):
-		if not bay_orders.has(i):
+		if not bay_orders.has(i) and not bay_reserved.get(i, false):
 			free_bay = i
 			break
-	if free_bay == -1: return # All bays busy
+	if free_bay == -1: return # All bays occupied or reserved
+	
+	bay_reserved[free_bay] = true
 	
 	# Pick random service
 	var service: Dictionary = service_catalog[randi() % service_catalog.size()]
@@ -155,13 +161,49 @@ func _try_spawn_customer() -> void:
 	order.table_index = free_bay
 	order.target_spot = bay_positions[free_bay] + position
 	
-	bay_orders[free_bay] = order
-	active_orders.append(order)
-	order_received.emit(order)
+	# Waypoints from road, turning into driveway to bay
+	var approach_path: Array[Vector3] = [
+		Vector3(-106, 0, 8),
+		Vector3(-106, 0, -5),
+		bay_positions[free_bay]
+	]
+	var departure_path: Array[Vector3] = [
+		bay_positions[free_bay],
+		Vector3(-106, 0, -5),
+		Vector3(-125, 0, 0)
+	]
 	
-	# Spawn visual scooter in bay
-	_spawn_bay_scooter(free_bay)
-	_update_bay_display(free_bay)
+	var customer := MotorcycleCustomer.new()
+	customer.name = "MotorcycleCustomer_%d" % free_bay
+	add_child(customer)
+	customer.setup(free_bay, cust_name, bay_positions[free_bay], approach_path, departure_path)
+	customer.order = order
+	bay_customers[free_bay] = customer
+	bay_scooters[free_bay] = customer.scooter
+	
+	customer.arrived_at_bay.connect(func(bay_idx: int):
+		if not is_instance_valid(self): return
+		bay_orders[bay_idx] = order
+		active_orders.append(order)
+		order_received.emit(order)
+		_update_bay_display(bay_idx)
+	)
+	
+	customer.departed_from_bay.connect(func(bay_idx: int):
+		if not is_instance_valid(self): return
+		bay_reserved.erase(bay_idx)
+		bay_customers.erase(bay_idx)
+		bay_orders.erase(bay_idx)
+		bay_scooters.erase(bay_idx)
+		if bay_status_labels.has(bay_idx):
+			bay_status_labels[bay_idx].visible = false
+	)
+
+func complete_order(order: BusinessOrder) -> bool:
+	var bay := order.table_index
+	if bay_customers.has(bay) and is_instance_valid(bay_customers[bay]):
+		bay_customers[bay].notify_service_done()
+	return super.complete_order(order)
 
 func _spawn_bay_scooter(bay_index: int) -> void:
 	if bay_scooters.has(bay_index) and is_instance_valid(bay_scooters[bay_index]):
@@ -176,13 +218,19 @@ func _spawn_bay_scooter(bay_index: int) -> void:
 
 func _on_customer_depart(order: BusinessOrder) -> void:
 	var bay := order.table_index
-	if bay_orders.has(bay) and bay_orders[bay] == order:
-		bay_orders.erase(bay)
-		if bay_scooters.has(bay) and is_instance_valid(bay_scooters[bay]):
-			bay_scooters[bay].queue_free()
-			bay_scooters.erase(bay)
-		if bay_status_labels.has(bay):
-			bay_status_labels[bay].visible = false
+	if bay_customers.has(bay) and is_instance_valid(bay_customers[bay]):
+		var cust: MotorcycleCustomer = bay_customers[bay]
+		if cust.current_state != MotorcycleCustomer.State.DEPARTING and cust.current_state != MotorcycleCustomer.State.DESPAWNED:
+			cust.notify_service_done()
+	else:
+		if bay_orders.has(bay) and bay_orders[bay] == order:
+			bay_orders.erase(bay)
+			bay_reserved.erase(bay)
+			if bay_scooters.has(bay) and is_instance_valid(bay_scooters[bay]):
+				bay_scooters[bay].queue_free()
+				bay_scooters.erase(bay)
+			if bay_status_labels.has(bay):
+				bay_status_labels[bay].visible = false
 
 func _process(delta: float) -> void:
 	super._process(delta)

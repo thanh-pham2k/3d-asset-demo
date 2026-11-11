@@ -15,6 +15,31 @@ The neighborhood features a living population of 12 distinct data-driven Vietnam
 - **Player Dialogue & Interaction**: Approaching an NPC displays an interaction prompt (`E — Trò chuyện với [Tên]`). Pressing `E` pauses the NPC, turns them to face the player, and opens an overhead speech bubble with time-sensitive Vietnamese dialogue. Pressing `E` advances lines, and walking away (> 2.8m) safely closes the interaction.
 - **Stuck & Schedule Recovery**: NPCs track progress while walking. Blocked routes trigger repathing within 2 seconds and failsafe position/schedule recovery within 5 seconds. Off-schedule time jumps catch up smoothly to the current scheduled location.
 
+## Realistic Customer Arrival, Shop Preparation & Navigation
+
+1. **Motorcycle Customer Arrival & Departure Flow** (`scripts/neighborhood/business/motorcycle_customer.gd`):
+   - **Realistic Road Approach**: NPC customers mount a 3D scooter with rolling wheels and exhaust smoke, riding from the roadway along waypoints into the garage.
+   - **Smooth Deceleration & Bay Parking**: As the customer approaches their assigned service bay, they decelerate smoothly (from 6.0 m/s down to 1.2 m/s), park neatly in the bay, step off the scooter, and stand beside it with dialogue waiting for service.
+   - **Service & Safe Departure**: Once the player repairs the scooter, the customer thanks the player, remounts the scooter, starts the engine, and drives along an exit path back to the outer roadway before despawning.
+   - **Anti-Overlap Bay Reservation**: If all repair bays are reserved or occupied, incoming spawns are safely throttled or turned away to prevent clutter and clipping.
+
+2. **Hu Tieu Shop Preparation Phase & Dining Flow** (`scripts/neighborhood/business/hutieu_business.gd`, `scripts/neighborhood/business/hutieu_customer.gd`):
+   - **Business Preparation State Machine**: The shop implements an explicit lifecycle: `CLOSED` → `PREPARING` → `READY` → `OPEN`.
+   - **Preparation Station**: Players approach the counter station and see `E — Chuẩn bị mở quán`. Pressing `E` initiates gradual ingredient prep and broth heating (0% to 100% progress bar) with floating 3D status banners.
+   - **Opening Confirmation**: At 100%, the prompt transitions to `E — Sẵn sàng bán`. Players press `E` to officially open the shop; customers only arrive after the shop is open.
+   - **Dining Experience Flow**: Customers walk in from the sidewalk, find an available dining table, take a seat on the wooden chair facing the table, and only place their order once comfortably seated. When the player serves the hot noodle bowl, the customer slurps their noodles (with eating animations), pays their bill, stands up, and walks out back to the street.
+
+3. **Camera-Relative Screen-Space Directional Arrow & Guidance** (`scripts/workplace_guidance.gd`):
+   - **True Camera-Relative Angle**: Projects horizontal ground delta vectors onto the camera's ground right (`camera.global_basis.x`) and forward (`-camera.global_basis.z`) axes to compute true screen-space directions (`Vector2(right_dot, -fwd_dot)`), smoothly updated during camera rotation.
+   - **Screen-Edge Clamping**: When the objective is outside the player's viewport, a prominent directional pointer clamps to the screen border with a rotating compass badge and remaining distance in meters.
+   - **Dynamic Context-Sensitive Objectives**:
+     - *Boy*: Starter Home Exit → Motorcycle Repair Shop → Active Service Bay needing repair.
+     - *Girl*: Starter Home Exit → Hu Tieu Shop → Prep Station (`Chuẩn bị mở quán`) → Kitchen Counter (`Trụng bánh` / `Chan nước` / `Topping`) → Seated Customer Table.
+   - **3D Ground Beacon**: A gentle pulsing ground ring highlights the exact active station or table in the 3D world; hides automatically upon arrival (< 2.5m).
+
+4. **Foliage Camera Occlusion Cutaway** (`scripts/neighborhood/module.gd`):
+   - Trees and banana plants register their canopy meshes in `cutaway_meshes` with dedicated visual bounding boxes, automatically cutting away transparency when occluding the player character.
+
 ## Playable Businesses
 
 Two interactive businesses are fully playable using the shared `BusinessShop` / `BusinessOrder` architecture:
@@ -102,6 +127,7 @@ Run the automated checks with Godot 4.7.2:
 /Applications/Godot.app/Contents/MacOS/Godot --headless --path . --script res://tests/economy_system_test.gd
 /Applications/Godot.app/Contents/MacOS/Godot --headless --path . --script res://tests/home_progression_test.gd
 /Applications/Godot.app/Contents/MacOS/Godot --headless --path . --script res://tests/local_coop_test.gd
+/Applications/Godot.app/Contents/MacOS/Godot --headless --path . --script res://tests/customer_arrival_and_prep_test.gd
 ```
 
 The room smoke test checks that its wall-collision setup starts free of obstacles before moving into the wall. After the pickup/throw checks, it isolates those movable test fixtures and verifies the intended sofa, bed and lamp are the nearest interaction targets before exercising their input paths. The navigation test flood-fills a two-metre grid using a conservative player-sized physics shape and sweeps each traversed edge; it checks representative district targets and connects all 31 building doorways to the sampled reachable area, not every possible position. It also checks a wall, all four map boundaries, spawn clearance, collision-free NPC guide segments, interior/exterior cutaway and collision, rotated side walls, map visibility, input movement and the camera toggle. The routes test verifies that all guides form one network through shared curve points. The walkthrough test plans on the same conservative grid and sends InputMap actions to the actual player controller across all ten districts and five interiors without teleporting; it uses 4× simulation time and a 240 Hz physics tick. It is an automated test, not human keyboard or visual QA. The entrances test sweeps a player-sized shape through each doorway and checks each building’s cutaway cycle. The layout test compares group and module counts, visual transforms and colors, collision counts, paths and markers with the live world. The editable-scene test checks mesh bounds, colors, collision shape types, dimensions and transforms against the procedural sources. The batching test compares visual bounds, collision counts and cutaway presence for every module. The entry test exercises scene transitions programmatically. The GLB test reimports each exported module and compares mesh count and combined bounds with the source; it does not verify appearance or collision in other applications. Rendered screenshots are staged captures, not hands-on gameplay. A short running-window check exercised movement and the map camera through UI-sent keys; a full keyboard walk-through, camera occlusion around every building, and performance on target hardware remain manual checks. The pond uses a simple cylindrical exclusion shape inside its decorative shoreline; it has no swimming or water simulation. Shops, NPCs and business mechanics are placeholders for future work.

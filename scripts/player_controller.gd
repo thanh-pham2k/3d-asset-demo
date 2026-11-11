@@ -123,7 +123,7 @@ func _physics_process(delta: float) -> void:
  var riding_scooter = get_meta("riding_scooter") if has_meta("riding_scooter") else null
  if riding_scooter != null and is_instance_valid(riding_scooter):
   speed = 13.0 if running else 8.5
- if Input.is_action_just_pressed(prefix + "dash") and dash_cooldown_remaining <= 0.0:
+ if Input.is_action_just_pressed(prefix + "dash") and dash_cooldown_remaining <= 0.0 and riding_scooter == null:
   dash_direction = direction.normalized() if direction.length() > 0.08 else facing
   dash_remaining = config.dash_duration
   dash_cooldown_remaining = config.dash_cooldown
@@ -245,6 +245,11 @@ func _physics_process(delta: float) -> void:
   visual.scale = Vector3(0.9, 1.15, 0.9)
   var cam = get_viewport().get_camera_3d()
   if cam and cam.has_method("add_trauma"): cam.add_trauma(0.12)
+ elif Input.is_action_just_pressed(prefix + "throw") and not held_pillow and riding_scooter == null:
+  var hutieu := get_tree().get_first_node_in_group("hutieu_business") as Node
+  if is_instance_valid(hutieu) and hutieu.has_method("cycle_recipe"):
+   if global_position.distance_to(hutieu.global_position + Vector3(-48.2, 0, -17.2)) < 3.2:
+    hutieu.cycle_recipe()
  var sc = get_meta("riding_scooter") if has_meta("riding_scooter") else null
  if sc != null and is_instance_valid(sc):
   update_animation(0.0, false)

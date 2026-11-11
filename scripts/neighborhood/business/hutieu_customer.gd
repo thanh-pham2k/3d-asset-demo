@@ -201,6 +201,16 @@ func _start_leaving() -> void:
 	current_waypoint_idx = 0
 	move_speed = 3.6
 
+func notify_order_failed(reason: String = "timeout") -> void:
+	if current_state == State.LEAVING or current_state == State.DESPAWNED:
+		return
+	eating_bowl.visible = false
+	_stand_up_pose()
+	_show_speech("Đợi lâu quá đói lả cả người! Tôi đi chỗ khác đây! 💢", 2.2)
+	current_state = State.LEAVING
+	current_waypoint_idx = 0
+	move_speed = 3.6
+
 func _on_departed() -> void:
 	current_state = State.DESPAWNED
 	departed_from_table.emit(table_index)

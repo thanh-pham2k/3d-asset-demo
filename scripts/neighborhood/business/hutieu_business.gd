@@ -64,6 +64,7 @@ var table_status_labels: Dictionary = {}
 # Current bowl cooking state on counter
 var current_bowl_state: BowlState = BowlState.EMPTY
 var current_bowl_dish: String = "" # e.g. "Hủ tiếu Nam Vang"
+var selected_recipe_index: int = 0 # 0: Nam Vang, 1: Sườn heo, 2: Tôm thịt
 var blanch_timer: float = 0.0
 const BLANCH_DURATION: float = 1.6
 
@@ -280,6 +281,19 @@ func _try_spawn_customer() -> void:
 			table_status_labels[tbl_idx].visible = false
 	)
 
+func cycle_recipe() -> String:
+	selected_recipe_index = (selected_recipe_index + 1) % menu_catalog.size()
+	var current_title: String = menu_catalog[selected_recipe_index]["title"]
+	_show_feedback(Vector3(-48.2, 0, -17.2), "Đã chọn món: %s 🥢" % current_title, Color("80d8ff"))
+	return current_title
+
+func set_recipe_by_title(dish_title: String) -> bool:
+	for i in range(menu_catalog.size()):
+		if menu_catalog[i]["title"] == dish_title:
+			selected_recipe_index = i
+			return true
+	return false
+
 func complete_order(order: BusinessOrder) -> bool:
 	var tbl := order.table_index
 	if table_customers.has(tbl) and is_instance_valid(table_customers[tbl]):
@@ -291,10 +305,10 @@ func _on_customer_depart(order: BusinessOrder) -> void:
 	if table_customers.has(tbl) and is_instance_valid(table_customers[tbl]):
 		var cust: HuTieuCustomer = table_customers[tbl]
 		# If order was completed/paid, customer is enjoying the food and will leave after eating.
-		# Only force immediate departure on failed/cancelled orders.
+		# Only force departure on failed/cancelled orders.
 		if order.status != BusinessOrder.Status.COMPLETED and order.status != BusinessOrder.Status.PAID:
 			if cust.current_state != HuTieuCustomer.State.LEAVING and cust.current_state != HuTieuCustomer.State.DESPAWNED:
-				cust._start_leaving()
+				cust.notify_order_failed("timeout")
 	else:
 		if table_orders.has(tbl) and table_orders[tbl] == order:
 			table_orders.erase(tbl)
@@ -349,6 +363,8 @@ func get_station_prompt(station: NoodleStation, _player: Node3D) -> String:
 				return "Đang trụng hủ tiếu... (chờ sôi)"
 			elif current_bowl_state == BowlState.NOODLES_DONE:
 				return "Đã có hủ tiếu trong tô! Cần thêm nước lèo"
+			elif current_bowl_state == BowlState.FULLY_PREPARED:
+				return "Đổ tô hủ tiếu (%s) để nấu lại" % current_bowl_dish
 			else:
 				return "Nồi nước sôi trụng hủ tiếu"
 		
@@ -362,11 +378,12 @@ func get_station_prompt(station: NoodleStation, _player: Node3D) -> String:
 		
 		"topping_counter":
 			if current_bowl_state == BowlState.BROTH_ADDED:
-				return "Thêm tôm, thịt, tóp mỡ & hành phi"
+				var next_dish: String = str(menu_catalog[(selected_recipe_index + 1) % menu_catalog.size()]["title"])
+				return "Thêm topping: %s [E] · [F] Đổi món (%s)" % [menu_catalog[selected_recipe_index]["title"], next_dish]
 			elif current_bowl_state == BowlState.FULLY_PREPARED:
-				return "Tô hủ tiếu đã sẵn sàng phục vụ khách!"
+				return "Tô %s đã xong! Mang phục vụ khách" % current_bowl_dish
 			else:
-				return "Quầy đồ ăn kèm (tôm, thịt, rau thơm)"
+				return "Quầy đồ ăn kèm: %s (Nhấn F đổi món)" % menu_catalog[selected_recipe_index]["title"]
 		
 		"table":
 			var tbl := station.table_index
@@ -374,7 +391,10 @@ func get_station_prompt(station: NoodleStation, _player: Node3D) -> String:
 				return "Bàn ăn số %d (trống)" % (tbl + 1)
 			var order: BusinessOrder = table_orders[tbl]
 			if current_bowl_state == BowlState.FULLY_PREPARED:
-				return "Phục vụ %s cho Bàn %d" % [order.service_title, tbl + 1]
+				if current_bowl_dish == order.service_title:
+					return "Phục vụ %s cho Bàn %d" % [order.service_title, tbl + 1]
+				else:
+					return "Sai món! Bàn %d gọi %s (Tô đang có: %s)" % [tbl + 1, order.service_title, current_bowl_dish]
 			else:
 				return "Bàn %d đang chờ: %s" % [tbl + 1, order.service_title]
 	
@@ -405,6 +425,12 @@ func on_station_interacted(station: NoodleStation, player_node: Node3D) -> void:
 				_show_feedback(station.global_position, "💧 Đang trụng sợi hủ tiếu vào vợt nước sôi...", Color("80d8ff"))
 			elif current_bowl_state == BowlState.BLANCHING:
 				_show_feedback(station.global_position, "⏳ Đang trụng, vui lòng chờ vài giây...", Color("ffe082"))
+			elif current_bowl_state == BowlState.FULLY_PREPARED:
+				# Clear bowl to remake
+				current_bowl_state = BowlState.EMPTY
+				var discarded := current_bowl_dish
+				current_bowl_dish = ""
+				_show_feedback(station.global_position, "Đã dọn sạch tô %s để nấu lại!" % discarded, Color("ffd54f"))
 			else:
 				_show_feedback(station.global_position, "Tô đã có bánh hủ tiếu rồi!", Color("cfd8dc"))
 		
@@ -420,15 +446,11 @@ func on_station_interacted(station: NoodleStation, player_node: Node3D) -> void:
 		"topping_counter":
 			if current_bowl_state == BowlState.BROTH_ADDED:
 				current_bowl_state = BowlState.FULLY_PREPARED
-				# Assign dish matching the nearest waiting customer order
-				var assigned := "Hủ tiếu Nam Vang"
-				for tbl in table_orders:
-					assigned = table_orders[tbl].service_title
-					break
-				current_bowl_dish = assigned
-				_show_feedback(station.global_position, "✨ Đã rắc tôm thịt, tóp mỡ, hành phi thơm lừng!\nTô %s đã sẵn sàng!" % current_bowl_dish, Color("69f0ae"))
+				# Strict assignment: Exactly matches the player's selected recipe!
+				current_bowl_dish = menu_catalog[selected_recipe_index]["title"]
+				_show_feedback(station.global_position, "✨ Đã rắc topping thơm lừng!\nTô '%s' đã sẵn sàng phục vụ!" % current_bowl_dish, Color("69f0ae"))
 			elif current_bowl_state == BowlState.FULLY_PREPARED:
-				_show_feedback(station.global_position, "Tô đã chuẩn bị xong, mang phục vụ khách nào!", Color("69f0ae"))
+				_show_feedback(station.global_position, "Tô '%s' đã sẵn sàng, mang phục vụ khách nào!" % current_bowl_dish, Color("69f0ae"))
 			else:
 				_show_feedback(station.global_position, "⚠️ Cần trụng hủ tiếu và chan nước lèo trước!", Color("ffab40"))
 		
@@ -439,12 +461,18 @@ func on_station_interacted(station: NoodleStation, player_node: Node3D) -> void:
 				return
 			
 			var order: BusinessOrder = table_orders[tbl]
-			if current_bowl_state == BowlState.FULLY_PREPARED:
-				# Complete the order
-				current_bowl_state = BowlState.EMPTY
-				current_bowl_dish = ""
-				order.status = BusinessOrder.Status.COMPLETED
-				complete_order(order)
-				_show_feedback(station.global_position, "😋 Khách ăn ngon miệng khen hết lời!", Color("69f0ae"))
-			else:
+			if current_bowl_state != BowlState.FULLY_PREPARED:
 				_show_feedback(station.global_position, "⚠️ Chưa chuẩn bị xong tô hủ tiếu để phục vụ!", Color("ffab40"))
+				return
+			
+			# Strict validation: prepared dish MUST match ordered dish
+			if current_bowl_dish != order.service_title:
+				_show_feedback(station.global_position, "❌ Món ăn không đúng! Khách gọi '%s', nhưng tô này là '%s'!" % [order.service_title, current_bowl_dish], Color("ff5252"))
+				return # Rejected without completing order or paying reward!
+			
+			# Complete the order
+			current_bowl_state = BowlState.EMPTY
+			current_bowl_dish = ""
+			order.status = BusinessOrder.Status.COMPLETED
+			complete_order(order)
+			_show_feedback(station.global_position, "😋 Khách ăn ngon miệng khen hết lời!", Color("69f0ae"))

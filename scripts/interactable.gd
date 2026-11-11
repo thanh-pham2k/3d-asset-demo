@@ -56,6 +56,13 @@ func interact(player: Node3D) -> void:
    elif user == null:
     user = player
     player.enter_rest(self, (get_parent() as Node3D).to_global(seat_point), kind == "bed")
+    if kind == "bed":
+     var econ = get_tree().get_first_node_in_group("economy_manager")
+     if is_instance_valid(econ) and econ.has_method("save_economy_state"):
+      econ.save_economy_state()
+     var fx = get_tree().get_first_node_in_group("chaos_feedback")
+     if is_instance_valid(fx) and fx.has_method("play_event"):
+      fx.play_event("pickup", global_position + Vector3(0, 1.2, 0))
   "lamp":
    toggle = not toggle
    if light: light.visible = toggle
@@ -65,7 +72,9 @@ func interact(player: Node3D) -> void:
    if hint: hint.text = "E — Đóng cửa" if toggle else "E — Mở cửa"
    if has_meta("door_body"):
     var body = get_meta("door_body")
-    if is_instance_valid(body): body.set_deferred("collision_layer", 0 if toggle else 1)
+    if is_instance_valid(body):
+     body.collision_layer = 0 if toggle else 1
+     body.set_deferred("collision_layer", 0 if toggle else 1)
    if moving_part:
     var tween = create_tween()
     tween.tween_property(moving_part, "rotation:y", -1.35 if toggle else 0.0, 0.3)

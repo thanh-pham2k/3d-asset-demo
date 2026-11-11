@@ -233,14 +233,14 @@ func dismount(snap_to_spot: Vector3 = Vector3.ZERO) -> void:
 	if snap_to_spot != Vector3.ZERO:
 		global_position = snap_to_spot
 	else:
-		# Check if within 3.5m of home or work parking spot
+		# Check if within 5.0m of home or work parking spot
 		var dist_home := current_world_pos.distance_to(home_parking_pos)
 		var dist_work := current_world_pos.distance_to(work_parking_pos)
-		if dist_home < 4.0:
+		if dist_home < 5.0:
 			global_position = home_parking_pos
 			rotation.y = PI # Face road
 			parked_at_destination.emit("home")
-		elif dist_work < 4.0:
+		elif dist_work < 5.0:
 			global_position = work_parking_pos
 			rotation.y = PI / 2.0 if owner_character == "boy" else 0.0
 			parked_at_destination.emit("work")
@@ -327,9 +327,11 @@ func get_riding_prompt() -> String:
 	elif dist_home < 4.5:
 		return "E — Đỗ xe vào bãi nhà · [Shift] Lái xe"
 	elif auto_cruising:
-		return "Đang tự lái đến quán... · [E] Dừng xe"
+		var dest_txt := destination_name if cruise_target_is_work else "nhà"
+		return "Đang tự lái đến %s... · [E] Dừng xe" % dest_txt
 	else:
-		return "E — Xuống xe · F — Tự lái đến quán · [Shift] Tăng tốc"
+		var target_txt := destination_name if dist_home < 25.0 else "về nhà"
+		return "E — Xuống xe · F — Tự lái %s · [Shift] Tăng tốc" % target_txt
 
 func start_auto_cruise() -> void:
 	auto_cruising = true
@@ -340,32 +342,55 @@ func start_auto_cruise() -> void:
 	
 	if cruise_target_is_work:
 		if owner_character == "boy":
-			# Road path from house to garage
+			# Road path from house to garage:
+			# Home parking -> yard gate -> local road -> west avenue -> boulevard -> garage driveway -> bay
 			cruise_waypoints = [
-				Vector3(-45, 0, 72),
+				home_parking_pos,
+				Vector3(-45, 0, 64),
 				Vector3(-45, 0, 50),
 				Vector3(-80, 0, 50),
-				Vector3(-80, 0, -8),
+				Vector3(-80, 0, 0),
+				Vector3(-63, 0, 0),
 				Vector3(-63, 0, -8),
 				work_parking_pos
 			]
 		else:
-			# Road path from house to hu tieu shop
+			# Road path from house to hu tieu shop:
+			# Home parking -> yard gate -> local road -> center avenue -> boulevard -> noodle stall front -> bay
 			cruise_waypoints = [
-				Vector3(-45, 0, 72),
+				home_parking_pos,
+				Vector3(-45, 0, 64),
 				Vector3(-45, 0, 50),
 				Vector3(0, 0, 50),
-				Vector3(0, 0, -8),
+				Vector3(0, 0, 0),
+				Vector3(-44, 0, 0),
 				Vector3(-44, 0, -8),
 				work_parking_pos
 			]
 	else:
-		# Return to house path
-		cruise_waypoints = [
-			global_position + Vector3(0, 0, 6),
-			Vector3(-45, 0, 50),
-			home_parking_pos
-		]
+		# Return to house path strictly following the road grid
+		if owner_character == "boy":
+			cruise_waypoints = [
+				work_parking_pos,
+				Vector3(-63, 0, -8),
+				Vector3(-63, 0, 0),
+				Vector3(-80, 0, 0),
+				Vector3(-80, 0, 50),
+				Vector3(-45, 0, 50),
+				Vector3(-45, 0, 64),
+				home_parking_pos
+			]
+		else:
+			cruise_waypoints = [
+				work_parking_pos,
+				Vector3(-44, 0, -8),
+				Vector3(-44, 0, 0),
+				Vector3(0, 0, 0),
+				Vector3(0, 0, 50),
+				Vector3(-45, 0, 50),
+				Vector3(-45, 0, 64),
+				home_parking_pos
+			]
 
 func _process_auto_cruise(delta: float) -> void:
 	if not is_instance_valid(rider): return
@@ -380,6 +405,10 @@ func _process_auto_cruise(delta: float) -> void:
 	var dist: float = to_target.length()
 	
 	var cruise_speed: float = 9.5
+	# Smoothly decelerate near final destination spot
+	if cruise_waypoint_idx == cruise_waypoints.size() - 1:
+		cruise_speed = clampf(dist * 2.5, 2.0, 9.5)
+	
 	if dist <= cruise_speed * delta:
 		rider.global_position.x = target.x
 		rider.global_position.z = target.z

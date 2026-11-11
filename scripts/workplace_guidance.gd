@@ -151,26 +151,55 @@ func _resolve_current_destination() -> void:
 	var char_name: String = str(char_val) if char_val != null and str(char_val) != "" else "boy"
 	var girl := char_name == "girl"
 	var p_pos := player.global_position
-	var in_house := p_pos.z > 65.0
+	var in_house := p_pos.z > 83.0
 	
 	var is_riding: bool = player.has_meta("riding_scooter") and is_instance_valid(player.get_meta("riding_scooter"))
+	var sc = player.get_meta("riding_scooter") if player.has_meta("riding_scooter") else null
+	var heading_home := false
+	if is_instance_valid(sc):
+		if sc.auto_cruising:
+			heading_home = not sc.cruise_target_is_work
+		else:
+			heading_home = p_pos.distance_to(sc.home_parking_pos) > p_pos.distance_to(sc.work_parking_pos)
 	
 	if in_house:
-		current_destination = HOUSE_EXIT
-		current_title = "Cổng Sân Nhà"
-		current_hint = "Ra sân lấy xe máy đi làm"
-		return
+		var econ = get_tree().get_first_node_in_group("economy_manager")
+		var has_worked: bool = is_instance_valid(econ) and (econ.wallet.total_earned > 0 or econ.wallet.balance > 100000)
+		if has_worked and p_pos.distance_to(Vector3(-45, 0, 88)) < 6.0:
+			current_destination = Vector3(-50.5, 0, 90.75)
+			current_title = "🛏️ Giường Ngủ (Lưu Tiến Trình)"
+			current_hint = "Nằm nghỉ trên giường [E] để lưu tiến trình ngày làm việc"
+			return
+		else:
+			current_destination = HOUSE_EXIT
+			current_title = "Cổng Sân Nhà"
+			current_hint = "Ra sân lấy xe máy đi làm"
+			return
 	
 	if not girl:
 		# -------------------------------------------------------------
-		# Boy Flow: Home -> Scooter -> Garage Parking -> Repair Bay
+		# Boy Flow: Home -> Scooter -> Garage Parking -> Repair Bay -> Return
 		# -------------------------------------------------------------
 		if is_riding:
-			current_destination = Vector3(-58.0, 0, -13.0)
-			current_title = "🅿️ Bãi Đậu Xe Tiệm Sửa Xe"
-			current_hint = "Lái xe đến bãi đậu của tiệm [E để đỗ xe]"
+			if heading_home:
+				current_destination = sc.home_parking_pos if is_instance_valid(sc) else Vector3(-48.0, 0, 72.0)
+				current_title = "🏡 Bãi Đỗ Xe Tại Nhà"
+				current_hint = "Lái xe về nhà [E để đỗ xe]"
+			else:
+				current_destination = Vector3(-58.0, 0, -13.0)
+				current_title = "🅿️ Bãi Đậu Xe Tiệm Sửa Xe"
+				current_hint = "Lái xe đến bãi đậu của tiệm [E để đỗ xe]"
 			return
 		elif p_pos.z > 60.0:
+			var at_home_bay := p_pos.distance_to(Vector3(-48.0, 0, 72.0)) < 4.0
+			var econ = get_tree().get_first_node_in_group("economy_manager")
+			var has_worked: bool = is_instance_valid(econ) and (econ.wallet.total_earned > 0)
+			if at_home_bay and has_worked:
+				current_destination = Vector3(-45.0, 0, 84.0)
+				current_title = "🏠 Cửa Chính Vào Nhà"
+				current_hint = "Vào nhà nghỉ ngơi & lưu tiến trình"
+				return
+			
 			current_destination = Vector3(-48.0, 0, 72.0)
 			current_title = "🛵 Xe Máy Của Boy"
 			current_hint = "Lên xe máy [E] để di chuyển đến tiệm"
@@ -223,14 +252,28 @@ func _resolve_current_destination() -> void:
 			current_hint = "Sẵn sàng đón khách vào tiệm sửa xe"
 	else:
 		# -------------------------------------------------------------
-		# Girl Flow: Home -> Scooter -> Hu Tieu Parking -> Prep -> Tables
+		# Girl Flow: Home -> Scooter -> Hu Tieu Parking -> Prep -> Tables -> Return
 		# -------------------------------------------------------------
 		if is_riding:
-			current_destination = Vector3(-44.0, 0, -15.0)
-			current_title = "🅿️ Bãi Đậu Xe Quán Hủ Tiếu"
-			current_hint = "Lái xe đến bãi đậu của quán [E để đỗ xe]"
+			if heading_home:
+				current_destination = sc.home_parking_pos if is_instance_valid(sc) else Vector3(-42.0, 0, 72.0)
+				current_title = "🏡 Bãi Đỗ Xe Tại Nhà"
+				current_hint = "Lái xe về nhà [E để đỗ xe]"
+			else:
+				current_destination = Vector3(-44.0, 0, -15.0)
+				current_title = "🅿️ Bãi Đậu Xe Quán Hủ Tiếu"
+				current_hint = "Lái xe đến bãi đậu của quán [E để đỗ xe]"
 			return
 		elif p_pos.z > 60.0:
+			var at_home_bay := p_pos.distance_to(Vector3(-42.0, 0, 72.0)) < 4.0
+			var econ = get_tree().get_first_node_in_group("economy_manager")
+			var has_worked: bool = is_instance_valid(econ) and (econ.wallet.total_earned > 0)
+			if at_home_bay and has_worked:
+				current_destination = Vector3(-45.0, 0, 84.0)
+				current_title = "🏠 Cửa Chính Vào Nhà"
+				current_hint = "Vào nhà nghỉ ngơi & lưu tiến trình"
+				return
+			
 			current_destination = Vector3(-42.0, 0, 72.0)
 			current_title = "🛵 Xe Máy Của Girl"
 			current_hint = "Lên xe máy [E] để di chuyển đến quán"

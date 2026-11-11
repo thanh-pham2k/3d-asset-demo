@@ -222,7 +222,10 @@ func _on_customer_depart(order: BusinessOrder) -> void:
 	if bay_customers.has(bay) and is_instance_valid(bay_customers[bay]):
 		var cust: MotorcycleCustomer = bay_customers[bay]
 		if cust.current_state != MotorcycleCustomer.State.DEPARTING and cust.current_state != MotorcycleCustomer.State.DESPAWNED:
-			cust.notify_service_done()
+			if order.status == BusinessOrder.Status.COMPLETED or order.status == BusinessOrder.Status.PAID:
+				cust.notify_service_done()
+			else:
+				cust.notify_order_failed("timeout")
 	else:
 		if bay_orders.has(bay) and bay_orders[bay] == order:
 			bay_orders.erase(bay)

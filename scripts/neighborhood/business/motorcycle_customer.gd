@@ -216,6 +216,16 @@ func notify_service_done() -> void:
 	if is_instance_valid(exhaust_particles):
 		exhaust_particles.emitting = true
 
+func notify_order_failed(reason: String = "timeout") -> void:
+	if current_state == State.DEPARTING or current_state == State.DESPAWNED:
+		return
+	current_state = State.SERVICE_COMPLETED
+	wait_timer = 0.0
+	_show_speech("Chờ lâu quá không ai sửa, tôi đi đây! 💢", 2.2)
+	_seat_driver_on_scooter()
+	if is_instance_valid(exhaust_particles):
+		exhaust_particles.emitting = true
+
 func _process_service_completed(delta: float) -> void:
 	wait_timer += delta
 	# Pause 0.8s for celebration and engine startup

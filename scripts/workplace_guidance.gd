@@ -14,8 +14,11 @@ var player: CharacterBody3D
 var camera: Camera3D
 
 var hud_panel: PanelContainer
+var header_label: Label
 var objective_title: Label
 var direction_label: Label
+var direction: Label:
+	get: return direction_label
 var hint_label: Label
 
 var edge_pointer: PanelContainer
@@ -33,6 +36,7 @@ var smoothed_angle: float = 0.0
 
 func _ready() -> void:
 	layer = 90
+	add_to_group("workplace_guidance")
 	_build_ui()
 	_build_ground_beacon()
 
@@ -56,6 +60,7 @@ func _build_ui() -> void:
 	header.add_theme_font_size_override("font_size", 13)
 	header.add_theme_color_override("font_color", Color("ffd54f"))
 	col.add_child(header)
+	header_label = header
 	
 	direction_label = Label.new()
 	direction_label.text = "🧭 Đang định vị..."
@@ -140,6 +145,10 @@ func _process(delta: float) -> void:
 	if not is_instance_valid(player) or not is_instance_valid(camera):
 		return
 	
+	var daily_loop = get_tree().get_first_node_in_group("daily_loop_manager")
+	if is_instance_valid(daily_loop) and is_instance_valid(header_label):
+		header_label.text = "🎯 MỤC TIÊU — NGÀY %d" % daily_loop.current_day
+	
 	_resolve_current_destination()
 	_update_beacon(delta)
 	_update_navigation_arrow(delta)
@@ -163,12 +172,18 @@ func _resolve_current_destination() -> void:
 			heading_home = p_pos.distance_to(sc.home_parking_pos) > p_pos.distance_to(sc.work_parking_pos)
 	
 	if in_house:
-		var econ = get_tree().get_first_node_in_group("economy_manager")
-		var has_worked: bool = is_instance_valid(econ) and (econ.wallet.total_earned > 0 or econ.wallet.balance > 100000)
-		if has_worked and p_pos.distance_to(Vector3(-45, 0, 88)) < 6.0:
+		var daily_loop_node = get_tree().get_first_node_in_group("daily_loop_manager")
+		var ready_sleep: bool = false
+		if is_instance_valid(daily_loop_node):
+			ready_sleep = daily_loop_node.is_ready_to_sleep()
+		else:
+			var econ = get_tree().get_first_node_in_group("economy_manager")
+			ready_sleep = is_instance_valid(econ) and (econ.wallet.total_earned > 0 or econ.wallet.balance > 100000)
+		
+		if ready_sleep and p_pos.distance_to(Vector3(-45, 0, 88)) < 6.0:
 			current_destination = Vector3(-50.5, 0, 90.75)
 			current_title = "🛏️ Giường Ngủ (Lưu Tiến Trình)"
-			current_hint = "Nằm nghỉ trên giường [E] để lưu tiến trình ngày làm việc"
+			current_hint = "Nằm nghỉ trên giường [E] để ngủ và sang ngày mới"
 			return
 		else:
 			current_destination = HOUSE_EXIT
@@ -192,8 +207,13 @@ func _resolve_current_destination() -> void:
 			return
 		elif p_pos.z > 60.0:
 			var at_home_bay := p_pos.distance_to(Vector3(-48.0, 0, 72.0)) < 4.0
-			var econ = get_tree().get_first_node_in_group("economy_manager")
-			var has_worked: bool = is_instance_valid(econ) and (econ.wallet.total_earned > 0)
+			var dl = get_tree().get_first_node_in_group("daily_loop_manager")
+			var has_worked: bool = false
+			if is_instance_valid(dl):
+				has_worked = dl.has_worked_today()
+			else:
+				var econ = get_tree().get_first_node_in_group("economy_manager")
+				has_worked = is_instance_valid(econ) and (econ.wallet.total_earned > 0)
 			if at_home_bay and has_worked:
 				current_destination = Vector3(-45.0, 0, 84.0)
 				current_title = "🏠 Cửa Chính Vào Nhà"
@@ -208,6 +228,13 @@ func _resolve_current_destination() -> void:
 		var garage := get_tree().get_first_node_in_group("garage_business") as GarageBusiness
 		if not garage:
 			garage = get_node_or_null("../GarageBusiness") as GarageBusiness
+		
+		var dl_boy = get_tree().get_first_node_in_group("daily_loop_manager")
+		if is_instance_valid(garage) and not garage.is_open and is_instance_valid(dl_boy) and dl_boy.has_worked_today():
+			current_destination = Vector3(-58.0, 0, -13.0)
+			current_title = "🛵 Lên Xe Máy Về Nhà"
+			current_hint = "Tiệm đã đóng cửa, lên xe máy [E] để về nhà nghỉ ngơi"
+			return
 		
 		if not is_instance_valid(garage) or p_pos.distance_to(GARAGE_DEFAULT) > 16.0:
 			current_destination = GARAGE_DEFAULT
@@ -266,8 +293,13 @@ func _resolve_current_destination() -> void:
 			return
 		elif p_pos.z > 60.0:
 			var at_home_bay := p_pos.distance_to(Vector3(-42.0, 0, 72.0)) < 4.0
-			var econ = get_tree().get_first_node_in_group("economy_manager")
-			var has_worked: bool = is_instance_valid(econ) and (econ.wallet.total_earned > 0)
+			var dl = get_tree().get_first_node_in_group("daily_loop_manager")
+			var has_worked: bool = false
+			if is_instance_valid(dl):
+				has_worked = dl.has_worked_today()
+			else:
+				var econ = get_tree().get_first_node_in_group("economy_manager")
+				has_worked = is_instance_valid(econ) and (econ.wallet.total_earned > 0)
 			if at_home_bay and has_worked:
 				current_destination = Vector3(-45.0, 0, 84.0)
 				current_title = "🏠 Cửa Chính Vào Nhà"
@@ -291,6 +323,12 @@ func _resolve_current_destination() -> void:
 		
 		# Check prep state
 		if hutieu.prep_state == HuTieuBusiness.PrepState.CLOSED:
+			var dl_girl = get_tree().get_first_node_in_group("daily_loop_manager")
+			if is_instance_valid(dl_girl) and dl_girl.has_worked_today():
+				current_destination = Vector3(-44.0, 0, -15.0)
+				current_title = "🛵 Lên Xe Máy Về Nhà"
+				current_hint = "Quán đã đóng cửa, lên xe máy [E] để về nhà nghỉ ngơi"
+				return
 			current_destination = hutieu.global_position + Vector3(-50.0, 0, -17.0)
 			current_title = "Bếp: Chuẩn Bị Mở Quán"
 			current_hint = "Nhấn [E] để chuẩn bị nước lèo & nguyên liệu"

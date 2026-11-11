@@ -1,7 +1,24 @@
 extends "res://tests/visual/scenarios/scenario_base.gd"
 
 func run_scenario() -> Dictionary:
-	print("--- Running TC07: Incorrect Order Rejection ---")
+	print("--- Running TC07: Incorrect Order Rejection & Discard ---")
+	scenario_description = "Tests order validation rejecting mismatched food orders: customer orders Nam Vang noodles, player prepares Pork Rib noodles instead, attempts to serve at dining table (rejected, 0đ reward, bowl preserved), and player discards wrong bowl at blanching pot."
+	expected_result = "Serving wrong dish is rejected with zero financial reward, customer order remains pending, and wrong bowl can be discarded cleanly to remake."
+	related_sources = [
+		"res://scripts/neighborhood/business/hutieu_business.gd",
+		"res://scripts/neighborhood/business/business_order.gd"
+	]
+	reproduction_steps = [
+		"1. Position player at Hu Tieu stall (-50, 0, -17).",
+		"2. Customer at Table 0 orders 'Hủ tiếu Nam Vang'.",
+		"3. Player intentionally prepares 'Hủ tiếu sườn heo' at cooking counter.",
+		"4. Walk to Table 0 and press [E] to attempt serving incorrect dish.",
+		"5. Assert order is REJECTED, remains PENDING, and wallet receives 0đ.",
+		"6. Assert kitchen bowl is preserved and not consumed.",
+		"7. Walk to BlanchingStation and press [E] to discard incorrect bowl.",
+		"8. Assert bowl state is reset to EMPTY."
+	]
+	
 	recorder.start_recording("TC07_incorrect_order")
 	
 	player.global_position = Vector3(-50.0, 0, -17.0)
@@ -9,9 +26,7 @@ func run_scenario() -> Dictionary:
 	await wait_and_record(6)
 	
 	var world = game_manager.get_node_or_null("Neighborhood")
-	var hutieu: HuTieuBusiness = world.get_node_or_null("03_HuTieu/HuTieuBusiness") if world else null
-	if not hutieu and world:
-		hutieu = world.get_node_or_null("HuTieuBusiness")
+	var hutieu: HuTieuBusiness = world.get_node_or_null("HuTieuBusiness") if world else null
 	check(is_instance_valid(hutieu), "HuTieuBusiness exists")
 	
 	# Customer orders Hủ tiếu Nam Vang
@@ -48,26 +63,20 @@ func run_scenario() -> Dictionary:
 	var wallet_before = econ.wallet.balance
 	
 	table0.interact(player)
-	await wait_and_record(15)
+	await wait_and_record(12)
 	
 	check(order.status == BusinessOrder.Status.PENDING, "Order REJECTED and remains PENDING")
 	check(econ.wallet.balance == wallet_before, "Zero reward granted for incorrect dish")
 	check(hutieu.current_bowl_state == HuTieuBusiness.BowlState.FULLY_PREPARED, "Kitchen bowl was not consumed")
 	
 	# 3. Discard wrong bowl at blanch pot
-	await simulate_walk(hutieu.global_position + Vector3(-51.8, 0, -16.0), 1.2)
+	await simulate_walk(hutieu.global_position + blanch.position + Vector3(0, 0, 1.0), 1.2)
 	blanch.interact(player)
-	await wait_and_record(12)
+	await wait_and_record(10)
 	
 	check(hutieu.current_bowl_state == HuTieuBusiness.BowlState.EMPTY, "Wrong bowl safely discarded to allow remaking")
 	check(hutieu.current_bowl_dish == "", "Bowl dish cleared")
 	
+	notes = "Verified dish validation rejecting incorrect food, zero payment, and bowl discard capability."
 	var gif_path = recorder.stop_recording_and_export_gif(30)
-	return {
-		"id": "TC07",
-		"title": "Incorrect Order",
-		"status": "PASS" if not failed else "FAIL",
-		"gif_path": gif_path,
-		"assertions": assertions,
-		"notes": "Verified dish validation rejecting incorrect food, zero payment, and bowl discard capability."
-	}
+	return build_result(gif_path)

@@ -7,7 +7,9 @@ extends Node
 signal time_updated(current_hour: float)
 signal period_changed(new_period: String)
 signal hour_ticked(hour: int)
+signal day_advanced(new_day: int)
 
+@export var current_day: int = 1
 # In-game hour: 0.0 to 24.0 (starts at 8:00 AM)
 @export var current_hour: float = 8.0
 
@@ -31,7 +33,11 @@ func _process(delta: float) -> void:
 	
 	# Advance time: (time_scale minutes / 60) hours per second
 	var hours_passed := (time_scale / 60.0) * delta
+	var prev_h := current_hour
 	current_hour = fposmod(current_hour + hours_passed, 24.0)
+	if prev_h + hours_passed >= 24.0:
+		current_day += 1
+		day_advanced.emit(current_day)
 	
 	var int_hour := int(current_hour)
 	if int_hour != _last_int_hour:
@@ -45,6 +51,17 @@ func _process(delta: float) -> void:
 	
 	time_updated.emit(current_hour)
 	_update_lighting()
+
+func advance_to_next_day(wake_hour: float = 7.0) -> void:
+	current_day += 1
+	current_hour = fposmod(wake_hour, 24.0)
+	_last_int_hour = int(current_hour)
+	current_period = get_period_name(current_hour)
+	period_changed.emit(current_period)
+	hour_ticked.emit(_last_int_hour)
+	time_updated.emit(current_hour)
+	_update_lighting()
+	day_advanced.emit(current_day)
 
 func set_hour(hour: float) -> void:
 	current_hour = fposmod(hour, 24.0)
@@ -79,7 +96,7 @@ func get_time_formatted() -> String:
 	elif hours >= 18 or hours < 5:
 		period_str = "tối"
 	
-	return "%02d:%02d (%s)" % [hours, minutes, period_str]
+	return "Ngày %d · %02d:%02d (%s)" % [current_day, hours, minutes, period_str]
 
 func _update_lighting() -> void:
 	if not is_instance_valid(directional_light): return

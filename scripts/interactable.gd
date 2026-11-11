@@ -57,6 +57,9 @@ func interact(player: Node3D) -> void:
     user = player
     player.enter_rest(self, (get_parent() as Node3D).to_global(seat_point), kind == "bed")
     if kind == "bed":
+     var daily_loop = get_tree().get_first_node_in_group("daily_loop_manager")
+     if is_instance_valid(daily_loop) and daily_loop.has_method("on_player_sleep"):
+      daily_loop.on_player_sleep(player)
      var econ = get_tree().get_first_node_in_group("economy_manager")
      if is_instance_valid(econ) and econ.has_method("save_economy_state"):
       econ.save_economy_state()

@@ -42,12 +42,14 @@ func get_hand_anchor() -> Marker3D:
 func trigger_action(action: String, time: float) -> void:
  if action == "hammer": hammer_until = time + 0.35
 
-func update_pose(move: float, running: bool, holding: bool, throwing: bool, resting: bool, lying: bool, reacting: bool, time: float) -> void:
+func update_pose(move: float, running: bool, holding: bool, throwing: bool, resting: bool, lying: bool, reacting: bool, time: float, riding: bool = false) -> void:
  if not animation: return
  if holding and not was_holding: pickup_until = time + 0.28
  was_holding = holding
  var next := "idle"
- if move > 0.05: next = "sprint" if running else "walk"
+ if riding:
+  next = "sit"
+ elif move > 0.05: next = "sprint" if running else "walk"
  if holding: next = "holding-both"
  if holding and time < pickup_until: next = "pick-up"
  if throwing or time < hammer_until: next = "attack-melee-right"

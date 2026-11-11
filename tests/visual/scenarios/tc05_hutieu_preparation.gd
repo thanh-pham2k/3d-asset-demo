@@ -1,7 +1,23 @@
 extends "res://tests/visual/scenarios/scenario_base.gd"
 
 func run_scenario() -> Dictionary:
-	print("--- Running TC05: Hu Tieu Preparation ---")
+	print("--- Running TC05: Hu Tieu Preparation & Opening ---")
+	scenario_description = "Tests Hu Tieu stall starting in CLOSED state, player interacting with prep station, natural real-time cooking and preparation progress (0% -> 100%), transition to READY state, and player opening the shop to receive customers."
+	expected_result = "Shop starts closed, prep station triggers gradual real-time progress accumulation to 100%, and second interaction opens stall with updated overhead billboard."
+	related_sources = [
+		"res://scripts/neighborhood/business/hutieu_business.gd",
+		"res://scripts/neighborhood/business/business_shop.gd"
+	]
+	reproduction_steps = [
+		"1. Position player at Hu Tieu stall (-45, 0, -14).",
+		"2. Reset shop to CLOSED state: assert customers blocked and billboard indicates closed.",
+		"3. Walk to PrepStation at cooking counter and press [E] to start preparation.",
+		"4. Shop enters PREPARING phase: wait and capture frames as progress naturally accumulates to 100%.",
+		"5. Assert stall transitions to READY state once progress hits 100%.",
+		"6. Press [E] at PrepStation to officially open shop: assert prep_state == OPEN and is_open == true.",
+		"7. Verify overhead billboard reflects active open status."
+	]
+	
 	recorder.start_recording("TC05_hutieu_preparation")
 	
 	player.global_position = Vector3(-45.0, 0, -14.0)
@@ -9,9 +25,7 @@ func run_scenario() -> Dictionary:
 	await wait_and_record(6)
 	
 	var world = game_manager.get_node_or_null("Neighborhood")
-	var hutieu: HuTieuBusiness = world.get_node_or_null("03_HuTieu/HuTieuBusiness") if world else null
-	if not hutieu and world:
-		hutieu = world.get_node_or_null("HuTieuBusiness")
+	var hutieu: HuTieuBusiness = world.get_node_or_null("HuTieuBusiness") if world else null
 	check(is_instance_valid(hutieu), "HuTieuBusiness exists")
 	
 	# Reset to CLOSED state
@@ -22,46 +36,39 @@ func run_scenario() -> Dictionary:
 	await wait_and_record(6)
 	
 	check(hutieu.prep_state == HuTieuBusiness.PrepState.CLOSED, "Shop starts in CLOSED state")
-	check(not hutieu.is_open, "Shop is closed, customers blocked")
+	check(not hutieu.is_open, "Shop is closed, customer arrivals blocked")
 	
 	# 1. Girl approaches preparation station
-	var prep_pos = hutieu.global_position + Vector3(-50.0, 0, -15.5)
-	await simulate_walk(prep_pos, 1.5)
-	await wait_and_record(8)
+	var prep_st = hutieu.prep_station
+	var prep_pos: Vector3 = hutieu.global_position + prep_st.position
+	await simulate_walk(prep_pos + Vector3(0, 0, 1.2), 1.5)
+	await wait_and_record(6)
 	
 	# 2. Press E to begin preparation
-	var prep_st = hutieu.prep_station
 	prep_st.interact(player)
 	await wait_and_record(6)
 	check(hutieu.prep_state == HuTieuBusiness.PrepState.PREPARING, "Shop entered PREPARING phase")
 	
-	# 3. Animate progress bar gradually from 0% -> 100%
-	for p in [25.0, 50.0, 75.0, 95.0, 100.0]:
-		hutieu.prep_progress = p
-		if p >= 100.0:
-			hutieu.prep_state = HuTieuBusiness.PrepState.READY
-		hutieu._update_prep_billboard()
-		await wait_and_record(6)
+	# 3. Allow progress to accumulate naturally via _process over ~3 seconds
+	var timeout := 4.0
+	var elapsed := 0.0
+	while hutieu.prep_state == HuTieuBusiness.PrepState.PREPARING and elapsed < timeout:
+		await wait_and_record(4)
+		elapsed += 0.15
 	
-	check(hutieu.prep_progress >= 100.0, "Preparation reached 100%")
-	check(hutieu.prep_state == HuTieuBusiness.PrepState.READY, "Shop entered READY state")
+	check(hutieu.prep_progress >= 100.0, "Preparation progress reached 100%")
+	check(hutieu.prep_state == HuTieuBusiness.PrepState.READY, "Shop naturally entered READY state")
 	check("Sẵn sàng bán" in prep_st.prompt(player), "Prompt offers to open shop")
 	
 	# 4. Press E to officially open shop
 	prep_st.interact(player)
 	hutieu._update_prep_billboard()
 	await wait_and_record(12)
+	
 	check(hutieu.prep_state == HuTieuBusiness.PrepState.OPEN, "Shop officially entered OPEN state")
 	check(hutieu.is_open, "is_open flag is true")
-	print("TC05 DEBUG prep_billboard.text = '", hutieu.prep_billboard.text, "'")
 	check("Mở Cửa" in hutieu.prep_billboard.text or "Đón Khách" in hutieu.prep_billboard.text, "Overhead billboard reflects shop open status")
 	
+	notes = "Verified CLOSED state, real-time natural preparation accumulation (0% -> 100%), READY transition, and E open interaction."
 	var gif_path = recorder.stop_recording_and_export_gif(30)
-	return {
-		"id": "TC05",
-		"title": "Hu Tieu Preparation",
-		"status": "PASS" if not failed else "FAIL",
-		"gif_path": gif_path,
-		"assertions": assertions,
-		"notes": "Verified CLOSED state, gradual 0%->100% preparation, READY state, and explicit player E open interaction."
-	}
+	return build_result(gif_path)

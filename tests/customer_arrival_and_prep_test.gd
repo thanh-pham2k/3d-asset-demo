@@ -85,6 +85,7 @@ func run() -> void:
 	print("\n--- Test 2: Garage Bay Occupancy ---")
 	var garage := GarageBusiness.new()
 	garage.name = "TestGarage"
+	garage.is_second_bay_unlocked = true
 	root_node.add_child(garage)
 	garage.is_open = true
 	

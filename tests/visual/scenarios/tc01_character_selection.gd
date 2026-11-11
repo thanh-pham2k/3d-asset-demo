@@ -2,6 +2,22 @@ extends "res://tests/visual/scenarios/scenario_base.gd"
 
 func run_scenario() -> Dictionary:
 	print("--- Running TC01: Character Selection ---")
+	scenario_description = "Validates seamless switching between Boy and Girl characters, verifying 3D model instantiation, animation controller attachment, and bedroom spawn location."
+	expected_result = "Both Boy and Girl visual models swap smoothly, retain physics/movement collision, and remain properly positioned within the house interior."
+	related_sources = [
+		"res://scripts/player.gd",
+		"res://scripts/player_config.gd",
+		"res://scripts/animation_controller.gd"
+	]
+	reproduction_steps = [
+		"1. Spawn player at home bedroom coordinates (-45, 0, 89).",
+		"2. Select Boy character: assert selected_character == 'boy' and model is active.",
+		"3. Simulate walking in bedroom circle to verify locomotion animations.",
+		"4. Switch character to Girl: assert selected_character == 'girl' and female visual model is active.",
+		"5. Walk in bedroom circle with Girl character.",
+		"6. Switch back to Boy character for subsequent scenarios."
+	]
+	
 	recorder.start_recording("TC01_character_selection")
 	
 	# 1. Start with Boy
@@ -34,12 +50,6 @@ func run_scenario() -> Dictionary:
 	player.select_character("boy")
 	await wait_and_record(5)
 	
+	notes = "Verified Boy and Girl selection, visual meshes, and initial spawn inside house without collision degradation."
 	var gif_path = recorder.stop_recording_and_export_gif(30)
-	return {
-		"id": "TC01",
-		"title": "Character Selection",
-		"status": "PASS" if not failed else "FAIL",
-		"gif_path": gif_path,
-		"assertions": assertions,
-		"notes": "Verified Boy and Girl selection, visual meshes, and initial spawn inside house."
-	}
+	return build_result(gif_path)

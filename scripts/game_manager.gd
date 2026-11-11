@@ -144,6 +144,11 @@ func _ready() -> void:
  guidance.player = p1
  guidance.camera = main_camera
  add_child(guidance)
+ var minimap = preload("res://scripts/ui/interactive_minimap.gd").new()
+ minimap.name = "InteractiveMinimap"
+ minimap.player = p1
+ minimap.guidance = guidance
+ add_child(minimap)
  ui.call("setup", round_manager, score_manager, challenge_manager)
  ui.call("setup_cleaning", mission_manager)
 

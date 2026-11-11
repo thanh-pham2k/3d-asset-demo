@@ -17,13 +17,44 @@ func trigger_action(action: String, time: float) -> void:
   model.trigger_action(action, time)
 
 # Common model adapter interface; independent visual scenes can implement update_pose.
-func apply_state(move: float, running: bool, holding: bool, throwing: bool, resting: bool, lying: bool, reacting: bool, time: float) -> void:
+func apply_state(move: float, running: bool, holding: bool, throwing: bool, resting: bool, lying: bool, reacting: bool, time: float, riding: bool = false) -> void:
  if model.has_method("update_pose"):
-  model.update_pose(move, running, holding, throwing, resting, lying, reacting, time)
+  var has_riding_arg := false
+  for m in model.get_method_list():
+   if m["name"] == "update_pose":
+    has_riding_arg = m["args"].size() >= 9
+    break
+  if has_riding_arg:
+   model.update_pose(move, running, holding, throwing, resting, lying, reacting, time, riding)
+  else:
+   model.update_pose(move, running, holding, throwing, resting, lying, reacting, time)
  elif "left_arm" in model:
-  update_placeholder(move, running, holding, throwing, resting, lying, reacting, time)
+  update_placeholder(move, running, holding, throwing, resting, lying, reacting, time, riding)
 
-func update_placeholder(move: float, running: bool, holding: bool, throwing: bool, resting: bool, lying: bool, reacting: bool, time: float) -> void:
+func update_placeholder(move: float, running: bool, holding: bool, throwing: bool, resting: bool, lying: bool, reacting: bool, time: float, riding: bool = false) -> void:
+ if riding:
+  state = "ride"
+  # Both hands on handlebars, both legs bent onto footboard
+  var left_arm_rot := Vector3(-0.98, 0.16, -0.20)
+  var right_arm_rot := Vector3(-0.98, -0.16, 0.20)
+  var left_leg_rot := Vector3(-1.15, 0.15, 0.10)
+  var right_leg_rot := Vector3(-1.15, -0.15, -0.10)
+  var engine_vibe := sin(time * 24.0) * 0.006
+  if model.has_method("pose_joint"):
+   model.pose_joint("root", Vector3(-0.08, 0, engine_vibe))
+   model.pose_joint("head", Vector3(0.04, 0, 0))
+   model.pose_joint("left_leg", left_leg_rot)
+   model.pose_joint("right_leg", right_leg_rot)
+   model.pose_joint("left_arm", left_arm_rot)
+   model.pose_joint("right_arm", right_arm_rot)
+  else:
+   model.left_leg.rotation = left_leg_rot
+   model.right_leg.rotation = right_leg_rot
+   model.left_arm.rotation = left_arm_rot
+   model.right_arm.rotation = right_arm_rot
+  model.scale = Vector3.ONE
+  model.rotation = Vector3.ZERO
+  return
  if holding and not previous_holding:
   pickup_until = time + 0.24
  if reacting and not last_reacting:

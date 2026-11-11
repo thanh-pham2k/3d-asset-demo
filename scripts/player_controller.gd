@@ -252,19 +252,20 @@ func _physics_process(delta: float) -> void:
     hutieu.cycle_recipe()
  var sc = get_meta("riding_scooter") if has_meta("riding_scooter") else null
  if sc != null and is_instance_valid(sc):
-  update_animation(0.0, false)
+  update_animation(0.0, false, true)
   sc.update_riding(delta, direction, speed, running)
   if Input.is_action_just_pressed(prefix + "interact") and interaction_cooldown <= 0:
    sc.dismount()
    interaction_cooldown = 0.3
  else:
-  update_animation(direction.length(), running)
+  update_animation(direction.length(), running, false)
 
 func find_target() -> void:
  if has_meta("riding_scooter"):
   var active_sc = get_meta("riding_scooter")
   if is_instance_valid(active_sc):
    prompt_label.text = active_sc.get_riding_prompt()
+   prompt_label.visible = true
    target = null
    return
  target = null
@@ -334,11 +335,15 @@ func find_target() -> void:
    if distance <= max_reach and distance < nearest_dist:
     nearest_dist = distance
     target = item
-  if target: prompt_label.text = key + " — " + target.prompt(self)
-  else: prompt_label.text = "P%d" % player_id
+  if target:
+   prompt_label.text = key + " — " + target.prompt(self)
+   prompt_label.visible = true
+  else:
+   prompt_label.text = ""
+   prompt_label.visible = false
 
-func update_animation(move: float, running: bool) -> void:
- animation_controller.apply_state(move, running, held_pillow != null, throw_anim > 0, resting != null, resting != null and resting.kind == "bed", reaction > 0, time)
+func update_animation(move: float, running: bool, is_riding: bool = false) -> void:
+ animation_controller.apply_state(move, running, held_pillow != null, throw_anim > 0, resting != null, resting != null and resting.kind == "bed", reaction > 0, time, is_riding)
  # Optional visual adapter: unrelated models retain the configured gameplay anchor.
  var model = animation_controller.model
  if config.use_visual_hand_anchor and model.has_method("get_hand_anchor"):

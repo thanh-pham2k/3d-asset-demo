@@ -264,28 +264,18 @@ func dismount(snap_to_spot: Vector3 = Vector3.ZERO) -> void:
 
 func _apply_seated_pose(seated: bool) -> void:
 	if not is_instance_valid(rider): return
-	var model = rider.get_node_or_null("Visual/boy_model")
-	if not model: model = rider.get_node_or_null("Visual/girl_model")
-	if not model and rider.has_node("Visual"):
-		for ch in rider.get_node("Visual").get_children():
-			if ch.has_method("_pose_joint"):
-				model = ch
-				break
+	var visual_root = rider.get_node_or_null("VisualRoot")
+	if not visual_root and rider.has_node("Visual"): visual_root = rider.get_node("Visual")
 	
-	if is_instance_valid(model) and model.has_method("_pose_joint"):
+	if is_instance_valid(visual_root):
 		if seated:
-			# Natural scooter driving pose
-			model.position = Vector3(0, 0.35, 0.20)
-			model._pose_joint("left_leg", Vector3(-1.15, 0, 0.2))
-			model._pose_joint("right_leg", Vector3(-1.15, 0, -0.2))
-			model._pose_joint("left_arm", Vector3(-0.65, 0, 0.2))
-			model._pose_joint("right_arm", Vector3(-0.65, 0, -0.2))
+			# Align rider hips onto scooter seat (seat at y=0.94, z=0.32)
+			# Hips pivot at y=0.48, so visual root at y=0.46, z=0.18 puts hips firmly on cushion
+			# and feet resting naturally on the footboard (y=0.62)
+			visual_root.position = Vector3(0, 0.46, 0.18)
 		else:
-			model.position = Vector3.ZERO
-			model._pose_joint("left_leg", Vector3.ZERO)
-			model._pose_joint("right_leg", Vector3.ZERO)
-			model._pose_joint("left_arm", Vector3.ZERO)
-			model._pose_joint("right_arm", Vector3.ZERO)
+			visual_root.position = rider.config.visual_offset if "config" in rider and rider.config else Vector3.ZERO
+			visual_root.rotation.z = 0.0
 
 func update_riding(delta: float, direction: Vector3, current_speed: float, is_running: bool) -> void:
 	if not is_mounted or not is_instance_valid(rider): return
@@ -310,6 +300,11 @@ func update_riding(delta: float, direction: Vector3, current_speed: float, is_ru
 	
 	current_lean = lerpf(current_lean, target_lean, 1.0 - exp(-10.0 * delta))
 	scooter_root.rotation.z = current_lean
+	
+	# Match rider body lean with motorcycle chassis
+	var visual_root = rider.get_node_or_null("VisualRoot")
+	if is_instance_valid(visual_root):
+		visual_root.rotation.z = current_lean * 0.75
 	
 	# 3. Check for auto-cruise trigger
 	var prefix := "p%d_" % rider.player_id

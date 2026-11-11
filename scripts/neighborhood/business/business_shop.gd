@@ -167,7 +167,7 @@ func complete_order(order: BusinessOrder) -> bool:
 	total_tips += order.tip_money
 	total_earnings += order.reward_money
 	customers_served += 1
-	daily_revenue += order.reward_money + order.tip_money
+	daily_revenue += order.reward_money
 	daily_customers_served += 1
 	
 	# Business progression check

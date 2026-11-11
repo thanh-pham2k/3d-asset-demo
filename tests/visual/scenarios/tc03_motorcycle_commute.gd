@@ -3,7 +3,22 @@ extends "res://tests/visual/scenarios/scenario_base.gd"
 const PlayerScooter = preload("res://scripts/neighborhood/player_scooter.gd")
 
 func run_scenario() -> Dictionary:
-	print("--- Running TC03: Motorcycle Commute ---")
+	print("--- Running TC03: Motorcycle Commute & Parking ---")
+	scenario_description = "Tests walking to motorcycle in front yard, mounting vehicle, folding kickstand, driving along road waypoints without building clipping, parking smoothly into garage workplace bay, and dismounting."
+	expected_result = "Player mounts motorcycle, kickstand retracts, drives road grid at cruise speed (11 m/s), parks squarely in designated workplace bay with kickstand down."
+	related_sources = [
+		"res://scripts/neighborhood/player_scooter.gd",
+		"res://scripts/neighborhood/world.gd"
+	]
+	reproduction_steps = [
+		"1. Spawn player in front yard at (-45, 0, 76).",
+		"2. Walk to Boy's motorcycle at parking bay (-47, 0, 72).",
+		"3. Mount motorcycle: assert kickstand retracted and riding_scooter meta set.",
+		"4. Drive along road waypoints (yard gate -> street -> West Avenue -> Boulevard -> garage driveway).",
+		"5. Enter garage workplace parking bay and dismount.",
+		"6. Verify motorcycle parked at work_parking_pos and kickstand deployed."
+	]
+	
 	recorder.start_recording("TC03_motorcycle_commute")
 	
 	player.global_position = Vector3(-45.0, 0, 76.0)
@@ -49,12 +64,6 @@ func run_scenario() -> Dictionary:
 	check(boy_scooter.global_position.distance_to(boy_scooter.work_parking_pos) < 0.2, "Motorcycle neatly parked in garage bay")
 	check(player.global_position.distance_to(boy_scooter.work_parking_pos) < 2.0, "Player arrived at garage workplace without teleporting")
 	
+	notes = "Verified walking to bike, mounting, driving entire road path to garage, parking, and dismounting cleanly."
 	var gif_path = recorder.stop_recording_and_export_gif(30)
-	return {
-		"id": "TC03",
-		"title": "Motorcycle Commute",
-		"status": "PASS" if not failed else "FAIL",
-		"gif_path": gif_path,
-		"assertions": assertions,
-		"notes": "Verified walking to bike, mounting, driving entire road path to garage, parking, and dismounting."
-	}
+	return build_result(gif_path)

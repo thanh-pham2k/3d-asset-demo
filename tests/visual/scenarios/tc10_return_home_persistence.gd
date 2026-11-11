@@ -2,6 +2,24 @@ extends "res://tests/visual/scenarios/scenario_base.gd"
 
 func run_scenario() -> Dictionary:
 	print("--- Running TC10: Return Home & Persistence ---")
+	scenario_description = "Tests end-of-day return home flow: revenue accumulation in household wallet, walking from front yard into bedroom, bed rest interaction triggering automatic state saving to disk, waking up, and reloading saved state to verify balance, earnings, and deduplication cache."
+	expected_result = "Bed rest triggers automatic file save, reloaded wallet balance and lifetime earnings match exactly, and processed transaction IDs persist without data loss."
+	related_sources = [
+		"res://scripts/economy/economy_save_system.gd",
+		"res://scripts/economy/household_wallet.gd",
+		"res://scripts/room.gd",
+		"res://scripts/interactable.gd"
+	]
+	reproduction_steps = [
+		"1. Position player in yard at (-45, 0, 72).",
+		"2. Simulate daily business revenue deposit (+75,000đ) into shared household wallet.",
+		"3. Walk player through front yard into house interior (Z > 83).",
+		"4. Interact with Bed: assert player resting pose and automatic save to disk.",
+		"5. Wake up from bed via second interaction.",
+		"6. Reload save file into fresh wallet and inventory instances.",
+		"7. Assert reloaded balance, total earned, and transaction cache match perfectly."
+	]
+	
 	recorder.start_recording("TC10_return_home_persistence")
 	
 	var test_save_path := "user://test_tc10_persistence.json"
@@ -60,12 +78,6 @@ func run_scenario() -> Dictionary:
 	if FileAccess.file_exists(test_save_path):
 		DirAccess.remove_absolute(test_save_path)
 	
+	notes = "Verified returning home, bed rest interaction, automatic state save, and exact reload of wallet/earnings."
 	var gif_path = recorder.stop_recording_and_export_gif(30)
-	return {
-		"id": "TC10",
-		"title": "Return Home & Persistence",
-		"status": "PASS" if not failed else "FAIL",
-		"gif_path": gif_path,
-		"assertions": assertions,
-		"notes": "Verified returning home, bed rest interaction, automatic state save, and exact reload of wallet/earnings."
-	}
+	return build_result(gif_path)

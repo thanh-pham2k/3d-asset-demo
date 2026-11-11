@@ -2,6 +2,7 @@ extends Node3D
 
 const MODULE = preload("res://scripts/neighborhood/module.gd")
 const WorkplaceGuidance = preload("res://scripts/workplace_guidance.gd")
+const PlayerScooter = preload("res://scripts/neighborhood/player_scooter.gd")
 @export var integrated := false
 @export var economy_save_path := EconomySaveSystem.DEFAULT_SAVE_PATH
 var camera: Camera3D
@@ -12,6 +13,8 @@ var is_coop: bool = false
 var coop_obstacle: Node3D
 var coop_bench: Node3D
 var guidance: WorkplaceGuidance
+var boy_scooter: PlayerScooter
+var girl_scooter: PlayerScooter
 var overview := false
 var time_manager: NeighborhoodTimeManager
 var npc_manager: NPCManager
@@ -40,6 +43,44 @@ func slab(parent: Node, pos: Vector3, size: Vector3, color: Color, collision := 
   body.position = pos
   body.add_child(shape)
   parent.add_child(body)
+
+func _create_parking_bay(p_parent: Node, p_pos: Vector3, p_rot_y: float, p_title: String, p_color: Color) -> Node3D:
+ var bay := Node3D.new()
+ bay.position = p_pos
+ bay.rotation.y = p_rot_y
+ for offset_x in [-1.1, 1.1]:
+  var line := MeshInstance3D.new()
+  var b := BoxMesh.new()
+  b.size = Vector3(0.08, 0.04, 2.4)
+  line.mesh = b
+  var m := StandardMaterial3D.new()
+  m.albedo_color = Color("fff8e1")
+  line.material_override = m
+  line.position = Vector3(offset_x, 0.02, 0)
+  bay.add_child(line)
+ var pole := MeshInstance3D.new()
+ var cyl := CylinderMesh.new()
+ cyl.top_radius = 0.04
+ cyl.bottom_radius = 0.04
+ cyl.height = 1.6
+ pole.mesh = cyl
+ var pole_m := StandardMaterial3D.new()
+ pole_m.albedo_color = Color("455a64")
+ pole.material_override = pole_m
+ pole.position = Vector3(1.3, 0.8, -1.0)
+ bay.add_child(pole)
+ var sign_label := Label3D.new()
+ sign_label.position = Vector3(1.3, 1.75, -1.0)
+ sign_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+ sign_label.font_size = 22
+ sign_label.pixel_size = 0.004
+ sign_label.outline_size = 6
+ sign_label.modulate = p_color
+ sign_label.outline_modulate = Color("1a1a1a")
+ sign_label.text = "🅿️ %s" % p_title
+ bay.add_child(sign_label)
+ p_parent.add_child(bay)
+ return bay
 
 func add_piece(parent: Node, kind: String, pos: Vector3, color := Color.WHITE, rot := 0.0) -> Node3D:
  var piece: Node3D = load("res://scenes/neighborhood/%s.tscn" % kind).instantiate()
@@ -283,6 +324,10 @@ func _ready() -> void:
  var street := zone("StreetFurniture")
  for x in [-115.0,-65.0,-15.0,15.0,65.0,115.0]:
   for z in [-10.0,10.0]:
+   if x == -65.0 and z == -10.0:
+    add_piece(street,"tree",Vector3(-78,0,z),Color("86ae7c"))
+    add_piece(street,"lamp",Vector3(-74,0,z))
+    continue
    add_piece(street,"tree",Vector3(x,0,z),Color("86ae7c"))
    add_piece(street,"lamp",Vector3(x+4,0,z))
  for p in [Vector3(-70,0,-10),Vector3(10,0,10),Vector3(70,0,-10),Vector3(35,0,28)]: add_piece(street,"trash_bin",p)
@@ -415,6 +460,32 @@ func _ready() -> void:
  coop_bench.name = "CoopAssemblyBench"
  coop_bench.position = Vector3(95, 0, -18)
  add_child(coop_bench)
+ # Dedicated parking bays with painted lines and 3D signposts
+ _create_parking_bay(self, Vector3(-48.0, 0, 72.0), PI, "Bãi Đậu Xe Boy", Color("80cbc4"))
+ _create_parking_bay(self, Vector3(-42.0, 0, 72.0), PI, "Bãi Đậu Xe Girl", Color("ffab91"))
+ _create_parking_bay(self, Vector3(-58.0, 0, -13.0), PI / 2.0, "Bãi Đậu Xe Boy\n(Tiệm Sửa Xe)", Color("80cbc4"))
+ _create_parking_bay(self, Vector3(-44.0, 0, -15.0), 0.0, "Bãi Đậu Xe Girl\n(Quán Hủ Tiếu)", Color("ffab91"))
+ # Personal commuter scooters for Boy and Girl
+ boy_scooter = PlayerScooter.new()
+ boy_scooter.name = "BoyScooter"
+ boy_scooter.owner_character = "boy"
+ boy_scooter.scooter_color = Color("00897b")
+ boy_scooter.destination_name = "Tiệm Sửa Xe Máy"
+ boy_scooter.home_parking_pos = Vector3(-48.0, 0, 72.0)
+ boy_scooter.work_parking_pos = Vector3(-58.0, 0, -13.0)
+ boy_scooter.position = Vector3(-48.0, 0, 72.0)
+ boy_scooter.rotation.y = PI
+ add_child(boy_scooter)
+ girl_scooter = PlayerScooter.new()
+ girl_scooter.name = "GirlScooter"
+ girl_scooter.owner_character = "girl"
+ girl_scooter.scooter_color = Color("ff7043")
+ girl_scooter.destination_name = "Quán Hủ Tiếu Cô Bảy"
+ girl_scooter.home_parking_pos = Vector3(-42.0, 0, 72.0)
+ girl_scooter.work_parking_pos = Vector3(-44.0, 0, -15.0)
+ girl_scooter.position = Vector3(-42.0, 0, 72.0)
+ girl_scooter.rotation.y = PI
+ add_child(girl_scooter)
  if integrated:
   add_help()
   return

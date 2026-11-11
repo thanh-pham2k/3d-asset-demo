@@ -120,6 +120,9 @@ func _physics_process(delta: float) -> void:
  var direction := (right * input.x + down * input.y).limit_length(1.0)
  var running := Input.is_action_pressed(prefix+"run")
  var speed := config.run_speed if running else config.walk_speed
+ var riding_scooter = get_meta("riding_scooter") if has_meta("riding_scooter") else null
+ if riding_scooter != null and is_instance_valid(riding_scooter):
+  speed = 13.0 if running else 8.5
  if Input.is_action_just_pressed(prefix + "dash") and dash_cooldown_remaining <= 0.0:
   dash_direction = direction.normalized() if direction.length() > 0.08 else facing
   dash_remaining = config.dash_duration
@@ -242,9 +245,23 @@ func _physics_process(delta: float) -> void:
   visual.scale = Vector3(0.9, 1.15, 0.9)
   var cam = get_viewport().get_camera_3d()
   if cam and cam.has_method("add_trauma"): cam.add_trauma(0.12)
- update_animation(direction.length(), running)
+ var sc = get_meta("riding_scooter") if has_meta("riding_scooter") else null
+ if sc != null and is_instance_valid(sc):
+  update_animation(0.0, false)
+  sc.update_riding(delta, direction, speed, running)
+  if Input.is_action_just_pressed(prefix + "interact") and interaction_cooldown <= 0:
+   sc.dismount()
+   interaction_cooldown = 0.3
+ else:
+  update_animation(direction.length(), running)
 
 func find_target() -> void:
+ if has_meta("riding_scooter"):
+  var active_sc = get_meta("riding_scooter")
+  if is_instance_valid(active_sc):
+   prompt_label.text = active_sc.get_riding_prompt()
+   target = null
+   return
  target = null
  var key = "E" if player_id == 1 else "Enter"
  var throw_key = "F" if player_id == 1 else "Right Ctrl"

@@ -153,16 +153,29 @@ func _resolve_current_destination() -> void:
 	var p_pos := player.global_position
 	var in_house := p_pos.z > 65.0
 	
+	var is_riding: bool = player.has_meta("riding_scooter") and is_instance_valid(player.get_meta("riding_scooter"))
+	
 	if in_house:
 		current_destination = HOUSE_EXIT
 		current_title = "Cổng Sân Nhà"
-		current_hint = "Ra khỏi nhà và đi đến nơi làm việc"
+		current_hint = "Ra sân lấy xe máy đi làm"
 		return
 	
 	if not girl:
 		# -------------------------------------------------------------
-		# Boy Flow: Home -> Garage -> Active Repair Bay / Counter
+		# Boy Flow: Home -> Scooter -> Garage Parking -> Repair Bay
 		# -------------------------------------------------------------
+		if is_riding:
+			current_destination = Vector3(-58.0, 0, -13.0)
+			current_title = "🅿️ Bãi Đậu Xe Tiệm Sửa Xe"
+			current_hint = "Lái xe đến bãi đậu của tiệm [E để đỗ xe]"
+			return
+		elif p_pos.z > 60.0:
+			current_destination = Vector3(-48.0, 0, 72.0)
+			current_title = "🛵 Xe Máy Của Boy"
+			current_hint = "Lên xe máy [E] để di chuyển đến tiệm"
+			return
+		
 		var garage := get_tree().get_first_node_in_group("garage_business") as GarageBusiness
 		if not garage:
 			garage = get_node_or_null("../GarageBusiness") as GarageBusiness
@@ -210,8 +223,19 @@ func _resolve_current_destination() -> void:
 			current_hint = "Sẵn sàng đón khách vào tiệm sửa xe"
 	else:
 		# -------------------------------------------------------------
-		# Girl Flow: Home -> Hu Tieu Shop -> Prep Station -> Open -> Tables
+		# Girl Flow: Home -> Scooter -> Hu Tieu Parking -> Prep -> Tables
 		# -------------------------------------------------------------
+		if is_riding:
+			current_destination = Vector3(-44.0, 0, -15.0)
+			current_title = "🅿️ Bãi Đậu Xe Quán Hủ Tiếu"
+			current_hint = "Lái xe đến bãi đậu của quán [E để đỗ xe]"
+			return
+		elif p_pos.z > 60.0:
+			current_destination = Vector3(-42.0, 0, 72.0)
+			current_title = "🛵 Xe Máy Của Girl"
+			current_hint = "Lên xe máy [E] để di chuyển đến quán"
+			return
+		
 		var hutieu := get_tree().get_first_node_in_group("hutieu_business") as HuTieuBusiness
 		if not hutieu:
 			hutieu = get_node_or_null("../HuTieuBusiness") as HuTieuBusiness

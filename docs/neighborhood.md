@@ -40,6 +40,16 @@ The neighborhood features a living population of 12 distinct data-driven Vietnam
 4. **Foliage Camera Occlusion Cutaway** (`scripts/neighborhood/module.gd`):
    - Trees and banana plants register their canopy meshes in `cutaway_meshes` with dedicated visual bounding boxes, automatically cutting away transparency when occluding the player character.
 
+5. **Boy & Girl Commuter Scooters & Dedicated Parking Spots** (`scripts/neighborhood/player_scooter.gd`):
+   - **Playable Motorcycles**: Personal low-poly motorcycles parked at the starter house driveway for Boy (vintage teal) and Girl (warm pastel coral).
+   - **Mounting & Realistic Riding**: Press `E` to mount. The player sits naturally on the seat with bent knees and hands on the handlebars. Drives with `WASD` at a brisk 8.5 m/s (or 13.0 m/s turbo `Shift`), with dynamic lean banking, rolling wheels, and cartoon exhaust smoke puffs.
+   - **Auto-Cruise Commute**: Press `F` while riding to automatically cruise along the neighborhood street network directly to the workplace parking spot.
+   - **Dedicated Parking Bays & Signposts**:
+     - *Boy*: Dedicated parking bay beside the Motorcycle Repair Shop at `Vector3(-58.0, 0, -13.0)` with white stripes and 3D signpost `🅿️ Bãi Đậu Xe Boy (Tiệm Sửa Xe)`, cleanly separated from customer repair bays.
+     - *Girl*: Dedicated parking bay on the paved court beside the Hu Tieu stall at `Vector3(-44.0, 0, -15.0)` with white stripes and 3D signpost `🅿️ Bãi Đậu Xe Girl (Quán Hủ Tiếu)`.
+     - *Home*: Double parking bay outside the starter house gate at `Vector3(-48.0, 0, 72.0)` and `Vector3(-42.0, 0, 72.0)` with signpost `🅿️ Bãi Đậu Xe Gia Đình (Boy & Girl)`.
+   - **Unobstructed Driveway**: Shifted the street tree at `Vector3(-65, 0, -10)` to `Vector3(-78, 0, -10)` so the garage driveway and parking area are completely open, unblocked, and spacious.
+
 ## Playable Businesses
 
 Two interactive businesses are fully playable using the shared `BusinessShop` / `BusinessOrder` architecture:
@@ -128,6 +138,7 @@ Run the automated checks with Godot 4.7.2:
 /Applications/Godot.app/Contents/MacOS/Godot --headless --path . --script res://tests/home_progression_test.gd
 /Applications/Godot.app/Contents/MacOS/Godot --headless --path . --script res://tests/local_coop_test.gd
 /Applications/Godot.app/Contents/MacOS/Godot --headless --path . --script res://tests/customer_arrival_and_prep_test.gd
+/Applications/Godot.app/Contents/MacOS/Godot --headless --path . --script res://tests/player_scooter_test.gd
 ```
 
 The room smoke test checks that its wall-collision setup starts free of obstacles before moving into the wall. After the pickup/throw checks, it isolates those movable test fixtures and verifies the intended sofa, bed and lamp are the nearest interaction targets before exercising their input paths. The navigation test flood-fills a two-metre grid using a conservative player-sized physics shape and sweeps each traversed edge; it checks representative district targets and connects all 31 building doorways to the sampled reachable area, not every possible position. It also checks a wall, all four map boundaries, spawn clearance, collision-free NPC guide segments, interior/exterior cutaway and collision, rotated side walls, map visibility, input movement and the camera toggle. The routes test verifies that all guides form one network through shared curve points. The walkthrough test plans on the same conservative grid and sends InputMap actions to the actual player controller across all ten districts and five interiors without teleporting; it uses 4× simulation time and a 240 Hz physics tick. It is an automated test, not human keyboard or visual QA. The entrances test sweeps a player-sized shape through each doorway and checks each building’s cutaway cycle. The layout test compares group and module counts, visual transforms and colors, collision counts, paths and markers with the live world. The editable-scene test checks mesh bounds, colors, collision shape types, dimensions and transforms against the procedural sources. The batching test compares visual bounds, collision counts and cutaway presence for every module. The entry test exercises scene transitions programmatically. The GLB test reimports each exported module and compares mesh count and combined bounds with the source; it does not verify appearance or collision in other applications. Rendered screenshots are staged captures, not hands-on gameplay. A short running-window check exercised movement and the map camera through UI-sent keys; a full keyboard walk-through, camera occlusion around every building, and performance on target hardware remain manual checks. The pond uses a simple cylindrical exclusion shape inside its decorative shoreline; it has no swimming or water simulation. Shops, NPCs and business mechanics are placeholders for future work.

@@ -107,6 +107,13 @@ func upgrade_house(wallet: HouseholdWallet) -> Dictionary:
 	house_level = next_lvl
 	_update_unlocked_areas()
 	
+	if is_inside_tree():
+		var econ: EconomyManager = get_tree().get_first_node_in_group("economy_manager") as EconomyManager
+		if is_instance_valid(econ):
+			econ.inventory.unlock_upgrade("upg_house_level_%d" % house_level)
+			if econ.auto_save_on_change:
+				econ.save_economy_state()
+	
 	house_upgraded.emit(house_level, unlocked_areas)
 	return {
 		"success": true,
@@ -156,6 +163,12 @@ func apply_save_data(data: Dictionary) -> void:
 	if typeof(data) != TYPE_DICTIONARY: return
 	house_level = clampi(int(data.get("level", 1)), 1, 3)
 	_update_unlocked_areas()
+	
+	if is_inside_tree():
+		var econ: EconomyManager = get_tree().get_first_node_in_group("economy_manager") as EconomyManager
+		if is_instance_valid(econ):
+			if house_level >= 2: econ.inventory.unlock_upgrade("upg_house_level_2")
+			if house_level >= 3: econ.inventory.unlock_upgrade("upg_house_level_3")
 	
 	var loaded_furn = data.get("placed_furniture", [])
 	if typeof(loaded_furn) == TYPE_ARRAY:

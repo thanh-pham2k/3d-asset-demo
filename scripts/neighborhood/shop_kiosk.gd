@@ -8,6 +8,7 @@ extends Interactable
 
 @export var kiosk_title: String = "Cửa hàng"
 @export var product_category: String = "furniture" # "furniture", "food_ingredient", "repair_tool", "house_upgrade", "business_upgrade"
+@export var target_system: String = "" # "garage", "hutieu", "house", ""
 
 var economy_mgr: EconomyManager
 var available_products: Array[EconomyProduct] = []
@@ -34,16 +35,34 @@ func _ready() -> void:
 func _setup_catalog() -> void:
 	economy_mgr = get_tree().get_first_node_in_group("economy_manager") as EconomyManager
 	if is_instance_valid(economy_mgr):
-		available_products = economy_mgr.get_products_by_category(product_category)
+		var prods := economy_mgr.get_products_by_category(product_category)
+		if target_system != "":
+			available_products.clear()
+			for p in prods:
+				if p.target_system == target_system:
+					available_products.append(p)
+		else:
+			available_products = prods
 
 func available(player_node: Node3D) -> bool:
 	return enabled and (user == null or user == player_node)
 
 func prompt(_player: Node3D) -> String:
+	if available_products.is_empty():
+		_setup_catalog()
 	var wallet_str := ""
 	if is_instance_valid(economy_mgr):
 		wallet_str = " (Ví: %s)" % HouseholdWallet.format_money(economy_mgr.wallet.balance)
-	return "Mua sắm tại %s%s" % [kiosk_title, wallet_str]
+	if available_products.is_empty():
+		return "Mua sắm tại %s%s" % [kiosk_title, wallet_str]
+	var prod: EconomyProduct = available_products[selected_index % available_products.size()]
+	var status_str := ""
+	if is_instance_valid(economy_mgr):
+		if (prod.category == "business_upgrade" or prod.category == "house_upgrade") and economy_mgr.inventory.is_upgrade_owned(prod.id):
+			status_str = " [ĐÃ SỞ HỮU]"
+		elif prod.category == "furniture" and prod.is_unique and economy_mgr.inventory.is_furniture_owned(prod.id):
+			status_str = " [ĐÃ SỞ HỮU]"
+	return "Mua sắm %s: %s%s%s" % [prod.name, HouseholdWallet.format_money(prod.price), status_str, wallet_str]
 
 func interact(player_node: Node3D) -> void:
 	if not is_instance_valid(economy_mgr):

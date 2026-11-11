@@ -26,6 +26,7 @@ static func save_economy(
 	var data := {
 		"version": 1,
 		"timestamp": Time.get_unix_time_from_system(),
+		"day": int(business_data.get("day", 1)),
 		"wallet": {
 			"balance": wallet.balance,
 			"total_earned": wallet.total_earned,
@@ -132,11 +133,20 @@ static func load_economy(
 		inventory.owned_furniture.clear()
 		var loaded_furn: Dictionary = inv.get("owned_furniture", {})
 		for k in loaded_furn:
-			inventory.owned_furniture[str(k)] = true
+			var val: Variant = loaded_furn[k]
+			if val is bool:
+				inventory.owned_furniture[str(k)] = val
+			else:
+				inventory.owned_furniture[str(k)] = maxi(1, int(val))
 	
 	# 3. Restore Business Progress & House Data
 	if data.has("businesses") and typeof(data["businesses"]) == TYPE_DICTIONARY:
 		business_data = data["businesses"]
+	
+	if data.has("day"):
+		business_data["day"] = int(data["day"])
+	elif not business_data.has("day"):
+		business_data["day"] = 1
 	
 	if data.has("house") and typeof(data["house"]) == TYPE_DICTIONARY:
 		business_data["house"] = data["house"]

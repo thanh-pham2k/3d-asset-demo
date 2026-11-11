@@ -50,12 +50,20 @@ func unlock_upgrade(upgrade_id: String) -> bool:
 	return true
 
 func is_furniture_owned(furniture_id: String) -> bool:
-	return owned_furniture.get(furniture_id, false)
+	var val: Variant = owned_furniture.get(furniture_id, false)
+	if val is bool: return val
+	return int(val) > 0
 
-func unlock_furniture(furniture_id: String) -> bool:
-	if owned_furniture.get(furniture_id, false):
-		return false # Already owned
-	owned_furniture[furniture_id] = true
+func get_furniture_count(furniture_id: String) -> int:
+	var val: Variant = owned_furniture.get(furniture_id, 0)
+	if val is bool: return 1 if val else 0
+	return maxi(0, int(val))
+
+func unlock_furniture(furniture_id: String, count := 1, allow_multiple := false) -> bool:
+	if not allow_multiple and is_furniture_owned(furniture_id):
+		return false # Already owned unique furniture
+	var current := get_furniture_count(furniture_id)
+	owned_furniture[furniture_id] = current + maxi(1, count)
 	furniture_unlocked.emit(furniture_id)
 	return true
 

@@ -112,21 +112,32 @@ static func create_default_catalog() -> Dictionary:
 		),
 		
 		# --- 4. Business Upgrades (Nâng cấp tiệm kinh doanh) ---
+		# Motorcycle Shop: Additional bay, Better tools, Faster service
 		EconomyProduct.new(
-			"upg_garage_second_bay", "Khoang sửa xe thứ 2", "business_upgrade",
-			200000, "Mở rộng thêm 1 khoang phục vụ khách đôi", true, "garage"
+			"upg_garage_second_bay", "Khoang sửa xe mở rộng", "business_upgrade",
+			150000, "Mở rộng thêm khoang sửa xe hoàn chỉnh, tăng gấp đôi lượng khách phục vụ cùng lúc", true, "garage"
+		),
+		EconomyProduct.new(
+			"upg_garage_tools", "Bộ đồ nghề sửa xe cao cấp", "business_upgrade",
+			80000, "Bộ dụng cụ thợ máy chuyên nghiệp, tăng 30% tiền công tip từ mỗi khách sửa xe", true, "garage"
 		),
 		EconomyProduct.new(
 			"upg_garage_compressor", "Máy nén khí siêu tốc", "business_upgrade",
-			120000, "Tăng tốc độ bơm hơi và áp suất tự động", true, "garage"
+			120000, "Bơm lốp siêu tốc tự động, khách đến nhanh hơn và kiên nhẫn chờ đợi lâu hơn 40%", true, "garage"
 		),
+		
+		# Hu Tieu Shop: Additional seating, Faster cooking equipment, Improved kitchen capacity
 		EconomyProduct.new(
 			"upg_hutieu_extra_table", "Bàn ăn ngoài trời thứ 4", "business_upgrade",
-			150000, "Tăng công suất đón thêm nhiều lượt khách", true, "hutieu"
+			120000, "Kê thêm bàn ăn số 4 và ghế tựa ngoài trời có dù che, tăng công suất đón khách", true, "hutieu"
 		),
 		EconomyProduct.new(
-			"upg_hutieu_quick_stove", "Bếp hầm áp suất đa năng", "business_upgrade",
-			140000, "Rút ngắn thời gian trụng bánh và nấu nước lèo", true, "hutieu"
+			"upg_hutieu_quick_stove", "Bếp trụng áp suất cao đa năng", "business_upgrade",
+			100000, "Trụng hủ tiếu siêu nhanh 0.4s và tăng gấp đôi tốc độ chuẩn bị quán mở cửa", true, "hutieu"
+		),
+		EconomyProduct.new(
+			"upg_hutieu_kitchen_capacity", "Quầy bếp dung tích lớn", "business_upgrade",
+			140000, "Mở rộng quầy chế biến và tặng trà đá, khách kiên nhẫn hơn và tăng 25% doanh thu mỗi tô", true, "hutieu"
 		),
 		
 		# --- 5. House Upgrades (Nâng cấp ngôi nhà tân hôn) ---

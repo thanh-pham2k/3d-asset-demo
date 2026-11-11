@@ -27,6 +27,7 @@ var custom_furniture_root: Node3D
 var player: CharacterBody3D
 var placement_hud: CanvasLayer
 var placement_banner: Label
+var was_rearranging_node: Node3D = null
 
 # References to base interactables to satisfy smoke test
 var current_sofa: Interactable
@@ -106,6 +107,13 @@ func _discover_scene_nodes() -> void:
 		econ.house_manager = self
 		if is_instance_valid(upgrade_board):
 			upgrade_board.wallet = econ.wallet
+		storage.sync_with_inventory(econ.inventory, progression_manager.placed_furniture)
+		if not econ.inventory.furniture_unlocked.is_connected(_on_furniture_unlocked_sync):
+			econ.inventory.furniture_unlocked.connect(_on_furniture_unlocked_sync)
+
+func _on_furniture_unlocked_sync(_id: String) -> void:
+	var econ: EconomyManager = get_tree().get_first_node_in_group("economy_manager") as EconomyManager
+	if is_instance_valid(econ):
 		storage.sync_with_inventory(econ.inventory, progression_manager.placed_furniture)
 
 func _load_persistent_house_data() -> void:
@@ -463,10 +471,11 @@ func start_placement(furniture_id: String, _initiator: Node3D = null) -> void:
 func _on_placement_started(furniture_id: String) -> void:
 	placement_hud.visible = true
 	var def := FurnitureData.get_definition(furniture_id)
-	placement_banner.text = "ĐANG ĐẶT: %s  ·  [WASD] Di chuyển  ·  [R] Xoay 90°  ·  [E] Xác nhận  ·  [F] Hủy" % def["name"]
+	placement_banner.text = "ĐANG ĐẶT: %s  ·  [WASD] Di chuyển  ·  [R] Xoay 90°  ·  [E] Xác nhận  ·  [F] Hủy  ·  [X] Thu hồi vào kho" % def["name"]
 
 func _on_placement_confirmed(furniture_id: String, placed_node: Node3D) -> void:
 	placement_hud.visible = false
+	was_rearranging_node = null
 	placed_node.position -= global_position
 	custom_furniture_root.add_child(placed_node)
 	progression_manager.register_placed_furniture(furniture_id, to_local(placed_node.global_position), placed_node.rotation.y)
@@ -474,8 +483,15 @@ func _on_placement_confirmed(furniture_id: String, placed_node: Node3D) -> void:
 
 func _on_placement_cancelled(furniture_id: String) -> void:
 	placement_hud.visible = false
-	# Return to storage
-	storage.add_item(furniture_id)
+	if is_instance_valid(was_rearranging_node):
+		progression_manager.register_placed_furniture(
+			furniture_id,
+			to_local(was_rearranging_node.global_position),
+			was_rearranging_node.rotation.y
+		)
+		was_rearranging_node = null
+	else:
+		storage.add_item(furniture_id)
 
 func _on_placement_rejected(reason: String, message: String) -> void:
 	placement_banner.text = "⚠️ %s  ·  [WASD] Di chuyển tìm vị trí trống" % message
@@ -510,6 +526,16 @@ func _unhandled_input(event: InputEvent) -> void:
 			var placed := placement_manager.confirm_placement(target_pos, space_state, bounds, player)
 			if placed:
 				get_viewport().set_input_as_handled()
+		elif event.keycode == KEY_X or event.keycode == KEY_DELETE or event.keycode == KEY_BACKSPACE:
+			# Put directly into storage box
+			if is_instance_valid(was_rearranging_node):
+				var fid: String = was_rearranging_node.get_meta("furniture_id", "")
+				was_rearranging_node.queue_free()
+				was_rearranging_node = null
+				placement_manager.cancel_placement()
+				storage.add_item(fid)
+				_save_state()
+				get_viewport().set_input_as_handled()
 		elif event.is_action_pressed("p1_throw") or event.keycode == KEY_ESCAPE:
 			placement_manager.cancel_placement()
 			get_viewport().set_input_as_handled()
@@ -518,6 +544,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		if event.is_action_pressed("p1_throw") and is_instance_valid(player):
 			var nearest_node: Node3D = _find_nearest_placed_furniture(player.global_position, 1.8)
 			if nearest_node:
+				was_rearranging_node = nearest_node
 				progression_manager.unregister_placed_furniture(
 					nearest_node.get_meta("furniture_id", ""),
 					to_local(nearest_node.global_position)

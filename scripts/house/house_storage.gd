@@ -32,6 +32,7 @@ func sync_with_inventory(inventory: InventoryManager, placed_list: Array) -> voi
 	# For each owned furniture in inventory, if owned count > placed count, add to unplaced
 	for fid in inventory.owned_furniture:
 		var placed_count: int = placed_counts.get(fid, 0)
-		# Unique furniture: 1 owned
-		if placed_count < 1:
+		var owned_count: int = inventory.get_furniture_count(fid)
+		var remaining: int = owned_count - placed_count
+		for i in range(maxi(0, remaining)):
 			unplaced_items.append(fid)

@@ -56,13 +56,15 @@ func run_scenario() -> Dictionary:
 		cam.look_at(chair_pos + Vector3(0, 0.5, 0))
 	await wait_and_record(15)
 	
-	var leg_rot_x: float = customer.diner.left_leg.rotation.x
-	check(leg_rot_x < -1.0, "Legs bent naturally downward in front of chair (not clipping table)")
-	var arm_rot_x: float = customer.diner.left_arm.rotation.x
-	check(arm_rot_x < -0.5, "Arms resting gently on table surface")
+	var leg_idx: int = customer.diner.skeleton.find_bone("left_leg")
+	var leg_rot_euler: Vector3 = customer.diner.skeleton.get_bone_pose_rotation(leg_idx).get_euler()
+	check(leg_rot_euler.x < -1.0, "Legs bent naturally downward in front of chair (not clipping table)")
+	var arm_idx: int = customer.diner.skeleton.find_bone("left_arm")
+	var arm_rot_euler: Vector3 = customer.diner.skeleton.get_bone_pose_rotation(arm_idx).get_euler()
+	check(arm_rot_euler.x < -0.5, "Arms resting gently on table surface")
 	
 	# 3. Serve food bowl (ORDER -> EAT)
-	customer.start_eating()
+	customer.notify_food_served()
 	check(customer.current_state == HuTieuCustomer.State.EATING, "Transitioned to EATING")
 	check(customer.eating_bowl.visible, "Steaming noodle bowl placed on table")
 	
@@ -77,10 +79,10 @@ func run_scenario() -> Dictionary:
 		recorder.capture_now()
 	
 	# 4. Customer finishes, stands up, and leaves (EAT -> STAND -> LEAVE)
-	customer._stand_up_pose()
-	customer.current_state = HuTieuCustomer.State.LEAVING
+	customer._start_leaving()
 	check(customer.current_state == HuTieuCustomer.State.LEAVING, "Customer stood up and transitioned to LEAVING")
-	check(customer.diner.left_leg.rotation.x == 0.0, "Leg rotations restored to upright standing posture")
+	var leg_stand_euler: Vector3 = customer.diner.skeleton.get_bone_pose_rotation(leg_idx).get_euler()
+	check(abs(leg_stand_euler.x) < 0.05, "Leg rotations restored to upright standing posture")
 	
 	# Wide angle showing customer departing
 	if is_instance_valid(cam):
@@ -89,7 +91,7 @@ func run_scenario() -> Dictionary:
 	
 	for step in 20:
 		customer.global_position += Vector3(0, 0, 1.0) * (3.0 * 0.05)
-		customer.diner.update_pose(3.0, false, false, false, false, false, false, step * 0.05)
+		customer.diner.update_animation(3.0, step * 0.05, false)
 		await RenderingServer.frame_post_draw
 		recorder.capture_now()
 	

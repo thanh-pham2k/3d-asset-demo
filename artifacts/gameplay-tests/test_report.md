@@ -1,34 +1,57 @@
 # Automated Visual Gameplay Test Report
 
 **Project**: Couple Chaos (Godot 4.7.2 3D Low-Poly Life Simulation)
-**Date**: 2026-11-11T23:10:44
-**Summary**: 1 Scenarios Executed — **1 PASS**, **0 FAIL**
+**Date**: 2026-11-11T23:45:15
+**Execution Summary**: 1 Scenarios Executed — **0 PASS**, **1 FAIL**, **0 BLOCKED**
 
 ## Executive Summary Table
 
 | Test ID | Scenario Description | Status | Duration | GIF Evidence |
 |---|---|---|---|---|
-| `TC02` | House Exit | 🟢 PASS | 7.7s | [TC02_house_exit.gif](./TC02_house_exit.gif) |
+| `TC04` | Motorcycle Customer Arrival & Repair | 🔴 FAIL | 11.8s | [TC04_motorcycle_repair.gif](./TC04_motorcycle_repair.gif) |
 
 ---
 
 ## Detailed Test Case Results
 
-### TC02 — House Exit (🟢 PASS)
+### TC04 — Motorcycle Customer Arrival & Repair (🔴 FAIL)
 
-- **Status**: 🟢 PASS
-- **Duration**: 7.7s
-- **GIF Evidence**: `artifacts/gameplay-tests/TC02_house_exit.gif`
+- **Description**: Tests realistic customer arrival along the road path into Bay 0, driver dismounting and ordering repair, player walking to workbench to pick up patch kit, interacting at Bay 0 to apply patch and pump air, payment processing, and customer riding away.
+- **Status**: 🔴 FAIL
+- **Duration**: 11.8s
+- **GIF Evidence**: `artifacts/gameplay-tests/TC04_motorcycle_repair.gif`
+- **Expected Result**: Customer drives into bay naturally, order is accepted, player executes sequential repair steps via physical station interactions, wallet earns 35,000đ, and customer rides away safely.
+- **Actual Result**: One or more assertions failed.
 
 #### Assertions Executed:
-- ✅ House front door exists
-- ✅ Door starts in closed state
-- ✅ Door opened after E interaction
-- ✅ Doorway collision disabled allowing pass-through
-- ✅ Player walked out of house into front yard (Z <= 80)
-- ✅ Player is within front yard bounds (Z >= 63)
-- ✅ Camera tracks player smoothly
-- ✅ Camera centered horizontally with player
+- ✅ GarageBusiness exists
+- ✅ Customer reached Bay 0 and is waiting for service
+- ✅ Customer driver stepped off motorcycle
+- ✅ Customer order registered in Bay 0
+- ✅ Boy picked up patch kit from workbench via physical interaction
+- ✅ Patch kit applied through station interaction; next step is pump_air
+- ✅ Patch kit consumed from player inventory
+- ✅ Order status marked PAID
+- ✅ Household wallet received +35,000đ
+- ✅ Customer celebrates completed service
+- ❌ Customer departed on motorcycle along road
 
-**Notes**: Verified walking to door, E opening door, collision removal, and smooth walk out to yard.
+#### Reproduction Steps:
+1. Position player at garage courtyard (-60, 0, -15).
+2. Customer arrives on motorcycle via driveway approach waypoints.
+3. Customer arrives at Bay 0, parks vehicle, rider steps off and requests repair.
+4. Player walks to WorkbenchStation and presses [E] to retrieve patch kit.
+5. Player walks to BikeBay_0 and presses [E] to patch customer tire.
+6. Player presses [E] at BikeBay_0 to pump tire and finalize service.
+7. Assert order marked PAID, wallet credited +35,000đ.
+8. Customer mounts motorcycle and departs along road waypoints.
+
+#### Related Source Files:
+- `res://scripts/neighborhood/business/garage_business.gd`
+- `res://scripts/neighborhood/business/motorcycle_customer.gd`
+- `res://scripts/neighborhood/business/business_order.gd`
+
+**Notes**: Verified natural customer arrival, workbench tool retrieval, bay patching & pumping station interactions, payout, and departure.
+
+---
 

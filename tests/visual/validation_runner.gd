@@ -39,12 +39,22 @@ func run() -> void:
 		["TC04", "Hu Tieu Customer Sitting and Eating"]
 	]
 	
+	# Parse command line argument if specific scenario is requested
+	var target_scenario := ""
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--scenario="):
+			target_scenario = arg.trim_prefix("--scenario=").to_upper()
+	
 	var total_passed := 0
 	var total_failed := 0
 	
 	for idx in range(scenarios.size()):
 		var sc_id: String = titles[idx][0]
 		var sc_title: String = titles[idx][1]
+		
+		if target_scenario != "" and target_scenario != sc_id:
+			continue
+		
 		var scenario = scenarios[idx]
 		
 		scenario.setup(sc_id, sc_title, game_manager, recorder)

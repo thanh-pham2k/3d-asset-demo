@@ -106,6 +106,8 @@ func toggle_expanded_map(enable: Variant = null) -> void:
 	else:
 		is_expanded = bool(enable)
 	modal_backdrop.visible = is_expanded
+	if is_instance_valid(modal_window):
+		modal_window.visible = is_expanded
 	if is_expanded:
 		_update_expanded_labels()
 

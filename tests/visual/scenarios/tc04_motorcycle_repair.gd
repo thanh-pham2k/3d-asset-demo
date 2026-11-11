@@ -116,13 +116,11 @@ func run_scenario() -> Dictionary:
 	check(customer.current_state == MotorcycleCustomer.State.SERVICE_COMPLETED or customer.current_state == MotorcycleCustomer.State.DEPARTING, "Customer celebrates completed service")
 	
 	# 5. Customer mounts motorcycle and departs
-	var depart_timeout := 2.5
-	elapsed = 0.0
-	while is_instance_valid(customer) and customer.current_state != MotorcycleCustomer.State.DESPAWNED and elapsed < depart_timeout:
-		await wait_and_record(4)
-		elapsed += 0.2
+	var t_dep_start := Time.get_ticks_msec()
+	while is_instance_valid(customer) and customer.current_state != MotorcycleCustomer.State.DESPAWNED and (Time.get_ticks_msec() - t_dep_start) < 3000:
+		await wait_and_record(3)
 	
-	check(customer.current_state == MotorcycleCustomer.State.DEPARTING or not is_instance_valid(customer), "Customer departed on motorcycle along road")
+	check(not is_instance_valid(customer) or customer.current_state == MotorcycleCustomer.State.DEPARTING or customer.current_state == MotorcycleCustomer.State.DESPAWNED, "Customer departed on motorcycle along road")
 	
 	notes = "Verified natural customer arrival, workbench tool retrieval, bay patching & pumping station interactions, payout, and departure."
 	var gif_path = recorder.stop_recording_and_export_gif(30)

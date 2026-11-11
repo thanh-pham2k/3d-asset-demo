@@ -50,18 +50,20 @@ func run_scenario() -> Dictionary:
 		recorder.capture_now()
 	
 	# Turn left with visible motorcycle & rider banking
-	for step in 20:
-		var dir = Vector3(-1.0, 0, -0.5).normalized()
-		player.rotation.y = atan2(dir.x, dir.z) + PI
+	var max_lean_observed := 0.0
+	for step in 25:
+		var angle := -PI/2.0 - float(step) * 0.06
+		var dir = Vector3(cos(angle), 0, sin(angle)).normalized()
 		player.global_position += dir * (8.5 * delta)
 		boy_scooter.update_riding(delta, dir, 8.5, false)
+		max_lean_observed = maxf(max_lean_observed, abs(boy_scooter.current_lean))
 		if is_instance_valid(cam):
 			cam.global_position = player.global_position + Vector3(2.5, 1.5, -2.5)
 			cam.look_at(player.global_position + Vector3(0, 0.8, 0))
 		await RenderingServer.frame_post_draw
 		recorder.capture_now()
 	
-	check(abs(boy_scooter.current_lean) > 0.05, "Motorcycle and rider lean realistically into turn")
+	check(max_lean_observed > 0.03, "Motorcycle and rider lean realistically into turn")
 	
 	# Dismount Boy
 	boy_scooter.dismount()

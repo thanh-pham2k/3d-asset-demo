@@ -54,7 +54,7 @@ func run_scenario() -> Dictionary:
 	check(is_instance_valid(body) and body.collision_layer == 0, "Doorway collision disabled allowing pass-through")
 	
 	# 3. Walk through doorway into front yard
-	await simulate_walk(Vector3(-45.0, 0, 76.0), 2.0)
+	await simulate_walk(Vector3(-45.0, 0, 76.0), 2.5)
 	await wait_and_record(8)
 	
 	check(player.global_position.z <= 80.0, "Player walked out of house into front yard (Z <= 80)")
@@ -65,7 +65,7 @@ func run_scenario() -> Dictionary:
 	check(absf(cam.global_position.x - player.global_position.x) < 2.0, "Camera centered horizontally with player")
 	
 	# 4. Turn around and walk back through doorway into bedroom
-	await simulate_walk(Vector3(-45.0, 0, 87.0), 2.2)
+	await simulate_walk(Vector3(-45.0, 0, 87.0), 2.8)
 	await wait_and_record(8)
 	check(player.global_position.z > 84.0, "Player walked back into house interior through open door")
 	
@@ -78,7 +78,7 @@ func run_scenario() -> Dictionary:
 	# 6. Re-open and step into yard for next commute scenario
 	door.interact(player)
 	await wait_and_record(5)
-	await simulate_walk(Vector3(-45.0, 0, 76.0), 1.6)
+	await simulate_walk(Vector3(-45.0, 0, 76.0), 2.8)
 	await wait_and_record(6)
 	
 	notes = "Verified complete entry and exit cycle, physical door collision blocking, smooth camera tracking, and bidirectional navigation."

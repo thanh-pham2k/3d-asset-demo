@@ -6,6 +6,8 @@ const ScenarioBaseScript = preload("res://tests/visual/scenarios/scenario_base.g
 var results: Array[Dictionary] = []
 
 func _initialize() -> void:
+	OS.low_processor_usage_mode = false
+	Engine.max_fps = 60
 	call_deferred("run")
 
 func run() -> void:

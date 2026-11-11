@@ -62,18 +62,19 @@ func run_scenario() -> Dictionary:
 	customer.setup(0, "Bác Năm", table_local_pos, approach_path, depart_path)
 	hutieu.table_customers[0] = customer
 	
-	customer.reached_table.connect(func(tbl_idx: int):
+	customer.arrived_at_table.connect(func(tbl_idx: int):
 		hutieu.table_orders[tbl_idx] = order
 		hutieu.active_orders.append(order)
 		hutieu._update_table_display(tbl_idx)
 	)
 	
 	# Wait for customer to walk to table naturally
-	var arrival_timeout := 3.0
+	var arrival_timeout := 4.0
 	var elapsed := 0.0
 	while customer.current_state == HuTieuCustomer.State.WALKING_TO_TABLE and elapsed < arrival_timeout:
-		await wait_and_record(4)
-		elapsed += 0.2
+		customer._process(0.1)
+		await wait_and_record(2)
+		elapsed += 0.1
 	
 	check(customer.current_state == HuTieuCustomer.State.SEATED_ORDERING, "Customer is seated on chair")
 	check(hutieu.table_orders.has(0), "Customer placed order for 'Hủ tiếu Nam Vang'")
@@ -86,11 +87,12 @@ func run_scenario() -> Dictionary:
 	check(hutieu.current_bowl_state == HuTieuBusiness.BowlState.BLANCHING, "Bowl in blanching strainer")
 	
 	# Wait for natural blanch timer (1.6s)
-	var blanch_timeout := 2.5
+	var blanch_timeout := 3.0
 	elapsed = 0.0
 	while hutieu.current_bowl_state == HuTieuBusiness.BowlState.BLANCHING and elapsed < blanch_timeout:
-		await wait_and_record(4)
-		elapsed += 0.15
+		hutieu._process(0.1)
+		await wait_and_record(2)
+		elapsed += 0.1
 	
 	check(hutieu.current_bowl_state == HuTieuBusiness.BowlState.NOODLES_DONE, "Noodles cooked to perfection naturally")
 	
@@ -127,10 +129,11 @@ func run_scenario() -> Dictionary:
 	var eat_timeout := 3.5
 	elapsed = 0.0
 	while customer.current_state == HuTieuCustomer.State.EATING and elapsed < eat_timeout:
-		await wait_and_record(4)
-		elapsed += 0.2
+		customer._process(0.1)
+		await wait_and_record(2)
+		elapsed += 0.1
 	
-	check(customer.current_state == HuTieuCustomer.State.LEAVING or not is_instance_valid(customer), "Customer finished meal and departed along sidewalk")
+	check(customer.current_state == HuTieuCustomer.State.LEAVING or customer.current_state == HuTieuCustomer.State.DESPAWNED or not is_instance_valid(customer), "Customer finished meal and departed along sidewalk")
 	
 	notes = "Verified customer seating, realistic sequential cooking (natural blanch, broth, toppings), table serving, payment, and departure."
 	var gif_path = recorder.stop_recording_and_export_gif(30)

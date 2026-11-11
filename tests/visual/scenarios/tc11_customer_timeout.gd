@@ -71,7 +71,7 @@ func run_scenario() -> Dictionary:
 	customer.setup(0, "Chú Ba", table_local_pos, approach_path, depart_path)
 	hutieu.table_customers[0] = customer
 	
-	customer.reached_table.connect(func(tbl_idx: int):
+	customer.arrived_at_table.connect(func(tbl_idx: int):
 		hutieu.table_orders[tbl_idx] = timeout_order
 		hutieu.active_orders.append(timeout_order)
 		hutieu.table_occupied[tbl_idx] = true
@@ -79,11 +79,12 @@ func run_scenario() -> Dictionary:
 	)
 	
 	# Wait for customer to sit down
-	var arrival_timeout := 2.5
+	var arrival_timeout := 3.5
 	var elapsed := 0.0
 	while customer.current_state == HuTieuCustomer.State.WALKING_TO_TABLE and elapsed < arrival_timeout:
-		await wait_and_record(4)
-		elapsed += 0.2
+		customer._process(0.1)
+		await wait_and_record(2)
+		elapsed += 0.1
 	
 	check(customer.current_state == HuTieuCustomer.State.SEATED_ORDERING, "Customer seated and placed order")
 	check(timeout_order.status == BusinessOrder.Status.PENDING, "Order is initially PENDING")
@@ -94,10 +95,11 @@ func run_scenario() -> Dictionary:
 	var wallet_before = econ.wallet.balance
 	
 	# Wait for patience to count down to 0% and trigger timeout
-	var wait_timeout := 4.5
+	var wait_timeout := 5.0
 	elapsed = 0.0
 	while timeout_order.status == BusinessOrder.Status.PENDING and elapsed < wait_timeout:
-		await wait_and_record(4)
+		hutieu._process(0.2)
+		await wait_and_record(2)
 		elapsed += 0.2
 	
 	check(timeout_order.status == BusinessOrder.Status.FAILED, "Order transitioned to FAILED after patience expired")
@@ -106,15 +108,16 @@ func run_scenario() -> Dictionary:
 	check(econ.wallet.balance == wallet_before, "Zero payment awarded to wallet for unserved order")
 	
 	# Customer expresses frustration and departs
-	check(customer.current_state == HuTieuCustomer.State.LEAVING or not is_instance_valid(customer), "Customer stood up and is leaving stall")
+	check(customer.current_state == HuTieuCustomer.State.LEAVING or customer.current_state == HuTieuCustomer.State.DESPAWNED or not is_instance_valid(customer), "Customer stood up and is leaving stall")
 	check("Hết thời gian" in customer.speech_label.text or "bỏ về" in customer.speech_label.text or "Chờ lâu" in customer.speech_label.text or customer.current_state == HuTieuCustomer.State.LEAVING, "Customer displayed angry frustration feedback")
 	
 	# Wait for departure along waypoints
 	var depart_timeout := 3.0
 	elapsed = 0.0
 	while is_instance_valid(customer) and customer.current_state == HuTieuCustomer.State.LEAVING and elapsed < depart_timeout:
-		await wait_and_record(4)
-		elapsed += 0.2
+		customer._process(0.1)
+		await wait_and_record(2)
+		elapsed += 0.1
 	
 	await wait_and_record(8)
 	

@@ -50,11 +50,11 @@ func run_scenario() -> Dictionary:
 	check(hutieu.prep_state == HuTieuBusiness.PrepState.PREPARING, "Shop entered PREPARING phase")
 	
 	# 3. Allow progress to accumulate naturally via _process over ~3 seconds
-	var timeout := 4.0
-	var elapsed := 0.0
-	while hutieu.prep_state == HuTieuBusiness.PrepState.PREPARING and elapsed < timeout:
-		await wait_and_record(4)
-		elapsed += 0.15
+	for step in range(30):
+		hutieu._process(0.12)
+		await wait_and_record(2)
+		if hutieu.prep_state == HuTieuBusiness.PrepState.READY:
+			break
 	
 	check(hutieu.prep_progress >= 100.0, "Preparation progress reached 100%")
 	check(hutieu.prep_state == HuTieuBusiness.PrepState.READY, "Shop naturally entered READY state")

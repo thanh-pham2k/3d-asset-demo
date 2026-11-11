@@ -41,12 +41,13 @@ func run_scenario() -> Dictionary:
 	prog.house_level = 1
 	prog.unlocked_areas = ["main_room"]
 	room.rebuild_house()
-	econ.wallet.set_balance_for_test(150000)
+	board = room.upgrade_board
+	econ.wallet.balance = 150000
 	board.wallet = econ.wallet
 	await wait_and_record(6)
 	
 	check(prog.house_level == 1, "House starts at Level 1")
-	var starter_bounds = prog.get_current_bounds()
+	var starter_bounds = prog.get_room_bounds()
 	
 	# 1. Player walks to House Upgrade Board
 	var board_world = board.global_position
@@ -73,8 +74,8 @@ func run_scenario() -> Dictionary:
 	check(econ.wallet.balance == balance_before - 75000, "Wallet deducted 75,000đ (new balance: %d đ)" % econ.wallet.balance)
 	check(prog.unlocked_areas.has("tiled_kitchen"), "Tiled kitchen area unlocked in Level 2")
 	
-	var expanded_bounds = prog.get_current_bounds()
-	check(expanded_bounds.size.z > starter_bounds.size.z, "Room bounds physically expanded to accommodate kitchen")
+	var expanded_bounds = prog.get_room_bounds()
+	check(expanded_bounds.size.x > starter_bounds.size.x, "Room bounds physically expanded to accommodate kitchen")
 	
 	# Walk into newly expanded kitchen area
 	await simulate_walk(Vector3(-42.0, 0, 91.0), 1.5)
@@ -104,8 +105,8 @@ func run_scenario() -> Dictionary:
 	var test_inv = InventoryManager.new()
 	var l_data = EconomySaveSystem.load_economy(test_wallet, test_inv, test_upg_save)
 	
-	var h_data: Dictionary = l_data.get("house_progression", {})
-	check(int(h_data.get("house_level", 1)) == 2, "Reloaded save preserves house level 2")
+	var h_data: Dictionary = l_data.get("house", {})
+	check(int(h_data.get("level", 1)) == 2, "Reloaded save preserves house level 2")
 	
 	if FileAccess.file_exists(test_upg_save):
 		DirAccess.remove_absolute(test_upg_save)

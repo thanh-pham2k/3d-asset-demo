@@ -84,7 +84,8 @@ func simulate_walk(target_world_pos: Vector3, max_seconds: float = 3.5, stop_dis
 		player.facing = dir
 		player.rotation.y = atan2(dir.x, dir.z) + PI
 		player.velocity = dir * 4.5
-		player.move_and_slide()
+		var move_step: Vector3 = dir * minf(dist, 4.5 * delta)
+		player.move_and_collide(move_step)
 		player.update_animation(4.5, false)
 		
 		elapsed += delta

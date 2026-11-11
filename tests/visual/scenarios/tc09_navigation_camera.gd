@@ -27,6 +27,11 @@ func run_scenario() -> Dictionary:
 	var world = game_manager.get_node_or_null("Neighborhood")
 	if world and world.economy_manager:
 		world.economy_manager.wallet.total_earned = 0
+	var dl = world.get_node_or_null("DailyLoopManager") if world else null
+	if is_instance_valid(dl):
+		dl.daily_revenue = 0
+		dl.daily_customers_served = 0
+		dl.current_phase = 0 # Phase.MORNING
 	await wait_and_record(6)
 	
 	var guidance: WorkplaceGuidance = game_manager.get_node_or_null("WorkplaceGuidance")
@@ -48,7 +53,7 @@ func run_scenario() -> Dictionary:
 	check(new_dist < initial_dist, "Distance decreased as player approached target")
 	
 	# 2. Reach destination (< 2.5m) and verify arrival state
-	await simulate_walk(Vector3(-47.0, 0, 72.2), 1.8)
+	await simulate_walk(guidance.current_destination + Vector3(0.5, 0, 0.5), 2.5)
 	guidance._process(0.05)
 	await wait_and_record(10)
 	

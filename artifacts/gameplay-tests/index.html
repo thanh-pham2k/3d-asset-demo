@@ -193,22 +193,22 @@
 			<div class="subtitle">Godot 4.7.2 Stylized Low-Poly Life Simulation • Rendered Frame Captures (960x540, 30 FPS)</div>
 		</div>
 		<div style="text-align: right;">
-			<div class="subtitle">Generated: 2026-11-11T23:46:55</div>
+			<div class="subtitle">Generated: 2026-11-12T00:07:41</div>
 		</div>
 	</header>
 
 	<div class="stats-bar">
 		<div class="stat-pill">
 			<div class="stat-label">Total Scenarios</div>
-			<div class="stat-val">1</div>
+			<div class="stat-val">13</div>
 		</div>
 		<div class="stat-pill">
 			<div class="stat-label">Passed</div>
-			<div class="stat-val stat-pass">0</div>
+			<div class="stat-val stat-pass">13</div>
 		</div>
 		<div class="stat-pill">
 			<div class="stat-label">Failed</div>
-			<div class="stat-val stat-fail">1</div>
+			<div class="stat-val stat-fail">0</div>
 		</div>
 		<div class="stat-pill">
 			<div class="stat-label">Blocked</div>
@@ -221,12 +221,144 @@
 		<div class="test-card">
 			<div class="card-header">
 				<div class="test-title-group">
+					<span class="test-id">TC01</span>
+					<span class="test-title">Character Selection</span>
+				</div>
+				<div style="display: flex; align-items: center; gap: 8px;">
+					<span class="duration-tag">2.7s</span>
+					<span class="badge badge-pass">PASS</span>
+				</div>
+			</div>
+			<div class="card-media">
+				<img src="./TC01_character_selection.gif" alt="Character Selection" loading="lazy" />
+			</div>
+			<div class="card-body">
+				<div class="desc-text">Validates seamless switching between Boy and Girl characters, verifying 3D model instantiation, animation controller attachment, and bedroom spawn location.</div>
+				
+				<div class="section-box">
+					<div class="section-label">Assertions Validated (6)</div>
+					<ul class="assertion-list">
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Character is Boy</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Boy 3D visual model is active</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Boy starts inside shared house interior (Z > 83)</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Character switched to Girl</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Girl 3D visual model is active</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Girl remains inside shared house interior</span></li>
+					</ul>
+				</div>
+
+				<div>
+					<div class="section-label">Related Sources</div>
+					<div class="sources-list">
+						<span class="source-tag">res://scripts/player.gd</span>
+						<span class="source-tag">res://scripts/player_config.gd</span>
+						<span class="source-tag">res://scripts/animation_controller.gd</span>
+					</div>
+				</div>
+
+			</div>
+		</div>
+
+		<div class="test-card">
+			<div class="card-header">
+				<div class="test-title-group">
+					<span class="test-id">TC02</span>
+					<span class="test-title">House Entry & Exit</span>
+				</div>
+				<div style="display: flex; align-items: center; gap: 8px;">
+					<span class="duration-tag">8.8s</span>
+					<span class="badge badge-pass">PASS</span>
+				</div>
+			</div>
+			<div class="card-media">
+				<img src="./TC02_house_exit.gif" alt="House Entry & Exit" loading="lazy" />
+			</div>
+			<div class="card-body">
+				<div class="desc-text">Tests complete house entry and exit cycle: validates closed door collision blocking passage, [E] interaction to open, smooth walking through doorway into yard, turning around to re-enter, closing door, and camera tracking.</div>
+				
+				<div class="section-box">
+					<div class="section-label">Assertions Validated (13)</div>
+					<ul class="assertion-list">
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>House front door exists</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Door starts in closed state</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Door collision active in closed state</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Solid door collision prevents walking through closed doorway</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Door opened after E interaction</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Doorway collision disabled allowing pass-through</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Player walked out of house into front yard (Z <= 80)</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Player is within front yard bounds (Z >= 63)</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Camera tracks player smoothly</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Camera centered horizontally with player</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Player walked back into house interior through open door</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Door closed after second E interaction</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Door collision re-enabled upon closing</span></li>
+					</ul>
+				</div>
+
+				<div>
+					<div class="section-label">Related Sources</div>
+					<div class="sources-list">
+						<span class="source-tag">res://scripts/room.gd</span>
+						<span class="source-tag">res://scripts/interactable.gd</span>
+						<span class="source-tag">res://scripts/player.gd</span>
+					</div>
+				</div>
+
+			</div>
+		</div>
+
+		<div class="test-card">
+			<div class="card-header">
+				<div class="test-title-group">
+					<span class="test-id">TC03</span>
+					<span class="test-title">Motorcycle Riding & Parking</span>
+				</div>
+				<div style="display: flex; align-items: center; gap: 8px;">
+					<span class="duration-tag">20.3s</span>
+					<span class="badge badge-pass">PASS</span>
+				</div>
+			</div>
+			<div class="card-media">
+				<img src="./TC03_motorcycle_commute.gif" alt="Motorcycle Riding & Parking" loading="lazy" />
+			</div>
+			<div class="card-body">
+				<div class="desc-text">Tests walking to motorcycle in front yard, mounting vehicle, folding kickstand, driving along road waypoints without building clipping, parking smoothly into garage workplace bay, and dismounting.</div>
+				
+				<div class="section-box">
+					<div class="section-label">Assertions Validated (9)</div>
+					<ul class="assertion-list">
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Boy's commuter motorcycle exists</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Motorcycle is available for mounting</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Player mounted motorcycle</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Kickstand folded up automatically</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Player meta indicates riding state</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Player dismounted motorcycle</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Kickstand put down upon parking</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Motorcycle neatly parked in garage bay</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Player arrived at garage workplace without teleporting</span></li>
+					</ul>
+				</div>
+
+				<div>
+					<div class="section-label">Related Sources</div>
+					<div class="sources-list">
+						<span class="source-tag">res://scripts/neighborhood/player_scooter.gd</span>
+						<span class="source-tag">res://scripts/neighborhood/world.gd</span>
+					</div>
+				</div>
+
+			</div>
+		</div>
+
+		<div class="test-card">
+			<div class="card-header">
+				<div class="test-title-group">
 					<span class="test-id">TC04</span>
 					<span class="test-title">Motorcycle Customer Arrival & Repair</span>
 				</div>
 				<div style="display: flex; align-items: center; gap: 8px;">
-					<span class="duration-tag">11.5s</span>
-					<span class="badge badge-fail">FAIL</span>
+					<span class="duration-tag">11.2s</span>
+					<span class="badge badge-pass">PASS</span>
 				</div>
 			</div>
 			<div class="card-media">
@@ -248,7 +380,7 @@
 						<li class="assertion-item"><span class="mark-pass">✓</span><span>Order status marked PAID</span></li>
 						<li class="assertion-item"><span class="mark-pass">✓</span><span>Household wallet received +35,000đ</span></li>
 						<li class="assertion-item"><span class="mark-pass">✓</span><span>Customer celebrates completed service</span></li>
-						<li class="assertion-item"><span class="mark-fail">✗</span><span>Customer departed on motorcycle along road</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Customer departed on motorcycle along road</span></li>
 					</ul>
 				</div>
 
@@ -258,6 +390,419 @@
 						<span class="source-tag">res://scripts/neighborhood/business/garage_business.gd</span>
 						<span class="source-tag">res://scripts/neighborhood/business/motorcycle_customer.gd</span>
 						<span class="source-tag">res://scripts/neighborhood/business/business_order.gd</span>
+					</div>
+				</div>
+
+			</div>
+		</div>
+
+		<div class="test-card">
+			<div class="card-header">
+				<div class="test-title-group">
+					<span class="test-id">TC05</span>
+					<span class="test-title">Hu Tieu Preparation & Opening</span>
+				</div>
+				<div style="display: flex; align-items: center; gap: 8px;">
+					<span class="duration-tag">5.9s</span>
+					<span class="badge badge-pass">PASS</span>
+				</div>
+			</div>
+			<div class="card-media">
+				<img src="./TC05_hutieu_preparation.gif" alt="Hu Tieu Preparation & Opening" loading="lazy" />
+			</div>
+			<div class="card-body">
+				<div class="desc-text">Tests Hu Tieu stall starting in CLOSED state, player interacting with prep station, natural real-time cooking and preparation progress (0% -> 100%), transition to READY state, and player opening the shop to receive customers.</div>
+				
+				<div class="section-box">
+					<div class="section-label">Assertions Validated (10)</div>
+					<ul class="assertion-list">
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>HuTieuBusiness exists</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Shop starts in CLOSED state</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Shop is closed, customer arrivals blocked</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Shop entered PREPARING phase</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Preparation progress reached 100%</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Shop naturally entered READY state</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Prompt offers to open shop</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Shop officially entered OPEN state</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>is_open flag is true</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Overhead billboard reflects shop open status</span></li>
+					</ul>
+				</div>
+
+				<div>
+					<div class="section-label">Related Sources</div>
+					<div class="sources-list">
+						<span class="source-tag">res://scripts/neighborhood/business/hutieu_business.gd</span>
+						<span class="source-tag">res://scripts/neighborhood/business/business_shop.gd</span>
+					</div>
+				</div>
+
+			</div>
+		</div>
+
+		<div class="test-card">
+			<div class="card-header">
+				<div class="test-title-group">
+					<span class="test-id">TC06</span>
+					<span class="test-title">Hu Tieu Customer Service</span>
+				</div>
+				<div style="display: flex; align-items: center; gap: 8px;">
+					<span class="duration-tag">11.6s</span>
+					<span class="badge badge-pass">PASS</span>
+				</div>
+			</div>
+			<div class="card-media">
+				<img src="./TC06_hutieu_customer_service.gif" alt="Hu Tieu Customer Service" loading="lazy" />
+			</div>
+			<div class="card-body">
+				<div class="desc-text">Tests complete dining service cycle: customer arriving and seating at Table 0, placing order, player sequentially cooking dish (blanching noodles naturally, ladling broth, garnishing toppings), serving food to table, payment processing, eating, and customer departure.</div>
+				
+				<div class="section-box">
+					<div class="section-label">Assertions Validated (13)</div>
+					<ul class="assertion-list">
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>HuTieuBusiness exists</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Customer is seated on chair</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Customer placed order for 'Hủ tiếu Nam Vang'</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Bowl in blanching strainer</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Noodles cooked to perfection naturally</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Hot bone broth ladled into bowl</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Bowl fully prepared</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Prepared dish is 'Hủ tiếu Nam Vang'</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Order marked PAID</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Shared wallet credited +45,000đ</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Customer is eating served food</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Hot noodle bowl visible on dining table</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Customer finished meal and departed along sidewalk</span></li>
+					</ul>
+				</div>
+
+				<div>
+					<div class="section-label">Related Sources</div>
+					<div class="sources-list">
+						<span class="source-tag">res://scripts/neighborhood/business/hutieu_business.gd</span>
+						<span class="source-tag">res://scripts/neighborhood/business/hutieu_customer.gd</span>
+						<span class="source-tag">res://scripts/neighborhood/business/business_order.gd</span>
+					</div>
+				</div>
+
+			</div>
+		</div>
+
+		<div class="test-card">
+			<div class="card-header">
+				<div class="test-title-group">
+					<span class="test-id">TC07</span>
+					<span class="test-title">Incorrect Order Rejection & Discard</span>
+				</div>
+				<div style="display: flex; align-items: center; gap: 8px;">
+					<span class="duration-tag">2.5s</span>
+					<span class="badge badge-pass">PASS</span>
+				</div>
+			</div>
+			<div class="card-media">
+				<img src="./TC07_incorrect_order.gif" alt="Incorrect Order Rejection & Discard" loading="lazy" />
+			</div>
+			<div class="card-body">
+				<div class="desc-text">Tests order validation rejecting mismatched food orders: customer orders Nam Vang noodles, player prepares Pork Rib noodles instead, attempts to serve at dining table (rejected, 0đ reward, bowl preserved), and player discards wrong bowl at blanching pot.</div>
+				
+				<div class="section-box">
+					<div class="section-label">Assertions Validated (9)</div>
+					<ul class="assertion-list">
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>HuTieuBusiness exists</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Bowl prepared</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Prepared dish is 'Hủ tiếu sườn heo'</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Customer ordered different dish 'Hủ tiếu Nam Vang'</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Order REJECTED and remains PENDING</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Zero reward granted for incorrect dish</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Kitchen bowl was not consumed</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Wrong bowl safely discarded to allow remaking</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Bowl dish cleared</span></li>
+					</ul>
+				</div>
+
+				<div>
+					<div class="section-label">Related Sources</div>
+					<div class="sources-list">
+						<span class="source-tag">res://scripts/neighborhood/business/hutieu_business.gd</span>
+						<span class="source-tag">res://scripts/neighborhood/business/business_order.gd</span>
+					</div>
+				</div>
+
+			</div>
+		</div>
+
+		<div class="test-card">
+			<div class="card-header">
+				<div class="test-title-group">
+					<span class="test-id">TC08</span>
+					<span class="test-title">Multiple Concurrent Customers</span>
+				</div>
+				<div style="display: flex; align-items: center; gap: 8px;">
+					<span class="duration-tag">2.4s</span>
+					<span class="badge badge-pass">PASS</span>
+				</div>
+			</div>
+			<div class="card-media">
+				<img src="./TC08_multiple_customers.gif" alt="Multiple Concurrent Customers" loading="lazy" />
+			</div>
+			<div class="card-body">
+				<div class="desc-text">Tests multiple concurrent customers dining at Hu Tieu tables and repairing motorcycles at Garage service bays simultaneously, validating independent order tracking, non-overlapping 3D positions, and capacity reservation bounds.</div>
+				
+				<div class="section-box">
+					<div class="section-label">Assertions Validated (6)</div>
+					<ul class="assertion-list">
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Both businesses exist in world</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Hu Tieu Customers occupy separate tables without overlapping (dist > 3m)</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Customers have independent food orders</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Both Hu Tieu tables marked occupied</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Motorcycle customers occupy distinct bays without overlapping (dist > 2.5m)</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Both garage bays properly marked as occupied</span></li>
+					</ul>
+				</div>
+
+				<div>
+					<div class="section-label">Related Sources</div>
+					<div class="sources-list">
+						<span class="source-tag">res://scripts/neighborhood/business/garage_business.gd</span>
+						<span class="source-tag">res://scripts/neighborhood/business/hutieu_business.gd</span>
+						<span class="source-tag">res://scripts/neighborhood/business/business_shop.gd</span>
+					</div>
+				</div>
+
+			</div>
+		</div>
+
+		<div class="test-card">
+			<div class="card-header">
+				<div class="test-title-group">
+					<span class="test-id">TC09</span>
+					<span class="test-title">Navigation & Camera Tracking</span>
+				</div>
+				<div style="display: flex; align-items: center; gap: 8px;">
+					<span class="duration-tag">2.1s</span>
+					<span class="badge badge-pass">PASS</span>
+				</div>
+			</div>
+			<div class="card-media">
+				<img src="./TC09_navigation_camera.gif" alt="Navigation & Camera Tracking" loading="lazy" />
+			</div>
+			<div class="card-body">
+				<div class="desc-text">Tests the 3D workplace guidance navigation system, including screen-edge directional arrows, HUD objective cards, distance countdown, 3D pulsing ground beacon, arrival state detection, and orthogonal camera tracking without perspective distortion.</div>
+				
+				<div class="section-box">
+					<div class="section-label">Assertions Validated (12)</div>
+					<ul class="assertion-list">
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>WorkplaceGuidance system exists</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>HUD navigation card is visible on screen</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Screen-edge pointer is visible</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Navigation objective points to motorcycle</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Target is initially at distance (> 3m)</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Distance decreased as player approached target</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Navigation marks 'arrived' when reaching target</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Edge pointer hides automatically upon arrival</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>HUD label displays arrival confirmation</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Ground beacon instance exists</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Camera exists and is orthogonal</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Camera projection is orthogonal (no perspective distortion)</span></li>
+					</ul>
+				</div>
+
+				<div>
+					<div class="section-label">Related Sources</div>
+					<div class="sources-list">
+						<span class="source-tag">res://scripts/workplace_guidance.gd</span>
+						<span class="source-tag">res://scripts/shared_camera.gd</span>
+					</div>
+				</div>
+
+			</div>
+		</div>
+
+		<div class="test-card">
+			<div class="card-header">
+				<div class="test-title-group">
+					<span class="test-id">TC10</span>
+					<span class="test-title">Return Home & Persistence</span>
+				</div>
+				<div style="display: flex; align-items: center; gap: 8px;">
+					<span class="duration-tag">4.8s</span>
+					<span class="badge badge-pass">PASS</span>
+				</div>
+			</div>
+			<div class="card-media">
+				<img src="./TC10_return_home_persistence.gif" alt="Return Home & Persistence" loading="lazy" />
+			</div>
+			<div class="card-body">
+				<div class="desc-text">Tests end-of-day return home flow: revenue accumulation in household wallet, walking from front yard into bedroom, bed rest interaction triggering automatic state saving to disk, waking up, and reloading saved state to verify balance, earnings, and deduplication cache.</div>
+				
+				<div class="section-box">
+					<div class="section-label">Assertions Validated (8)</div>
+					<ul class="assertion-list">
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Player entered house interior</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Bed interactable exists</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Player is resting in bed</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Progression saved to disk automatically upon resting</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Player woke up refreshed</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Persisted balance matches after reload (255000 đ)</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Persisted earnings match after reload (75000 đ)</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Transaction history and idempotency cache preserved</span></li>
+					</ul>
+				</div>
+
+				<div>
+					<div class="section-label">Related Sources</div>
+					<div class="sources-list">
+						<span class="source-tag">res://scripts/economy/economy_save_system.gd</span>
+						<span class="source-tag">res://scripts/economy/household_wallet.gd</span>
+						<span class="source-tag">res://scripts/room.gd</span>
+						<span class="source-tag">res://scripts/interactable.gd</span>
+					</div>
+				</div>
+
+			</div>
+		</div>
+
+		<div class="test-card">
+			<div class="card-header">
+				<div class="test-title-group">
+					<span class="test-id">TC11</span>
+					<span class="test-title">Customer Timeout & Departure</span>
+				</div>
+				<div style="display: flex; align-items: center; gap: 8px;">
+					<span class="duration-tag">6.2s</span>
+					<span class="badge badge-pass">PASS</span>
+				</div>
+			</div>
+			<div class="card-media">
+				<img src="./TC11_customer_timeout.gif" alt="Customer Timeout & Departure" loading="lazy" />
+			</div>
+			<div class="card-body">
+				<div class="desc-text">Tests customer patience expiration: a customer is seated and places an order, the player does not serve the order in time, patience bar drains to 0%, the customer becomes frustrated, the order is marked FAILED with zero payment, and the customer departs cleanly, freeing the dining table.</div>
+				
+				<div class="section-box">
+					<div class="section-label">Assertions Validated (10)</div>
+					<ul class="assertion-list">
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>HuTieuBusiness exists</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Customer seated and placed order</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Order is initially PENDING</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Order is in active queue</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Order transitioned to FAILED after patience expired</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Failed order removed from active orders queue</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Customers lost counter incremented</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Zero payment awarded to wallet for unserved order</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Customer stood up and is leaving stall</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Customer displayed angry frustration feedback</span></li>
+					</ul>
+				</div>
+
+				<div>
+					<div class="section-label">Related Sources</div>
+					<div class="sources-list">
+						<span class="source-tag">res://scripts/neighborhood/business/business_shop.gd</span>
+						<span class="source-tag">res://scripts/neighborhood/business/hutieu_business.gd</span>
+						<span class="source-tag">res://scripts/neighborhood/business/hutieu_customer.gd</span>
+						<span class="source-tag">res://scripts/neighborhood/business/business_order.gd</span>
+					</div>
+				</div>
+
+			</div>
+		</div>
+
+		<div class="test-card">
+			<div class="card-header">
+				<div class="test-title-group">
+					<span class="test-id">TC12</span>
+					<span class="test-title">House & Business Upgrades Progression</span>
+				</div>
+				<div style="display: flex; align-items: center; gap: 8px;">
+					<span class="duration-tag">4.5s</span>
+					<span class="badge badge-pass">PASS</span>
+				</div>
+			</div>
+			<div class="card-media">
+				<img src="./TC12_house_business_upgrades.gif" alt="House & Business Upgrades Progression" loading="lazy" />
+			</div>
+			<div class="card-body">
+				<div class="desc-text">Tests progression mechanics for household and business upgrades: player walks to House Upgrade Board in bedroom, reviews Level 2 requirements, initiates two-step confirmation, executes house upgrade (wallet deducted 75,000đ, tiled kitchen spawned, room bounds expanded), verifies business equipment upgrade at Garage, and confirms save/load persistence.</div>
+				
+				<div class="section-box">
+					<div class="section-label">Assertions Validated (16)</div>
+					<ul class="assertion-list">
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>HouseProgressionManager and UpgradeBoard exist</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>House starts at Level 1</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Upgrade board is interactive</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Prompt shows Level 2 upgrade fee (75,000 đ)</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Board entered confirmation mode for Level 2</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Prompt requests confirmation ('Nhấn E lần nữa để XÁC NHẬN')</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>House successfully upgraded to Level 2 (Căn hộ ấm cúng)</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Wallet deducted 75,000đ (new balance: 75000 đ)</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Tiled kitchen area unlocked in Level 2</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Room bounds physically expanded to accommodate kitchen</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Garage business exists</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Second bay starts locked</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Second service bay unlocked</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Second bay visual platform spawned in 3D world</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Progression saved to disk</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Reloaded save preserves house level 2</span></li>
+					</ul>
+				</div>
+
+				<div>
+					<div class="section-label">Related Sources</div>
+					<div class="sources-list">
+						<span class="source-tag">res://scripts/house/house_progression_manager.gd</span>
+						<span class="source-tag">res://scripts/house/house_upgrade_board.gd</span>
+						<span class="source-tag">res://scripts/room.gd</span>
+						<span class="source-tag">res://scripts/neighborhood/business/garage_business.gd</span>
+						<span class="source-tag">res://scripts/economy/economy_manager.gd</span>
+					</div>
+				</div>
+
+			</div>
+		</div>
+
+		<div class="test-card">
+			<div class="card-header">
+				<div class="test-title-group">
+					<span class="test-id">TC13</span>
+					<span class="test-title">Visual Regression & System Integrity</span>
+				</div>
+				<div style="display: flex; align-items: center; gap: 8px;">
+					<span class="duration-tag">1.8s</span>
+					<span class="badge badge-pass">PASS</span>
+				</div>
+			</div>
+			<div class="card-media">
+				<img src="./TC13_visual_regression.gif" alt="Visual Regression & System Integrity" loading="lazy" />
+			</div>
+			<div class="card-body">
+				<div class="desc-text">Executes critical regression checks: camera occlusion cutaway verification for trees/structures, UI vertical offset separation (speech labels vs bay status labels), duplicate reward rejection, corrupted save file recovery, and physical boundary collision enforcement.</div>
+				
+				<div class="section-box">
+					<div class="section-label">Assertions Validated (11)</div>
+					<ul class="assertion-list">
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Environment trees present with foliage models</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Camera instance valid and active</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Garage Bay 0 status label exists</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>UI vertical clearance between speech (2.9m) and bay status (2.35m) is 0.55m (>= 0.5m, no overlap)</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>First claim of completed order succeeded (+20,000đ)</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Second claim of same order was REJECTED by duplicate protection</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Household wallet balance unchanged on duplicate claim attempt</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>First deposit with transaction ID succeeded</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Duplicate deposit with same transaction ID blocked by idempotency cache</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Corrupted save file safely recovered to default balance without crashing engine</span></li>
+						<li class="assertion-item"><span class="mark-pass">✓</span><span>Solid room wall collision prevents player from escaping house boundaries (Z: 92.2 <= 93.5)</span></li>
+					</ul>
+				</div>
+
+				<div>
+					<div class="section-label">Related Sources</div>
+					<div class="sources-list">
+						<span class="source-tag">res://scripts/shared_camera.gd</span>
+						<span class="source-tag">res://scripts/neighborhood/business/business_shop.gd</span>
+						<span class="source-tag">res://scripts/economy/economy_save_system.gd</span>
+						<span class="source-tag">res://scripts/economy/household_wallet.gd</span>
+						<span class="source-tag">res://scripts/room.gd</span>
 					</div>
 				</div>
 

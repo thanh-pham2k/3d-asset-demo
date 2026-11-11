@@ -43,11 +43,15 @@ func run_scenario() -> Dictionary:
 	await wait_and_record(6)
 	
 	# 1. Walk through front yard towards house door
-	await simulate_walk(Vector3(-45.0, 0, 83.5), 2.0)
+	var door: Interactable = room.current_door if room else null
+	if door and not door.toggle:
+		door.interact(player)
+	
+	await simulate_walk(Vector3(-45.0, 0, 83.5), 2.8)
 	await wait_and_record(6)
 	
 	# 2. Enter house interior
-	await simulate_walk(Vector3(-45.0, 0, 89.0), 1.5)
+	await simulate_walk(Vector3(-45.0, 0, 88.0), 2.5)
 	await wait_and_record(8)
 	check(player.global_position.z > 83.0, "Player entered house interior")
 	

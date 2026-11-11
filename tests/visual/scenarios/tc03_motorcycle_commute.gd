@@ -49,7 +49,7 @@ func run_scenario() -> Dictionary:
 	check(boy_scooter.global_position.distance_to(boy_scooter.work_parking_pos) < 0.2, "Motorcycle neatly parked in garage bay")
 	check(player.global_position.distance_to(boy_scooter.work_parking_pos) < 2.0, "Player arrived at garage workplace without teleporting")
 	
-	var gif_path = recorder.stop_recording_and_export_gif(12)
+	var gif_path = recorder.stop_recording_and_export_gif(30)
 	return {
 		"id": "TC03",
 		"title": "Motorcycle Commute",

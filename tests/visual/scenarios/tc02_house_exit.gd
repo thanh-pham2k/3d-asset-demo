@@ -40,7 +40,7 @@ func run_scenario() -> Dictionary:
 	check(is_instance_valid(cam), "Camera tracks player smoothly")
 	check(absf(cam.global_position.x - player.global_position.x) < 2.0, "Camera centered horizontally with player")
 	
-	var gif_path = recorder.stop_recording_and_export_gif(12)
+	var gif_path = recorder.stop_recording_and_export_gif(30)
 	return {
 		"id": "TC02",
 		"title": "House Exit",

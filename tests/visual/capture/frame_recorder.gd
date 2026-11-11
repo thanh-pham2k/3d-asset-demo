@@ -53,7 +53,7 @@ func step_and_capture(frames: int = 1) -> void:
 		await RenderingServer.frame_post_draw
 		capture_now()
 
-func stop_recording_and_export_gif(fps: int = 12) -> String:
+func stop_recording_and_export_gif(fps: int = 30) -> String:
 	recording = false
 	print("[FrameRecorder] Finished capturing %d frames for '%s'. Assembling GIF..." % [frame_index, current_scenario])
 	

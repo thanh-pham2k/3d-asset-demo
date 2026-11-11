@@ -62,7 +62,7 @@ func run_scenario() -> Dictionary:
 	check(hutieu.current_bowl_state == HuTieuBusiness.BowlState.EMPTY, "Wrong bowl safely discarded to allow remaking")
 	check(hutieu.current_bowl_dish == "", "Bowl dish cleared")
 	
-	var gif_path = recorder.stop_recording_and_export_gif(12)
+	var gif_path = recorder.stop_recording_and_export_gif(30)
 	return {
 		"id": "TC07",
 		"title": "Incorrect Order",

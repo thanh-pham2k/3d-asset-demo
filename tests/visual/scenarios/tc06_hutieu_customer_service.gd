@@ -89,7 +89,7 @@ func run_scenario() -> Dictionary:
 	await wait_and_record(10)
 	check(customer.current_state == HuTieuCustomer.State.LEAVING, "Customer stood up and departed")
 	
-	var gif_path = recorder.stop_recording_and_export_gif(12)
+	var gif_path = recorder.stop_recording_and_export_gif(30)
 	return {
 		"id": "TC06",
 		"title": "Hu Tieu Customer Service",

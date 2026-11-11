@@ -67,7 +67,7 @@ func run_scenario() -> Dictionary:
 	await simulate_walk(hutieu.global_position + Vector3(-55.0, 0, -20.0), 1.2)
 	await wait_and_record(10)
 	
-	var gif_path = recorder.stop_recording_and_export_gif(12)
+	var gif_path = recorder.stop_recording_and_export_gif(30)
 	return {
 		"id": "TC08",
 		"title": "Multiple Customers",

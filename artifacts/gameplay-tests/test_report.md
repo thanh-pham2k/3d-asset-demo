@@ -1,23 +1,23 @@
 # Automated Visual Gameplay Test Report
 
 **Project**: Couple Chaos (Godot 4.7.2 3D Low-Poly Life Simulation)
-**Date**: 2026-11-11T15:50:00
+**Date**: 2026-11-11T22:55:30
 **Summary**: 10 Scenarios Executed — **10 PASS**, **0 FAIL**
 
 ## Executive Summary Table
 
 | Test ID | Scenario Description | Status | Duration | GIF Evidence |
 |---|---|---|---|---|
-| `TC01` | Character Selection | 🟢 PASS | 4.5s | [TC01_character_selection.gif](./TC01_character_selection.gif) |
-| `TC02` | House Exit | 🟢 PASS | 7.2s | [TC02_house_exit.gif](./TC02_house_exit.gif) |
-| `TC03` | Motorcycle Commute | 🟢 PASS | 25.7s | [TC03_motorcycle_commute.gif](./TC03_motorcycle_commute.gif) |
-| `TC04` | Motorcycle Repair | 🟢 PASS | 8.9s | [TC04_motorcycle_repair.gif](./TC04_motorcycle_repair.gif) |
-| `TC05` | Hu Tieu Preparation | 🟢 PASS | 6.3s | [TC05_hutieu_preparation.gif](./TC05_hutieu_preparation.gif) |
-| `TC06` | Hu Tieu Customer Service | 🟢 PASS | 9.3s | [TC06_hutieu_customer_service.gif](./TC06_hutieu_customer_service.gif) |
-| `TC07` | Incorrect Order | 🟢 PASS | 3.7s | [TC07_incorrect_order.gif](./TC07_incorrect_order.gif) |
-| `TC08` | Multiple Customers | 🟢 PASS | 4.5s | [TC08_multiple_customers.gif](./TC08_multiple_customers.gif) |
-| `TC09` | Navigation & Camera | 🟢 PASS | 4.0s | [TC09_navigation_camera.gif](./TC09_navigation_camera.gif) |
-| `TC10` | Return Home & Persistence | 🟢 PASS | 7.9s | [TC10_return_home_persistence.gif](./TC10_return_home_persistence.gif) |
+| `TC01` | Character Selection | 🟢 PASS | 4.4s | [TC01_character_selection.gif](./TC01_character_selection.gif) |
+| `TC02` | House Exit | 🟢 PASS | 7.3s | [TC02_house_exit.gif](./TC02_house_exit.gif) |
+| `TC03` | Motorcycle Commute | 🟢 PASS | 25.5s | [TC03_motorcycle_commute.gif](./TC03_motorcycle_commute.gif) |
+| `TC04` | Motorcycle Repair | 🟢 PASS | 9.1s | [TC04_motorcycle_repair.gif](./TC04_motorcycle_repair.gif) |
+| `TC05` | Hu Tieu Preparation | 🟢 PASS | 6.4s | [TC05_hutieu_preparation.gif](./TC05_hutieu_preparation.gif) |
+| `TC06` | Hu Tieu Customer Service | 🟢 PASS | 9.5s | [TC06_hutieu_customer_service.gif](./TC06_hutieu_customer_service.gif) |
+| `TC07` | Incorrect Order | 🟢 PASS | 3.8s | [TC07_incorrect_order.gif](./TC07_incorrect_order.gif) |
+| `TC08` | Multiple Customers | 🟢 PASS | 4.7s | [TC08_multiple_customers.gif](./TC08_multiple_customers.gif) |
+| `TC09` | Navigation & Camera | 🟢 PASS | 4.1s | [TC09_navigation_camera.gif](./TC09_navigation_camera.gif) |
+| `TC10` | Return Home & Persistence | 🟢 PASS | 8.5s | [TC10_return_home_persistence.gif](./TC10_return_home_persistence.gif) |
 
 ---
 
@@ -26,7 +26,7 @@
 ### TC01 — Character Selection (🟢 PASS)
 
 - **Status**: 🟢 PASS
-- **Duration**: 4.5s
+- **Duration**: 4.4s
 - **GIF Evidence**: `artifacts/gameplay-tests/TC01_character_selection.gif`
 
 #### Assertions Executed:
@@ -42,7 +42,7 @@
 ### TC02 — House Exit (🟢 PASS)
 
 - **Status**: 🟢 PASS
-- **Duration**: 7.2s
+- **Duration**: 7.3s
 - **GIF Evidence**: `artifacts/gameplay-tests/TC02_house_exit.gif`
 
 #### Assertions Executed:
@@ -60,7 +60,7 @@
 ### TC03 — Motorcycle Commute (🟢 PASS)
 
 - **Status**: 🟢 PASS
-- **Duration**: 25.7s
+- **Duration**: 25.5s
 - **GIF Evidence**: `artifacts/gameplay-tests/TC03_motorcycle_commute.gif`
 
 #### Assertions Executed:
@@ -79,7 +79,7 @@
 ### TC04 — Motorcycle Repair (🟢 PASS)
 
 - **Status**: 🟢 PASS
-- **Duration**: 8.9s
+- **Duration**: 9.1s
 - **GIF Evidence**: `artifacts/gameplay-tests/TC04_motorcycle_repair.gif`
 
 #### Assertions Executed:
@@ -98,7 +98,7 @@
 ### TC05 — Hu Tieu Preparation (🟢 PASS)
 
 - **Status**: 🟢 PASS
-- **Duration**: 6.3s
+- **Duration**: 6.4s
 - **GIF Evidence**: `artifacts/gameplay-tests/TC05_hutieu_preparation.gif`
 
 #### Assertions Executed:
@@ -118,7 +118,7 @@
 ### TC06 — Hu Tieu Customer Service (🟢 PASS)
 
 - **Status**: 🟢 PASS
-- **Duration**: 9.3s
+- **Duration**: 9.5s
 - **GIF Evidence**: `artifacts/gameplay-tests/TC06_hutieu_customer_service.gif`
 
 #### Assertions Executed:
@@ -140,7 +140,7 @@
 ### TC07 — Incorrect Order (🟢 PASS)
 
 - **Status**: 🟢 PASS
-- **Duration**: 3.7s
+- **Duration**: 3.8s
 - **GIF Evidence**: `artifacts/gameplay-tests/TC07_incorrect_order.gif`
 
 #### Assertions Executed:
@@ -159,7 +159,7 @@
 ### TC08 — Multiple Customers (🟢 PASS)
 
 - **Status**: 🟢 PASS
-- **Duration**: 4.5s
+- **Duration**: 4.7s
 - **GIF Evidence**: `artifacts/gameplay-tests/TC08_multiple_customers.gif`
 
 #### Assertions Executed:
@@ -174,7 +174,7 @@
 ### TC09 — Navigation & Camera (🟢 PASS)
 
 - **Status**: 🟢 PASS
-- **Duration**: 4.0s
+- **Duration**: 4.1s
 - **GIF Evidence**: `artifacts/gameplay-tests/TC09_navigation_camera.gif`
 
 #### Assertions Executed:
@@ -196,7 +196,7 @@
 ### TC10 — Return Home & Persistence (🟢 PASS)
 
 - **Status**: 🟢 PASS
-- **Duration**: 7.9s
+- **Duration**: 8.5s
 - **GIF Evidence**: `artifacts/gameplay-tests/TC10_return_home_persistence.gif`
 
 #### Assertions Executed:

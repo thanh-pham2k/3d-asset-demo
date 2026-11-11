@@ -56,7 +56,7 @@ func run_scenario() -> Dictionary:
 	print("TC05 DEBUG prep_billboard.text = '", hutieu.prep_billboard.text, "'")
 	check("Mở Cửa" in hutieu.prep_billboard.text or "Đón Khách" in hutieu.prep_billboard.text, "Overhead billboard reflects shop open status")
 	
-	var gif_path = recorder.stop_recording_and_export_gif(12)
+	var gif_path = recorder.stop_recording_and_export_gif(30)
 	return {
 		"id": "TC05",
 		"title": "Hu Tieu Preparation",

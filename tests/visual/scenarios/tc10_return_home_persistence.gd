@@ -60,7 +60,7 @@ func run_scenario() -> Dictionary:
 	if FileAccess.file_exists(test_save_path):
 		DirAccess.remove_absolute(test_save_path)
 	
-	var gif_path = recorder.stop_recording_and_export_gif(12)
+	var gif_path = recorder.stop_recording_and_export_gif(30)
 	return {
 		"id": "TC10",
 		"title": "Return Home & Persistence",

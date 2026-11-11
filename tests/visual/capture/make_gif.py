@@ -9,16 +9,16 @@ import sys
 import glob
 from PIL import Image
 
-def build_gif(frames_dir: str, output_path: str, fps: int = 12, target_width: int = 960, target_height: int = 540):
+def build_gif(frames_dir: str, output_path: str, fps: int = 30, target_width: int = 960, target_height: int = 540):
     files = sorted(glob.glob(os.path.join(frames_dir, "*.png")))
     if not files:
         print(f"Error: No PNG frames found in {frames_dir}", file=sys.stderr)
         sys.exit(1)
     
-    print(f"Compiling {len(files)} frames from {frames_dir} at {fps} FPS -> {output_path}...")
+    print(f"Compiling {len(files)} frames from {frames_dir} at {fps} FPS (2.5x speed) -> {output_path}...")
     
     frames = []
-    duration_ms = int(1000.0 / fps)
+    duration_ms = max(20, int(round(1000.0 / fps)))
     
     for idx, f in enumerate(files):
         try:
@@ -30,8 +30,7 @@ def build_gif(frames_dir: str, output_path: str, fps: int = 12, target_width: in
             if target_width > 0 and target_height > 0:
                 bg = bg.resize((target_width, target_height), Image.Resampling.BILINEAR)
             
-            # Convert to 256-color palette with dithering for smooth gradients
-            p_im = bg.convert("P", palette=Image.Palette.ADAPTIVE, colors=256)
+            p_im = bg.quantize(colors=256, method=Image.Quantize.MEDIANCUT)
             frames.append(p_im)
         except Exception as e:
             print(f"Warning: Failed reading {f}: {e}", file=sys.stderr)
@@ -42,14 +41,14 @@ def build_gif(frames_dir: str, output_path: str, fps: int = 12, target_width: in
     
     os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
     
-    # Save as animated GIF
+    # Save as animated GIF at 2.5x speed without dropping/merging frames
     frames[0].save(
         output_path,
         save_all=True,
         append_images=frames[1:],
         duration=duration_ms,
         loop=0,
-        optimize=True
+        optimize=False
     )
     
     file_size_kb = os.path.getsize(output_path) / 1024.0
@@ -62,7 +61,7 @@ if __name__ == "__main__":
     
     f_dir = sys.argv[1]
     o_path = sys.argv[2]
-    fps_val = int(sys.argv[3]) if len(sys.argv) > 3 else 12
+    fps_val = int(sys.argv[3]) if len(sys.argv) > 3 else 30
     w_val = int(sys.argv[4]) if len(sys.argv) > 4 else 960
     h_val = int(sys.argv[5]) if len(sys.argv) > 5 else 540
     

@@ -51,7 +51,7 @@ func run_scenario() -> Dictionary:
 	
 	await wait_and_record(12)
 	
-	var gif_path = recorder.stop_recording_and_export_gif(12)
+	var gif_path = recorder.stop_recording_and_export_gif(30)
 	return {
 		"id": "TC09",
 		"title": "Navigation & Camera",

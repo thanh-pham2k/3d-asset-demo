@@ -34,7 +34,7 @@ func run_scenario() -> Dictionary:
 	player.select_character("boy")
 	await wait_and_record(5)
 	
-	var gif_path = recorder.stop_recording_and_export_gif(12)
+	var gif_path = recorder.stop_recording_and_export_gif(30)
 	return {
 		"id": "TC01",
 		"title": "Character Selection",

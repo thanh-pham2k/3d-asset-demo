@@ -1,14 +1,14 @@
 # Automated Visual Gameplay Test Report
 
 **Project**: Couple Chaos (Godot 4.7.2 3D Low-Poly Life Simulation)
-**Date**: 2026-11-11T23:45:15
+**Date**: 2026-11-11T23:46:55
 **Execution Summary**: 1 Scenarios Executed — **0 PASS**, **1 FAIL**, **0 BLOCKED**
 
 ## Executive Summary Table
 
 | Test ID | Scenario Description | Status | Duration | GIF Evidence |
 |---|---|---|---|---|
-| `TC04` | Motorcycle Customer Arrival & Repair | 🔴 FAIL | 11.8s | [TC04_motorcycle_repair.gif](./TC04_motorcycle_repair.gif) |
+| `TC04` | Motorcycle Customer Arrival & Repair | 🔴 FAIL | 11.5s | [TC04_motorcycle_repair.gif](./TC04_motorcycle_repair.gif) |
 
 ---
 
@@ -18,7 +18,7 @@
 
 - **Description**: Tests realistic customer arrival along the road path into Bay 0, driver dismounting and ordering repair, player walking to workbench to pick up patch kit, interacting at Bay 0 to apply patch and pump air, payment processing, and customer riding away.
 - **Status**: 🔴 FAIL
-- **Duration**: 11.8s
+- **Duration**: 11.5s
 - **GIF Evidence**: `artifacts/gameplay-tests/TC04_motorcycle_repair.gif`
 - **Expected Result**: Customer drives into bay naturally, order is accepted, player executes sequential repair steps via physical station interactions, wallet earns 35,000đ, and customer rides away safely.
 - **Actual Result**: One or more assertions failed.

@@ -522,16 +522,23 @@ func _build_kitchen_capacity_visual() -> void:
 	add_child(kitchen_capacity_node)
 
 func complete_order(order: BusinessOrder) -> bool:
-	var tbl := order.table_index
-	if table_customers.has(tbl) and is_instance_valid(table_customers[tbl]):
-		table_customers[tbl].notify_food_served()
+	if not is_instance_valid(order): return false
+	if not active_orders.has(order) or completed_order_ids.has(order.order_id):
+		return false
+	if order.status == BusinessOrder.Status.PAID or order.status == BusinessOrder.Status.FAILED or order.status == BusinessOrder.Status.CANCELLED:
+		return false
 	
+	var tbl := order.table_index
 	if is_kitchen_capacity_unlocked:
 		var bonus_tip := int(order.reward_money * 0.25)
-		order.reward_money += bonus_tip
+		order.tip_money += bonus_tip
 		_show_feedback(table_positions[tbl], "🍵 Quán chu đáo tặng trà đá! Khách thưởng thêm tip: +%s đ ✨" % HouseholdWallet.format_money(bonus_tip), Color("ffd54f"))
 		
-	return super.complete_order(order)
+	var success := super.complete_order(order)
+	if success:
+		if table_customers.has(tbl) and is_instance_valid(table_customers[tbl]):
+			table_customers[tbl].notify_food_served()
+	return success
 
 func _on_customer_depart(order: BusinessOrder) -> void:
 	var tbl := order.table_index
@@ -728,8 +735,8 @@ func on_station_interacted(station: NoodleStation, player_node: Node3D) -> void:
 				return
 			
 			var order: BusinessOrder = table_orders[tbl]
-			if order.status == BusinessOrder.Status.FAILED or order.status == BusinessOrder.Status.CANCELLED:
-				_show_feedback(station.global_position, "⚠️ Khách ở Bàn %d đã bỏ về do chờ quá lâu! Không thể phục vụ.", Color("ffab40"))
+			if order.status == BusinessOrder.Status.FAILED or order.status == BusinessOrder.Status.CANCELLED or order.status == BusinessOrder.Status.PAID:
+				_show_feedback(station.global_position, "⚠️ Không thể phục vụ Bàn %d!" % (tbl + 1), Color("ffab40"))
 				return
 			
 			if current_bowl_state != BowlState.FULLY_PREPARED:

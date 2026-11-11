@@ -12,6 +12,7 @@ enum State {
 	PARKED,
 	WAITING_FOR_REPAIR,
 	SERVICE_COMPLETED,
+	ORDER_FAILED,
 	DEPARTING,
 	DESPAWNED
 }
@@ -147,6 +148,8 @@ func _process(delta: float) -> void:
 			_process_waiting(delta)
 		State.SERVICE_COMPLETED:
 			_process_service_completed(delta)
+		State.ORDER_FAILED:
+			_process_order_failed(delta)
 		State.DEPARTING:
 			_process_movement(delta, departure_waypoints, false)
 
@@ -221,6 +224,8 @@ func _process_waiting(delta: float) -> void:
 		driver.skeleton.position.y = sin(wait_timer * 2.5) * 0.015
 
 func notify_service_done() -> void:
+	if current_state == State.SERVICE_COMPLETED or current_state == State.DEPARTING or current_state == State.DESPAWNED or current_state == State.ORDER_FAILED:
+		return
 	current_state = State.SERVICE_COMPLETED
 	wait_timer = 0.0
 	_show_speech("Cảm ơn chú thợ! Xe chạy êm ru!", 2.0)
@@ -231,14 +236,22 @@ func notify_service_done() -> void:
 		exhaust_particles.emitting = true
 
 func notify_order_failed(reason: String = "timeout") -> void:
-	if current_state == State.DEPARTING or current_state == State.DESPAWNED:
+	if current_state == State.ORDER_FAILED or current_state == State.DEPARTING or current_state == State.DESPAWNED or current_state == State.SERVICE_COMPLETED:
 		return
-	current_state = State.SERVICE_COMPLETED
+	current_state = State.ORDER_FAILED
 	wait_timer = 0.0
 	_show_speech("Chờ lâu quá không ai sửa, tôi đi đây! 💢", 2.2)
 	_seat_driver_on_scooter()
 	if is_instance_valid(exhaust_particles):
 		exhaust_particles.emitting = true
+
+func _process_order_failed(delta: float) -> void:
+	wait_timer += delta
+	# After brief angry pause (0.8s), drive away
+	if wait_timer >= 0.8:
+		current_state = State.DEPARTING
+		current_waypoint_idx = 0
+		move_speed = 5.5
 
 func _process_service_completed(delta: float) -> void:
 	wait_timer += delta
@@ -249,6 +262,8 @@ func _process_service_completed(delta: float) -> void:
 		move_speed = 5.5
 
 func _on_departed() -> void:
+	if current_state == State.DESPAWNED:
+		return
 	current_state = State.DESPAWNED
 	departed_from_bay.emit(bay_index)
 	queue_free()

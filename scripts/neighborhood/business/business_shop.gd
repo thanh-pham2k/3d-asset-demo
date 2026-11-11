@@ -138,11 +138,17 @@ func _update_orders_patience(delta: float) -> void:
 		active_orders.erase(order)
 		_on_customer_depart(order)
 
+var is_closing: bool = false
+
 func complete_order(order: BusinessOrder) -> bool:
+	if not is_instance_valid(order):
+		return false
 	if not active_orders.has(order):
 		return false
 	if completed_order_ids.has(order.order_id):
 		return false # Prevent duplicate reward
+	if order.status == BusinessOrder.Status.PAID or order.status == BusinessOrder.Status.FAILED or order.status == BusinessOrder.Status.CANCELLED:
+		return false
 	
 	completed_order_ids[order.order_id] = true
 	order.status = BusinessOrder.Status.PAID
@@ -156,18 +162,21 @@ func complete_order(order: BusinessOrder) -> bool:
 		streak_count += 1
 		reputation_score = minf(100.0, reputation_score + (2.5 if stars == 5 else 1.5))
 		if stars == 5:
-			order.tip_money = int(float(order.reward_money) * 0.20)
+			order.tip_money += int(float(order.reward_money) * 0.20)
 		else:
-			order.tip_money = int(float(order.reward_money) * 0.10)
+			order.tip_money += int(float(order.reward_money) * 0.10)
 	else:
 		streak_count = 0
 		reputation_score = maxf(10.0, reputation_score - 1.0)
-		order.tip_money = 0
 	
+	if order.is_peak_hour and peak_multiplier > 1.0:
+		order.peak_bonus = int(float(order.reward_money) * (peak_multiplier - 1.0))
+	
+	var total_payout: int = order.get_total_payout()
 	total_tips += order.tip_money
-	total_earnings += order.reward_money
+	total_earnings += total_payout
 	customers_served += 1
-	daily_revenue += order.reward_money
+	daily_revenue += total_payout
 	daily_customers_served += 1
 	
 	# Business progression check
@@ -177,14 +186,14 @@ func complete_order(order: BusinessOrder) -> bool:
 		_show_feedback(global_position + Vector3(0, 3.0, 0), "🎉 Cửa hàng thăng hạng CẤP %d! ⭐" % business_level, Color("ffd54f"))
 	
 	earnings_changed.emit(total_earnings)
-	order_completed.emit(order, order.reward_money)
+	order_completed.emit(order, total_payout)
 	
 	var streak_msg := (" 🔥 Chuỗi x%d!" % streak_count) if streak_count >= 3 else ""
 	var tip_msg := (" (+%s đ Tip)" % format_money(order.tip_money)) if order.tip_money > 0 else ""
 	_show_feedback(
 		order.target_spot,
 		"+%s đ · %s%s\n%s%s" % [
-			format_money(order.reward_money),
+			format_money(total_payout),
 			order.service_title,
 			tip_msg,
 			rating_text,
@@ -232,6 +241,11 @@ func open_shop() -> void:
 	_update_status_display()
 
 func close_shop() -> void:
+	if not is_open and not is_closing:
+		return
+	if is_closing:
+		return
+	is_closing = true
 	manual_closed = true
 	is_open = false
 	shop_status_changed.emit(false)
@@ -241,6 +255,7 @@ func close_shop() -> void:
 		_on_customer_depart(order)
 	_safe_clear_remaining_customers()
 	_update_status_display()
+	is_closing = false
 
 func reset_daily_state() -> void:
 	daily_revenue = 0

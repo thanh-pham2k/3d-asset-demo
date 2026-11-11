@@ -410,16 +410,23 @@ func _try_spawn_customer() -> void:
 	)
 
 func complete_order(order: BusinessOrder) -> bool:
-	var bay := order.table_index
-	if bay_customers.has(bay) and is_instance_valid(bay_customers[bay]):
-		bay_customers[bay].notify_service_done()
+	if not is_instance_valid(order): return false
+	if not active_orders.has(order) or completed_order_ids.has(order.order_id):
+		return false
+	if order.status == BusinessOrder.Status.PAID or order.status == BusinessOrder.Status.FAILED or order.status == BusinessOrder.Status.CANCELLED:
+		return false
 	
+	var bay := order.table_index
 	if is_better_tools_unlocked:
 		var bonus_tip := int(order.reward_money * 0.30)
-		order.reward_money += bonus_tip
+		order.tip_money += bonus_tip
 		_show_feedback(bay_positions[bay] + position, "🧰 Thợ giỏi đồ nghề xịn! Khách thưởng thêm tip: +%s đ ✨" % HouseholdWallet.format_money(bonus_tip), Color("ffd54f"))
 		
-	return super.complete_order(order)
+	var success := super.complete_order(order)
+	if success:
+		if bay_customers.has(bay) and is_instance_valid(bay_customers[bay]):
+			bay_customers[bay].notify_service_done()
+	return success
 
 func _spawn_bay_scooter(bay_index: int) -> void:
 	if bay_scooters.has(bay_index) and is_instance_valid(bay_scooters[bay_index]):
@@ -437,9 +444,7 @@ func _on_customer_depart(order: BusinessOrder) -> void:
 	if bay_customers.has(bay) and is_instance_valid(bay_customers[bay]):
 		var cust: MotorcycleCustomer = bay_customers[bay]
 		if cust.current_state != MotorcycleCustomer.State.DEPARTING and cust.current_state != MotorcycleCustomer.State.DESPAWNED:
-			if order.status == BusinessOrder.Status.COMPLETED or order.status == BusinessOrder.Status.PAID:
-				cust.notify_service_done()
-			else:
+			if order.status != BusinessOrder.Status.PAID and order.status != BusinessOrder.Status.COMPLETED:
 				if bay_status_labels.has(bay):
 					bay_status_labels[bay].text = "🏍️ %s: [ĐÃ HỦY - KHÁCH BỎ VỀ 💢]" % order.customer_name
 					bay_status_labels[bay].modulate = Color("ff5252")
@@ -596,8 +601,8 @@ func on_station_interacted(station: RepairStation, player_node: Node3D) -> void:
 				return
 			
 			var order: BusinessOrder = bay_orders[bay]
-			if order.status == BusinessOrder.Status.FAILED or order.status == BusinessOrder.Status.CANCELLED:
-				_show_feedback(station.global_position, "⚠️ Khách ở khoang này đã bỏ về! Không thể sửa xe.", Color("ffab40"))
+			if order.status == BusinessOrder.Status.FAILED or order.status == BusinessOrder.Status.CANCELLED or order.status == BusinessOrder.Status.PAID:
+				_show_feedback(station.global_position, "⚠️ Không thể sửa xe ở khoang này!", Color("ffab40"))
 				return
 			
 			var next_step := order.get_current_required_step()

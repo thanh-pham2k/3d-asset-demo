@@ -175,6 +175,9 @@ func _limb(node_name: String, bone_name: String, size: Vector3, color: Color) ->
 	return pivot
 
 func _pose_joint(bone_name: String, euler: Vector3) -> void:
+	if not is_instance_valid(skeleton):
+		_build()
+	if not is_instance_valid(skeleton): return
 	var idx := skeleton.find_bone(bone_name)
 	if idx >= 0:
 		skeleton.set_bone_pose_rotation(idx, Quaternion.from_euler(euler))

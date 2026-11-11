@@ -40,7 +40,12 @@ func available(player: Node3D) -> bool:
 
 func prompt(player: Node3D) -> String:
  if kind == "sofa": return "Đứng dậy" if (user != null and user == player) else "Ngồi sofa"
- if kind == "bed": return "Thức dậy" if (user != null and user == player) else "Nằm nghỉ"
+ if kind == "bed":
+  if user != null and user == player: return "Thức dậy"
+  var daily_loop = get_tree().get_first_node_in_group("daily_loop_manager")
+  if is_instance_valid(daily_loop) and daily_loop.has_method("is_ready_to_sleep") and not daily_loop.is_ready_to_sleep():
+   return "Nằm nghỉ (Chưa đến giờ ngủ)"
+  return "Đi ngủ (kết thúc ngày)"
  if kind == "chair": return "Đứng dậy" if (user != null and user == player) else "Ngồi ghế"
  if kind == "lamp": return "Tắt đèn" if toggle else "Bật đèn"
  if kind == "door": return "Đóng cửa" if toggle else "Mở cửa"
@@ -58,14 +63,21 @@ func interact(player: Node3D) -> void:
     player.enter_rest(self, (get_parent() as Node3D).to_global(seat_point), kind == "bed")
     if kind == "bed":
      var daily_loop = get_tree().get_first_node_in_group("daily_loop_manager")
+     var slept: bool = false
      if is_instance_valid(daily_loop) and daily_loop.has_method("on_player_sleep"):
-      daily_loop.on_player_sleep(player)
-     var econ = get_tree().get_first_node_in_group("economy_manager")
-     if is_instance_valid(econ) and econ.has_method("save_economy_state"):
-      econ.save_economy_state()
-     var fx = get_tree().get_first_node_in_group("chaos_feedback")
-     if is_instance_valid(fx) and fx.has_method("play_event"):
-      fx.play_event("pickup", global_position + Vector3(0, 1.2, 0))
+      if not daily_loop.has_method("is_ready_to_sleep") or daily_loop.is_ready_to_sleep():
+       slept = daily_loop.on_player_sleep(player)
+     if slept:
+      var econ = get_tree().get_first_node_in_group("economy_manager")
+      if is_instance_valid(econ) and econ.has_method("save_economy_state"):
+       econ.save_economy_state()
+      var fx = get_tree().get_first_node_in_group("chaos_feedback")
+      if is_instance_valid(fx) and fx.has_method("play_event"):
+       fx.play_event("pickup", global_position + Vector3(0, 1.2, 0))
+     else:
+      var fx = get_tree().get_first_node_in_group("chaos_feedback")
+      if is_instance_valid(fx) and fx.has_method("show_toast"):
+       fx.show_toast("Chưa đến giờ ngủ! Hãy hoàn thành công việc trước 🌙")
   "lamp":
    toggle = not toggle
    if light: light.visible = toggle

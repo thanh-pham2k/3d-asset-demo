@@ -12,6 +12,7 @@ enum State {
 	WALKING_TO_TABLE,
 	SEATED_ORDERING,
 	EATING,
+	ORDER_FAILED,
 	LEAVING,
 	DESPAWNED
 }
@@ -108,6 +109,8 @@ func _process(delta: float) -> void:
 			_process_seated(delta)
 		State.EATING:
 			_process_eating(delta)
+		State.ORDER_FAILED:
+			_process_order_failed(delta)
 		State.LEAVING:
 			_process_walking(delta, departure_waypoints, false)
 
@@ -193,6 +196,8 @@ func _process_seated(delta: float) -> void:
 		diner.skeleton.position.y = sin(state_timer * 2.0) * 0.012
 
 func notify_food_served() -> void:
+	if current_state == State.EATING or current_state == State.LEAVING or current_state == State.DESPAWNED or current_state == State.ORDER_FAILED:
+		return
 	current_state = State.EATING
 	state_timer = 0.0
 	eating_bowl.visible = true
@@ -212,25 +217,34 @@ func _process_eating(delta: float) -> void:
 		_start_leaving()
 
 func _start_leaving() -> void:
+	if current_state == State.LEAVING or current_state == State.DESPAWNED:
+		return
 	eating_bowl.visible = false
 	_stand_up_pose()
-	_show_speech("Ngon tuyệt cú mèo! Gửi tiền cô nhé!", 2.0)
+	if current_state != State.ORDER_FAILED:
+		_show_speech("Ngon tuyệt cú mèo! Gửi tiền cô nhé!", 2.0)
 	
 	current_state = State.LEAVING
 	current_waypoint_idx = 0
 	move_speed = 3.6
 
 func notify_order_failed(reason: String = "timeout") -> void:
-	if current_state == State.LEAVING or current_state == State.DESPAWNED:
+	if current_state == State.ORDER_FAILED or current_state == State.LEAVING or current_state == State.DESPAWNED or current_state == State.EATING:
 		return
 	eating_bowl.visible = false
 	_stand_up_pose()
 	_show_speech("Đợi lâu quá đói lả cả người! Tôi đi chỗ khác đây! 💢", 2.2)
-	current_state = State.LEAVING
-	current_waypoint_idx = 0
-	move_speed = 3.6
+	current_state = State.ORDER_FAILED
+	state_timer = 0.0
+
+func _process_order_failed(delta: float) -> void:
+	state_timer += delta
+	if state_timer >= 0.8:
+		_start_leaving()
 
 func _on_departed() -> void:
+	if current_state == State.DESPAWNED:
+		return
 	current_state = State.DESPAWNED
 	departed_from_table.emit(table_index)
 	queue_free()

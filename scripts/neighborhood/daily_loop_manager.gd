@@ -35,6 +35,10 @@ var daily_revenue: int = 0
 var daily_expenses: int = 0
 var daily_customers_lost: int = 0
 
+var is_transitioning_day: bool = false
+var is_closing_workplace: bool = false
+var summary_shown_today: bool = false
+
 var garage_business: GarageBusiness:
 	set(v):
 		garage_business = v
@@ -119,19 +123,21 @@ func _on_hutieu_order_completed(_order: BusinessOrder, reward: int) -> void:
 	daily_revenue += reward
 
 func _on_garage_status_changed(is_open: bool) -> void:
+	if is_transitioning_day: return
 	if is_open:
 		set_phase(Phase.SERVING)
 		workplace_opened.emit(garage_business)
 	else:
-		if has_worked_today():
+		if has_worked_today() and current_phase == Phase.SERVING:
 			close_workplace(garage_business)
 
 func _on_hutieu_status_changed(is_open: bool) -> void:
+	if is_transitioning_day: return
 	if is_open:
 		set_phase(Phase.SERVING)
 		workplace_opened.emit(hutieu_business)
 	else:
-		if has_worked_today():
+		if has_worked_today() and current_phase == Phase.SERVING:
 			close_workplace(hutieu_business)
 
 func set_phase(new_phase: Phase) -> void:
@@ -170,6 +176,10 @@ func open_workplace(shop: BusinessShop = null) -> bool:
 	return true
 
 func close_workplace(shop: BusinessShop = null) -> Dictionary:
+	if is_closing_workplace or is_transitioning_day:
+		return get_daily_summary()
+	is_closing_workplace = true
+	
 	var target_shop := shop if is_instance_valid(shop) else get_active_business()
 	if is_instance_valid(target_shop) and target_shop.is_open:
 		target_shop.close_shop()
@@ -178,7 +188,11 @@ func close_workplace(shop: BusinessShop = null) -> Dictionary:
 	workplace_closed.emit(target_shop)
 	
 	var summary := get_daily_summary()
-	show_summary_dialog(summary)
+	if not summary_shown_today:
+		summary_shown_today = true
+		show_summary_dialog(summary)
+	
+	is_closing_workplace = false
 	return summary
 
 func get_daily_summary() -> Dictionary:
@@ -232,7 +246,14 @@ func has_worked_today() -> bool:
 func is_ready_to_sleep() -> bool:
 	return has_worked_today() or (is_instance_valid(time_manager) and (time_manager.current_hour >= 20.0 or time_manager.current_hour < 6.0))
 
-func on_player_sleep(player_node: CharacterBody3D) -> void:
+func on_player_sleep(player_node: CharacterBody3D) -> bool:
+	if is_transitioning_day:
+		return false
+	if not is_ready_to_sleep():
+		return false
+	
+	is_transitioning_day = true
+	
 	# 1. Close any open shops safely
 	if is_instance_valid(garage_business) and garage_business.is_open:
 		garage_business.close_shop()
@@ -245,6 +266,7 @@ func on_player_sleep(player_node: CharacterBody3D) -> void:
 		current_day = time_manager.current_day
 	else:
 		current_day += 1
+		day_advanced.emit(current_day)
 	
 	# 3. Reset daily business state cleanly
 	if is_instance_valid(garage_business):
@@ -256,6 +278,7 @@ func on_player_sleep(player_node: CharacterBody3D) -> void:
 	daily_revenue = 0
 	daily_expenses = 0
 	daily_customers_lost = 0
+	summary_shown_today = false
 	
 	# 4. Safely reposition commuter scooters at home parking bays
 	_reset_scooters_to_home()
@@ -266,10 +289,11 @@ func on_player_sleep(player_node: CharacterBody3D) -> void:
 	
 	# 6. Morning wake-up
 	set_phase(Phase.WAKE_UP)
-	day_advanced.emit(current_day)
 	day_started.emit(current_day)
 	
 	show_morning_announcement()
+	is_transitioning_day = false
+	return true
 
 func _reset_scooters_to_home() -> void:
 	for sc in get_tree().get_nodes_in_group("player_scooters"):
@@ -281,7 +305,8 @@ func _reset_scooters_to_home() -> void:
 func _on_time_manager_day_advanced(new_day: int) -> void:
 	if current_day != new_day:
 		current_day = new_day
-		day_advanced.emit(current_day)
+		if not is_transitioning_day:
+			day_advanced.emit(current_day)
 
 func _build_morning_toast() -> void:
 	morning_toast = CanvasLayer.new()

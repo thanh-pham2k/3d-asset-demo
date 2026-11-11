@@ -15,15 +15,27 @@ func run() -> void:
 	print("   COUPLE CHAOS — AUTOMATED VISUAL GAMEPLAY TEST RUNNER")
 	print("=======================================================\n")
 	
-	# Isolate test environment from previous persistent run state
-	var default_save := "user://couple_chaos_economy.json"
-	if FileAccess.file_exists(default_save):
-		DirAccess.remove_absolute(default_save)
+	# Use isolated test save path for visual test runner — NEVER delete or touch player's real save file!
+	var test_runner_save := "user://test_visual_runner_economy.json"
+	EconomySaveSystem.active_save_path = test_runner_save
+	if FileAccess.file_exists(test_runner_save):
+		DirAccess.remove_absolute(test_runner_save)
+	if FileAccess.file_exists(test_runner_save + ".bak"):
+		DirAccess.remove_absolute(test_runner_save + ".bak")
 	
 	# Instantiate live game from main scene
 	var main_scene: PackedScene = load("res://scenes/main.tscn")
 	var game_manager: Node3D = main_scene.instantiate()
 	root.add_child(game_manager)
+	
+	# Configure isolated save path on world / economy manager
+	var neighborhood = game_manager.get_node_or_null("Neighborhood")
+	if is_instance_valid(neighborhood):
+		if "economy_save_path" in neighborhood:
+			neighborhood.economy_save_path = test_runner_save
+		var econ = neighborhood.get_node_or_null("EconomyManager")
+		if is_instance_valid(econ) and "save_file_path" in econ:
+			econ.save_file_path = test_runner_save
 	
 	# Wait a couple of frames for full scene initialization
 	for i in 8:
@@ -118,6 +130,14 @@ func run() -> void:
 	print("\n=======================================================")
 	print("   ALL SCENARIOS COMPLETED: %d PASSED, %d FAILED, %d BLOCKED" % [total_passed, total_failed, total_blocked])
 	print("=======================================================\n")
+	
+	# Clean up isolated test runner files
+	var test_runner_save := "user://test_visual_runner_economy.json"
+	if FileAccess.file_exists(test_runner_save):
+		DirAccess.remove_absolute(test_runner_save)
+	if FileAccess.file_exists(test_runner_save + ".bak"):
+		DirAccess.remove_absolute(test_runner_save + ".bak")
+	EconomySaveSystem.active_save_path = EconomySaveSystem.DEFAULT_SAVE_PATH
 	
 	quit(1 if total_failed > 0 else 0)
 

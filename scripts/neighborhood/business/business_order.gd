@@ -92,8 +92,14 @@ func get_current_required_step() -> String:
 		return required_steps[current_step_index]
 	return ""
 
+func get_total_payout() -> int:
+	return reward_money + tip_money + peak_bonus
+
+func is_actionable() -> bool:
+	return status == Status.PENDING or status == Status.IN_PROGRESS
+
 func advance_step(step_name: String) -> bool:
-	if status == Status.COMPLETED or status == Status.PAID:
+	if status == Status.COMPLETED or status == Status.PAID or status == Status.FAILED or status == Status.CANCELLED:
 		return false
 	
 	if current_step_index < required_steps.size():

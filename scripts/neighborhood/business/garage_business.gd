@@ -11,6 +11,7 @@ class RepairStation extends Interactable:
 	var garage: GarageBusiness
 	var station_type: String = "" # "bike_bay", "air_pump", "workbench", "tire_rack"
 	var bay_index: int = 0
+	var interaction_radius: float = 2.4
 	
 	func available(player_node: Node3D) -> bool:
 		return enabled and is_instance_valid(garage) and garage.is_open

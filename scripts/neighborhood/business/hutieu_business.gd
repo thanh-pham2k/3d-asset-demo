@@ -25,11 +25,16 @@ var table_customers: Dictionary = {} # table_index -> HuTieuCustomer
 
 class NoodleStation extends Interactable:
 	var hutieu: HuTieuBusiness
-	var station_type: String = "" # "table", "blanch_pot", "broth_pot", "topping_counter"
+	var station_type: String = "" # "table", "blanch_pot", "broth_pot", "topping_counter", "prep_station"
 	var table_index: int = 0
+	var interaction_radius: float = 2.4
 	
 	func available(player_node: Node3D) -> bool:
-		return enabled and is_instance_valid(hutieu) and hutieu.is_open
+		if not enabled or not is_instance_valid(hutieu):
+			return false
+		if station_type == "prep_station":
+			return hutieu.prep_state != HuTieuBusiness.PrepState.OPEN
+		return hutieu.is_open
 	
 	func prompt(player_node: Node3D) -> String:
 		if not hutieu: return "Quán hủ tiếu"
@@ -149,7 +154,7 @@ func _create_kitchen_and_table_stations() -> void:
 	prep_station.name = "PrepStation"
 	prep_station.hutieu = self
 	prep_station.station_type = "prep_station"
-	prep_station.position = Vector3(-46.0, 0, -17.2)
+	prep_station.position = Vector3(-50.0, 0, -17.0)
 	add_child(prep_station)
 	
 	prep_billboard = Label3D.new()

@@ -224,15 +224,15 @@ func _resolve_current_destination() -> void:
 		
 		# Check prep state
 		if hutieu.prep_state == HuTieuBusiness.PrepState.CLOSED:
-			current_destination = hutieu.global_position + Vector3(-46.0, 0, -17.2)
+			current_destination = hutieu.global_position + Vector3(-50.0, 0, -17.0)
 			current_title = "Bếp: Chuẩn Bị Mở Quán"
 			current_hint = "Nhấn [E] để chuẩn bị nước lèo & nguyên liệu"
 		elif hutieu.prep_state == HuTieuBusiness.PrepState.PREPARING:
-			current_destination = hutieu.global_position + Vector3(-46.0, 0, -17.2)
+			current_destination = hutieu.global_position + Vector3(-50.0, 0, -17.0)
 			current_title = "Đang Chuẩn Bị Quán... %d%%" % int(hutieu.prep_progress)
 			current_hint = "Nồi nước lèo đang sôi sùng sục..."
 		elif hutieu.prep_state == HuTieuBusiness.PrepState.READY:
-			current_destination = hutieu.global_position + Vector3(-46.0, 0, -17.2)
+			current_destination = hutieu.global_position + Vector3(-50.0, 0, -17.0)
 			current_title = "Bếp: Sẵn Sàng Bán!"
 			current_hint = "Nhấn [E] để chính thức mở cửa đón khách"
 		else:

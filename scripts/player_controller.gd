@@ -304,12 +304,13 @@ func find_target() -> void:
   if target_zone and is_instance_valid(target_zone) and target_zone.has_method("highlight"):
    target_zone.highlight(false)
   target_zone = null
-  var nearest := 1.1
+  var nearest_dist := 999.0
   for item in get_tree().get_nodes_in_group("interactables"):
    if not item.available(self): continue
+   var max_reach: float = item.get("interaction_radius") if "interaction_radius" in item else 1.15
    var distance: float = global_position.distance_to(item.global_position)
-   if distance < nearest:
-    nearest = distance
+   if distance <= max_reach and distance < nearest_dist:
+    nearest_dist = distance
     target = item
   if target: prompt_label.text = key + " — " + target.prompt(self)
   else: prompt_label.text = "P%d" % player_id

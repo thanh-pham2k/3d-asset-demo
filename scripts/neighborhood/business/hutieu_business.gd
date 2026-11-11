@@ -413,6 +413,7 @@ func on_station_interacted(station: NoodleStation, player_node: Node3D) -> void:
 				PrepState.READY:
 					prep_state = PrepState.OPEN
 					is_open = true
+					_update_prep_billboard()
 					_show_feedback(station.global_position, "🎉 Quán hủ tiếu chính thức MỞ CỬA đón khách!", Color("69f0ae"))
 					shop_status_changed.emit(true)
 				PrepState.OPEN:

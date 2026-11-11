@@ -18,7 +18,7 @@ var prep_state: PrepState = PrepState.CLOSED
 var prep_progress: float = 0.0 # 0 to 100
 var prep_station: NoodleStation
 var prep_billboard: Label3D
-const PREP_SPEED: float = 30.0 # ~3.3s to prepare
+const PREP_SPEED: float = 33.34 # Exactly 3.0s to complete 0% to 100%
 
 var table_occupied: Dictionary = {} # table_index -> bool
 var table_customers: Dictionary = {} # table_index -> HuTieuCustomer
@@ -328,7 +328,10 @@ func get_station_prompt(station: NoodleStation, _player: Node3D) -> String:
 				PrepState.CLOSED:
 					return "Chuẩn bị mở quán"
 				PrepState.PREPARING:
-					return "Đang chuẩn bị quán... (%d%%)" % int(prep_progress)
+					var pct := int(prep_progress)
+					var blocks := int(pct / 10)
+					var bar := "█".repeat(blocks) + "░".repeat(10 - blocks)
+					return "Đang chuẩn bị quán... [%s] %d%%" % [bar, pct]
 				PrepState.READY:
 					return "Sẵn sàng bán (Nhấn E để mở cửa)"
 				PrepState.OPEN:

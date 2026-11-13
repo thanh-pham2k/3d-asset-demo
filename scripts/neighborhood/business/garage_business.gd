@@ -11,7 +11,8 @@ class RepairStation extends Interactable:
 	var garage: GarageBusiness
 	var station_type: String = "" # "bike_bay", "air_pump", "workbench", "tire_rack"
 	var bay_index: int = 0
-	var interaction_radius: float = 2.4
+	func _init() -> void:
+		interaction_radius = 2.4
 	
 	func available(player_node: Node3D) -> bool:
 		if station_type == "shop_sign":
@@ -49,6 +50,7 @@ var compressor_visual_node: Node3D = null
 # Inventory/holding state of player at garage
 var player_holding_tool: String = "" # "", "patch_kit", "new_tire", "worn_tire"
 var player_holding_tools: Dictionary = {} # player_id -> tool_string
+var held_tool_visuals: Dictionary = {} # player_id -> visual-only node
 
 func get_holding_tool(player_node: Node3D = null) -> String:
 	if not is_instance_valid(player_node): return player_holding_tool
@@ -59,6 +61,35 @@ func set_holding_tool(player_node: Node3D, tool: String) -> void:
 	var pid: int = player_node.get("player_id") if (is_instance_valid(player_node) and "player_id" in player_node) else 1
 	player_holding_tools[pid] = tool
 	player_holding_tool = tool
+	_update_held_tool_visual(player_node, pid, tool)
+
+func _update_held_tool_visual(player_node: Node3D, player_id: int, tool: String) -> void:
+	var previous = held_tool_visuals.get(player_id)
+	if is_instance_valid(previous):
+		previous.queue_free()
+	held_tool_visuals.erase(player_id)
+	if tool == "" or not is_instance_valid(player_node) or not "hold_anchor" in player_node:
+		return
+	var anchor := player_node.get("hold_anchor") as Node3D
+	if not is_instance_valid(anchor): return
+	var visual := Node3D.new()
+	visual.name = "GarageHeldTool"
+	anchor.add_child(visual)
+	if tool == "patch_kit":
+		Art.box(visual, Vector3.ZERO, Vector3(0.3, 0.16, 0.22), Color("cf755a"))
+		Art.box(visual, Vector3(0, 0.09, 0), Vector3(0.15, 0.035, 0.08), Color("f3d59a"))
+	else:
+		var ring := MeshInstance3D.new()
+		var mesh := TorusMesh.new()
+		mesh.inner_radius = 0.17
+		mesh.outer_radius = 0.28
+		mesh.rings = 12
+		mesh.ring_segments = 8
+		ring.mesh = mesh
+		ring.material_override = Art.material(Color("424a49") if tool == "new_tire" else Color("6f625b"))
+		ring.rotation.x = PI / 2.0
+		visual.add_child(ring)
+	held_tool_visuals[player_id] = visual
 
 var service_catalog: Array[Dictionary] = [
 	{
@@ -89,6 +120,7 @@ var customer_names: Array[String] = [
 ]
 
 func _ready() -> void:
+	add_to_group("garage_business")
 	shop_id = "garage"
 	shop_name = "Tiệm Sửa Xe Máy Chú Ba"
 	open_hour = 6.0
@@ -171,12 +203,15 @@ func _safe_clear_remaining_customers() -> void:
 		if is_instance_valid(cust) and cust.current_state != MotorcycleCustomer.State.DEPARTING and cust.current_state != MotorcycleCustomer.State.DESPAWNED:
 			cust.notify_order_failed("shop_closed")
 	bay_orders.clear()
-	bay_reserved.clear()
+	# Keep bays reserved until their current customers finish departing.
 	for bay in bay_status_labels:
 		if is_instance_valid(bay_status_labels[bay]):
 			bay_status_labels[bay].visible = false
 	player_holding_tool = ""
 	player_holding_tools.clear()
+	for visual in held_tool_visuals.values():
+		if is_instance_valid(visual): visual.queue_free()
+	held_tool_visuals.clear()
 
 func get_patience_multiplier() -> float:
 	var base_mult := super.get_patience_multiplier()
@@ -355,7 +390,7 @@ func _try_spawn_customer() -> void:
 	# Pick random service
 	var service: Dictionary = service_catalog[randi() % service_catalog.size()]
 	var cust_name: String = customer_names[randi() % customer_names.size()]
-	var order_id := "garage_%d_%d" % [free_bay, Time.get_ticks_msec()]
+	var order_id := "garage_%d_%d_%d_%d" % [free_bay, int(Time.get_unix_time_from_system()), Time.get_ticks_usec(), randi()]
 	
 	var adjusted_patience: float = float(service["patience"]) * get_patience_multiplier()
 	var order := BusinessOrder.new(
@@ -401,6 +436,7 @@ func _try_spawn_customer() -> void:
 	
 	customer.departed_from_bay.connect(func(bay_idx: int):
 		if not is_instance_valid(self): return
+		if bay_customers.get(bay_idx) != customer: return
 		bay_reserved.erase(bay_idx)
 		bay_customers.erase(bay_idx)
 		bay_orders.erase(bay_idx)
@@ -413,7 +449,7 @@ func complete_order(order: BusinessOrder) -> bool:
 	if not is_instance_valid(order): return false
 	if not active_orders.has(order) or completed_order_ids.has(order.order_id):
 		return false
-	if order.status == BusinessOrder.Status.PAID or order.status == BusinessOrder.Status.FAILED or order.status == BusinessOrder.Status.CANCELLED:
+	if order.status != BusinessOrder.Status.COMPLETED:
 		return false
 	
 	var bay := order.table_index
@@ -461,6 +497,11 @@ func _on_customer_depart(order: BusinessOrder) -> void:
 
 func _process(delta: float) -> void:
 	super._process(delta)
+	for player in get_tree().get_nodes_in_group("players"):
+		if not "player_id" in player: continue
+		var held_visual = held_tool_visuals.get(player.get("player_id"))
+		if is_instance_valid(held_visual):
+			held_visual.visible = not ("held_pillow" in player and is_instance_valid(player.get("held_pillow")))
 	for bay in bay_orders:
 		_update_bay_display(bay)
 
@@ -522,14 +563,14 @@ func get_station_prompt(station: RepairStation, player_node: Node3D = null) -> S
 					return "Bơm lốp xe (Khoang %d)" % (bay + 1)
 				"patch_kit":
 					if get_holding_tool(player_node) == "patch_kit":
-						return "Dán miếng vá săm (Khoang %d)" % (bay + 1)
+						return "Dán miếng vá săm (Khoang %d)%s" % [bay + 1, stock_hint("tool_patch_strip")]
 					else:
 						return "Cần lấy bộ vá săm ở Bàn Thợ trước!"
 				"remove_tire":
 					return "Tháo lốp mòn ra khỏi xe (Khoang %d)" % (bay + 1)
 				"mount_tire":
 					if get_holding_tool(player_node) == "new_tire":
-						return "Lắp lốp mới vào xe (Khoang %d)" % (bay + 1)
+						return "Lắp lốp mới vào xe (Khoang %d)%s" % [bay + 1, stock_hint("tool_spare_tire")]
 					else:
 						return "Cần lấy lốp mới từ Kệ Lốp trước!"
 				_:
@@ -601,7 +642,7 @@ func on_station_interacted(station: RepairStation, player_node: Node3D) -> void:
 				return
 			
 			var order: BusinessOrder = bay_orders[bay]
-			if order.status == BusinessOrder.Status.FAILED or order.status == BusinessOrder.Status.CANCELLED or order.status == BusinessOrder.Status.PAID:
+			if not active_orders.has(order) or order.status == BusinessOrder.Status.FAILED or order.status == BusinessOrder.Status.CANCELLED or order.status == BusinessOrder.Status.PAID:
 				_show_feedback(station.global_position, "⚠️ Không thể sửa xe ở khoang này!", Color("ffab40"))
 				return
 			
@@ -628,9 +669,14 @@ func on_station_interacted(station: RepairStation, player_node: Node3D) -> void:
 				"patch_kit":
 					if get_holding_tool(player_node) == "patch_kit":
 						order.advance_step("patch_kit")
+						if consume_household_stock("tool_patch_strip"):
+							order.tip_money += 12000
+							_show_feedback(station.global_position, "🧰 Dùng miếng vá trong kho: khách thưởng thêm 12,000 đ", Color("ffd54f"))
 						set_holding_tool(player_node, "")
 						order_step_done.emit(order, "patch_kit")
 						_show_feedback(station.global_position, "🔧 Đã dán vá săm kín mít!", Color("69f0ae"))
+						if order.status == BusinessOrder.Status.COMPLETED:
+							complete_order(order)
 					else:
 						order.record_mistake(0.1)
 						_show_feedback(station.global_position, "⚠️ Cần lấy bộ vá săm ở bàn thợ trước!", Color("ffab40"))
@@ -644,9 +690,14 @@ func on_station_interacted(station: RepairStation, player_node: Node3D) -> void:
 				"mount_tire":
 					if get_holding_tool(player_node) == "new_tire":
 						order.advance_step("mount_tire")
+						if consume_household_stock("tool_spare_tire"):
+							order.tip_money += 50000
+							_show_feedback(station.global_position, "🛞 Dùng lốp trong kho: khách trả thêm 50,000 đ", Color("ffd54f"))
 						set_holding_tool(player_node, "")
 						order_step_done.emit(order, "mount_tire")
 						_show_feedback(station.global_position, "✨ Đã lắp lốp mới & siết ốc chặt!", Color("69f0ae"))
+						if order.status == BusinessOrder.Status.COMPLETED:
+							complete_order(order)
 					else:
 						order.record_mistake(0.1)
 						_show_feedback(station.global_position, "⚠️ Cần lấy lốp mới từ kệ trước!", Color("ffab40"))

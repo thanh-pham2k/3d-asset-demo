@@ -1,0 +1,21 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scripts/farming/farming_prop.gd" id="1"]
+[ext_resource type="PackedScene" path="res://assets/farming/tool_harvest_basket.glb" id="2"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_basket"]
+size = Vector3(0.40, 0.32, 0.30)
+
+[node name="ToolHarvestBasket" type="Node3D"]
+script = ExtResource("1")
+prop_category = "tool"
+item_id = "tool_harvest_basket"
+display_name = "Giỏ mây thu hoạch rau củ"
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.16, 0)
+shape = SubResource("BoxShape3D_basket")
+
+[node name="Visual" type="Node3D" parent="."]
+
+[node name="Model" parent="Visual" instance=ExtResource("2")]

@@ -6,9 +6,11 @@ extends Interactable
 
 var house_storage: HouseStorage
 var room_node: Node3D
+var selected_index: int = 0
 
 func _ready() -> void:
 	kind = "delivery_box"
+	interaction_radius = 2.0
 	display_name = "Thùng Giao Hàng"
 	add_to_group("interactables")
 	_build_visual()
@@ -52,9 +54,10 @@ func prompt(_player: Node3D) -> String:
 	var items := house_storage.get_items()
 	if items.is_empty():
 		return "Kho đồ trống (Hãy ghé Tiệm Nội Thất mua sắm)"
-	var first_id := items[0]
-	var def := FurnitureData.get_definition(first_id)
-	return "Đặt %s (Còn %d món trong kho)" % [def["name"], items.size()]
+	selected_index = clampi(selected_index, 0, items.size() - 1)
+	var def := FurnitureData.get_definition(items[selected_index])
+	var hint := " · [R] Chọn món khác" if items.size() > 1 else ""
+	return "Đặt %s (%d/%d)%s" % [def["name"], selected_index + 1, items.size(), hint]
 
 func interact(player: Node3D) -> void:
 	if not house_storage or not room_node: return
@@ -62,7 +65,22 @@ func interact(player: Node3D) -> void:
 	if items.is_empty():
 		return
 	
-	var item_id := items[0]
-	house_storage.remove_item(item_id)
-	if room_node.has_method("start_placement"):
+	if not room_node.has_method("start_placement"):
+		return
+	selected_index = clampi(selected_index, 0, items.size() - 1)
+	var item_id := items[selected_index]
+	if house_storage.remove_item(item_id):
 		room_node.call("start_placement", item_id, player)
+
+func _unhandled_input(event: InputEvent) -> void:
+	if not (event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_R): return
+	if not house_storage or not is_inside_tree(): return
+	var player := get_tree().get_first_node_in_group("players") as CharacterBody3D
+	if not is_instance_valid(player) or player.get("target") != self or player.has_meta("shopping_open") or player.has_meta("pet_rename_open") or player.has_meta("daily_summary_open") or player.has_meta("map_open"):
+		return
+	var manager := get_tree().get_first_node_in_group("furniture_placement_manager") as FurniturePlacementManager
+	if is_instance_valid(manager) and manager.is_active(): return
+	var items := house_storage.get_items()
+	if items.size() < 2: return
+	selected_index = (selected_index + 1) % items.size()
+	get_viewport().set_input_as_handled()

@@ -14,12 +14,97 @@ static func get_effective_path(path: String = "") -> String:
 		return active_save_path
 	return DEFAULT_SAVE_PATH
 
+static func _is_number_like(value: Variant) -> bool:
+	return typeof(value) in [TYPE_INT, TYPE_FLOAT] or (value is String and value.is_valid_float())
+
+static func is_usable_save(data: Variant) -> bool:
+	if not data is Dictionary:
+		return false
+	if not (data.get("wallet", null) is Dictionary and data.get("inventory", null) is Dictionary):
+		return false
+	var wallet_data: Dictionary = data["wallet"]
+	var inventory_data: Dictionary = data["inventory"]
+	for key in ["balance", "total_earned", "total_spent"]:
+		if wallet_data.has(key) and not _is_number_like(wallet_data[key]):
+			return false
+	for key in ["processed_ids", "history"]:
+		if wallet_data.has(key) and not wallet_data[key] is Array:
+			return false
+	for key in ["items", "owned_upgrades", "owned_furniture"]:
+		if inventory_data.has(key) and not inventory_data[key] is Dictionary:
+			return false
+	for amount in inventory_data.get("items", {}).values():
+		if not _is_number_like(amount): return false
+	for amount in inventory_data.get("owned_furniture", {}).values():
+		if not (amount is bool) and not _is_number_like(amount): return false
+	var pet: Variant = data.get("pet", null)
+	if pet == null and data.get("businesses", null) is Dictionary:
+		pet = data["businesses"].get("pet", null)
+	if pet != null:
+		if not pet is Dictionary: return false
+		for key in ["hunger", "thirst", "happiness", "affection"]:
+			if pet.has(key) and not _is_number_like(pet[key]): return false
+		if pet.has("home_position"):
+			var home: Variant = pet["home_position"]
+			if not home is Array or home.size() < 3: return false
+			for i in range(3):
+				if not _is_number_like(home[i]): return false
+	var farm: Variant = data.get("farm", null)
+	if farm == null and data.get("businesses", null) is Dictionary:
+		farm = data["businesses"].get("farm", null)
+	if farm != null:
+		if not farm is Dictionary: return false
+		var farm_plots: Variant = farm.get("plots", [])
+		if not farm_plots is Array: return false
+		for plot in farm_plots:
+			if not plot is Dictionary or not plot.get("plot_id", null) is String: return false
+			for key in ["stage", "growth_progress", "growth_hours_accumulated", "last_growth_day"]:
+				if plot.has(key) and not _is_number_like(plot[key]): return false
+	# Reject malformed placement data before choosing the primary or backup.
+	# Otherwise rebuilding the house can fail and a later save can overwrite
+	# the only usable copy. Older saves may omit the house or furniture list.
+	var house: Variant = data.get("house", null)
+	if house == null and data.get("businesses", null) is Dictionary:
+		house = data["businesses"].get("house", null)
+	if house != null:
+		if not house is Dictionary:
+			return false
+		var furniture: Variant = house.get("placed_furniture", [])
+		if not furniture is Array:
+			return false
+		for entry in furniture:
+			if not entry is Dictionary or not entry.get("id", null) is String:
+				return false
+			var pos: Variant = entry.get("pos", null)
+			if not pos is Array or pos.size() < 3:
+				return false
+			for i in range(3):
+				if typeof(pos[i]) not in [TYPE_INT, TYPE_FLOAT]:
+					return false
+			if entry.has("rot_y") and typeof(entry["rot_y"]) not in [TYPE_INT, TYPE_FLOAT]:
+				return false
+			if entry.has("state") and not entry["state"] is Dictionary:
+				return false
+	return true
+
+static func _read_usable_save(path: String) -> Dictionary:
+	if not FileAccess.file_exists(path):
+		return {}
+	var file := FileAccess.open(path, FileAccess.READ)
+	if not file:
+		return {}
+	var parsed: Variant = JSON.parse_string(file.get_as_text())
+	file.close()
+	return parsed if is_usable_save(parsed) else {}
+
 static func save_economy(
 	wallet: HouseholdWallet,
 	inventory: InventoryManager,
 	business_data: Dictionary = {},
 	house_or_path: Variant = DEFAULT_SAVE_PATH,
-	optional_path: String = ""
+	optional_path: String = "",
+	pet_data: Dictionary = {},
+	farm_data: Dictionary = {}
 ) -> bool:
 	if not wallet or not inventory: return false
 	
@@ -35,6 +120,16 @@ static func save_economy(
 	var tmp_path := target_path + ".tmp"
 	var bak_path := target_path + ".bak"
 	
+	# Extract pet data if nested in business_data or passed explicitly
+	var effective_pet: Dictionary = pet_data
+	if effective_pet.is_empty() and business_data.has("pet") and business_data["pet"] is Dictionary:
+		effective_pet = business_data["pet"]
+
+	# Extract farm data if nested in business_data or passed explicitly (Requirement 7)
+	var effective_farm: Dictionary = farm_data
+	if effective_farm.is_empty() and business_data.has("farm") and business_data["farm"] is Dictionary:
+		effective_farm = business_data["farm"]
+
 	var data := {
 		"version": 1,
 		"timestamp": Time.get_unix_time_from_system(),
@@ -52,9 +147,30 @@ static func save_economy(
 			"owned_furniture": inventory.owned_furniture
 		},
 		"businesses": business_data,
-		"house": house_data
+		"house": house_data,
+		"pet": effective_pet,
+		"farm": effective_farm
 	}
+	if not is_usable_save(data):
+		push_error("Refusing to write an invalid economy snapshot.")
+		return false
 	
+	# Do not replace the only copies with a fresh/default state after failed recovery.
+	if (FileAccess.file_exists(target_path) or FileAccess.file_exists(bak_path)) and _read_usable_save(target_path).is_empty() and _read_usable_save(bak_path).is_empty():
+		push_error("Economy save and backup are unreadable; refusing to overwrite them.")
+		return false
+
+	# Repeated callbacks may save the same snapshot within one frame. Do not
+	# replace the previous recovery point solely because the timestamp changed.
+	var existing := _read_usable_save(target_path)
+	if not existing.is_empty():
+		var old_snapshot := existing.duplicate(true)
+		var new_snapshot := data.duplicate(true)
+		old_snapshot.erase("timestamp")
+		new_snapshot.erase("timestamp")
+		if old_snapshot == new_snapshot:
+			return true
+
 	var json_string := JSON.stringify(data, "\t")
 	
 	# 1. Write to temporary file first
@@ -66,47 +182,33 @@ static func save_economy(
 	file.store_string(json_string)
 	file.close()
 	
-	# 2. Verify temporary file was written completely
-	if not FileAccess.file_exists(tmp_path):
-		printerr("Temp file missing after write: ", tmp_path)
+	# Verify the complete payload before touching the previous save.
+	var verify := FileAccess.open(tmp_path, FileAccess.READ)
+	if not verify or verify.get_as_text() != json_string:
+		push_error("Could not verify temporary economy save: " + tmp_path)
 		return false
-	
-	# 3. If target file already exists, create a backup before replacing it
-	var target_existed := FileAccess.file_exists(target_path)
-	if target_existed:
-		var copy_err := DirAccess.copy_absolute(target_path, bak_path)
-		if copy_err != OK:
-			push_warning("Could not backup existing save to %s: %d" % [bak_path, copy_err])
-	
-	# 4. Atomic rename / replace
-	var replaced := false
-	var rename_err := DirAccess.rename_absolute(tmp_path, target_path)
-	if rename_err == OK:
-		replaced = true
-	else:
-		# If rename failed because target exists, remove target now that backup is secured
-		if target_existed and (FileAccess.file_exists(bak_path) or rename_err != OK):
-			DirAccess.remove_absolute(target_path)
-			rename_err = DirAccess.rename_absolute(tmp_path, target_path)
-			if rename_err == OK:
-				replaced = true
-	
-	# 5. Fallback write if rename still failed
-	if not replaced:
-		printerr("Atomic rename failed for economy save (%d). Using fallback write..." % rename_err)
-		var fallback_file := FileAccess.open(target_path, FileAccess.WRITE)
-		if fallback_file:
-			fallback_file.store_string(json_string)
-			fallback_file.close()
-			if FileAccess.file_exists(tmp_path):
-				DirAccess.remove_absolute(tmp_path)
-			replaced = true
-		else:
-			printerr("Fallback write failed! Restoring from backup...")
-			if target_existed and FileAccess.file_exists(bak_path) and not FileAccess.file_exists(target_path):
-				DirAccess.copy_absolute(bak_path, target_path)
+	verify.close()
+
+	# Never remove or truncate the last valid save on a failed replacement.
+	if FileAccess.file_exists(target_path):
+		var previous := FileAccess.open(target_path, FileAccess.READ)
+		if not previous:
+			push_error("Could not read existing economy save: " + target_path)
 			return false
-	
+		var previous_data: Variant = JSON.parse_string(previous.get_as_text())
+		previous.close()
+		# A corrupt primary may have been recovered from .bak. Do not replace
+		# that last valid backup with the corrupt file.
+		if is_usable_save(previous_data):
+			var copy_err := DirAccess.copy_absolute(target_path, bak_path)
+			if copy_err != OK:
+				push_error("Could not back up economy save: %d" % copy_err)
+				return false
+	var rename_err := DirAccess.rename_absolute(tmp_path, target_path)
+	if rename_err != OK:
+		push_error("Could not replace economy save; previous save retained: %d" % rename_err)
+		return false
+
 	return true
 
 static func load_economy(
@@ -128,7 +230,7 @@ static func load_economy(
 			var content := file.get_as_text()
 			file.close()
 			var parsed: Variant = JSON.parse_string(content)
-			if parsed != null and typeof(parsed) == TYPE_DICTIONARY:
+			if is_usable_save(parsed):
 				data = parsed
 				loaded_successfully = true
 			else:
@@ -142,7 +244,7 @@ static func load_economy(
 			var bak_content := bak_file.get_as_text()
 			bak_file.close()
 			var bak_parsed: Variant = JSON.parse_string(bak_content)
-			if bak_parsed != null and typeof(bak_parsed) == TYPE_DICTIONARY:
+			if is_usable_save(bak_parsed):
 				print("EconomySaveSystem: Successfully recovered save data from backup file: ", bak_path)
 				data = bak_parsed
 				loaded_successfully = true
@@ -181,16 +283,18 @@ static func load_economy(
 		inventory.owned_upgrades.clear()
 		var loaded_upgrades: Dictionary = inv.get("owned_upgrades", {})
 		for k in loaded_upgrades:
-			inventory.owned_upgrades[str(k)] = true
+			if bool(loaded_upgrades[k]):
+				inventory.owned_upgrades[str(k)] = true
 		
 		inventory.owned_furniture.clear()
 		var loaded_furn: Dictionary = inv.get("owned_furniture", {})
 		for k in loaded_furn:
 			var val: Variant = loaded_furn[k]
 			if val is bool:
-				inventory.owned_furniture[str(k)] = val
+				if val: inventory.owned_furniture[str(k)] = true
 			else:
-				inventory.owned_furniture[str(k)] = maxi(1, int(val))
+				var count := maxi(0, int(val))
+				if count > 0: inventory.owned_furniture[str(k)] = count
 	
 	# 5. Restore Business Progress & House Data
 	if data.has("businesses") and typeof(data["businesses"]) == TYPE_DICTIONARY:
@@ -206,8 +310,97 @@ static func load_economy(
 	elif business_data.has("house") and typeof(business_data["house"]) == TYPE_DICTIONARY:
 		# Compatibility with nested house structures
 		pass
+
+	# 6. Restore Pet Data (Requirement 7)
+	if data.has("pet") and typeof(data["pet"]) == TYPE_DICTIONARY:
+		business_data["pet"] = data["pet"]
+
+	# 7. Restore Farm Data (Requirement 7)
+	if data.has("farm") and typeof(data["farm"]) == TYPE_DICTIONARY:
+		business_data["farm"] = data["farm"]
 	
 	return business_data
+
+static func load_objective_data(path: String = "") -> Dictionary:
+	var target_path := get_effective_path(path)
+	for candidate in [target_path, target_path + ".bak"]:
+		if not FileAccess.file_exists(candidate):
+			continue
+		var file := FileAccess.open(candidate, FileAccess.READ)
+		if not file:
+			continue
+		var parsed: Variant = JSON.parse_string(file.get_as_text())
+		file.close()
+		if is_usable_save(parsed):
+			var businesses: Variant = parsed.get("businesses", {})
+			if businesses is Dictionary and businesses.get("objectives", null) is Dictionary:
+				return businesses["objectives"]
+			return {}
+	return {}
+
+static func load_farm_data(path: String = "") -> Dictionary:
+	var target_path := get_effective_path(path)
+	var bak_path := target_path + ".bak"
+
+	var content := ""
+	if FileAccess.file_exists(target_path):
+		var file := FileAccess.open(target_path, FileAccess.READ)
+		if file:
+			content = file.get_as_text()
+			file.close()
+
+	var parsed: Variant = null
+	if content != "":
+		parsed = JSON.parse_string(content)
+
+	if not is_usable_save(parsed) and FileAccess.file_exists(bak_path):
+		var bfile := FileAccess.open(bak_path, FileAccess.READ)
+		if bfile:
+			var bcontent := bfile.get_as_text()
+			bfile.close()
+			parsed = JSON.parse_string(bcontent)
+
+	if is_usable_save(parsed):
+		if parsed.has("farm") and typeof(parsed["farm"]) == TYPE_DICTIONARY:
+			return parsed["farm"]
+		elif parsed.has("businesses") and typeof(parsed["businesses"]) == TYPE_DICTIONARY:
+			var b = parsed["businesses"]
+			if b.has("farm") and typeof(b["farm"]) == TYPE_DICTIONARY:
+				return b["farm"]
+
+	return {}
+
+static func load_pet_data(path: String = "") -> Dictionary:
+	var target_path := get_effective_path(path)
+	var bak_path := target_path + ".bak"
+
+	var content := ""
+	if FileAccess.file_exists(target_path):
+		var file := FileAccess.open(target_path, FileAccess.READ)
+		if file:
+			content = file.get_as_text()
+			file.close()
+
+	var parsed: Variant = null
+	if content != "":
+		parsed = JSON.parse_string(content)
+
+	if not is_usable_save(parsed) and FileAccess.file_exists(bak_path):
+		var bfile := FileAccess.open(bak_path, FileAccess.READ)
+		if bfile:
+			var bcontent := bfile.get_as_text()
+			bfile.close()
+			parsed = JSON.parse_string(bcontent)
+
+	if is_usable_save(parsed):
+		if parsed.has("pet") and typeof(parsed["pet"]) == TYPE_DICTIONARY:
+			return parsed["pet"]
+		elif parsed.has("businesses") and typeof(parsed["businesses"]) == TYPE_DICTIONARY:
+			var b = parsed["businesses"]
+			if b.has("pet") and typeof(b["pet"]) == TYPE_DICTIONARY:
+				return b["pet"]
+
+	return {}
 
 static func load_house_data(path: String = "") -> Dictionary:
 	var default_house := {
@@ -230,14 +423,14 @@ static func load_house_data(path: String = "") -> Dictionary:
 		parsed = JSON.parse_string(content)
 	
 	# Fallback to backup if primary missing or invalid
-	if (parsed == null or typeof(parsed) != TYPE_DICTIONARY) and FileAccess.file_exists(bak_path):
+	if not is_usable_save(parsed) and FileAccess.file_exists(bak_path):
 		var bfile := FileAccess.open(bak_path, FileAccess.READ)
 		if bfile:
 			var bcontent := bfile.get_as_text()
 			bfile.close()
 			parsed = JSON.parse_string(bcontent)
 	
-	if parsed != null and typeof(parsed) == TYPE_DICTIONARY:
+	if is_usable_save(parsed):
 		if parsed.has("house") and typeof(parsed["house"]) == TYPE_DICTIONARY:
 			return parsed["house"]
 		elif parsed.has("businesses") and typeof(parsed["businesses"]) == TYPE_DICTIONARY:

@@ -1,0 +1,14 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/farming/farming_prop.gd" id="1"]
+[ext_resource type="PackedScene" path="res://assets/farming/soil_watered.glb" id="2"]
+
+[node name="Soil_watered" type="Node3D"]
+script = ExtResource("1")
+prop_category = "soil"
+item_id = "soil_watered"
+display_name = "Đất ẩm đã tưới nước"
+
+[node name="Visual" type="Node3D" parent="."]
+
+[node name="Model" parent="Visual" instance=ExtResource("2")]

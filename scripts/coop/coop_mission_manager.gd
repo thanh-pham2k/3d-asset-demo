@@ -47,7 +47,11 @@ func report_progress(mission_id: String, amount: int = 1, wallet: HouseholdWalle
 		m["completed"] = true
 		var rew: int = m["reward"]
 		if wallet:
-			wallet.deposit(rew, "coop_mission", "Thưởng nhiệm vụ co-op: " + m["title"])
+			wallet.deposit(rew, "coop_mission", "Thưởng nhiệm vụ co-op: " + m["title"], "coop_mission_" + mission_id)
+			if is_inside_tree():
+				var econ := get_tree().get_first_node_in_group("economy_manager") as EconomyManager
+				if is_instance_valid(econ) and econ.wallet == wallet and econ.auto_save_on_change:
+					econ.save_economy_state()
 		mission_completed.emit(mission_id, m["title"], rew)
 		return true
 	return false

@@ -7,6 +7,9 @@ extends Node
 signal time_updated(current_hour: float)
 signal period_changed(new_period: String)
 signal hour_ticked(hour: int)
+# Only emitted for real clock progression, not manual clock changes or sleep.
+signal hour_elapsed(hour: int)
+signal sleep_time_advanced(hours_before_midnight: float)
 signal day_advanced(new_day: int)
 
 @export var current_day: int = 1
@@ -25,6 +28,7 @@ var directional_light: DirectionalLight3D
 var world_environment: WorldEnvironment
 
 func _ready() -> void:
+	add_to_group("time_manager")
 	current_period = get_period_name(current_hour)
 	_last_int_hour = int(current_hour)
 
@@ -32,17 +36,24 @@ func _process(delta: float) -> void:
 	if is_paused: return
 	
 	# Advance time: (time_scale minutes / 60) hours per second
-	var hours_passed := (time_scale / 60.0) * delta
-	var prev_h := current_hour
-	current_hour = fposmod(current_hour + hours_passed, 24.0)
-	if prev_h + hours_passed >= 24.0:
-		current_day += 1
-		day_advanced.emit(current_day)
-	
-	var int_hour := int(current_hour)
-	if int_hour != _last_int_hour:
-		_last_int_hour = int_hour
-		hour_ticked.emit(int_hour)
+	var hours_passed := maxf(0.0, (time_scale / 60.0) * delta)
+	var previous_hour := current_hour
+	var end_hour := previous_hour + hours_passed
+	var crossed_hours := int(floor(end_hour)) - int(floor(previous_hour))
+	for step in range(1, crossed_hours + 1):
+		var tick := (int(floor(previous_hour)) + step) % 24
+		current_hour = float(tick)
+		_last_int_hour = tick
+		if tick == 0:
+			# Finish the last watered hour before the new day dries the plots.
+			hour_elapsed.emit(tick)
+			current_day += 1
+			day_advanced.emit(current_day)
+			hour_ticked.emit(tick)
+		else:
+			hour_ticked.emit(tick)
+			hour_elapsed.emit(tick)
+	current_hour = fposmod(end_hour, 24.0)
 	
 	var period := get_period_name(current_hour)
 	if period != current_period:
@@ -53,6 +64,8 @@ func _process(delta: float) -> void:
 	_update_lighting()
 
 func advance_to_next_day(wake_hour: float = 7.0) -> void:
+	# Crops receive only the remaining watered time before the day changes.
+	sleep_time_advanced.emit(maxf(0.0, 24.0 - current_hour))
 	current_day += 1
 	current_hour = fposmod(wake_hour, 24.0)
 	_last_int_hour = int(current_hour)

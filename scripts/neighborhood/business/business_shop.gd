@@ -147,7 +147,7 @@ func complete_order(order: BusinessOrder) -> bool:
 		return false
 	if completed_order_ids.has(order.order_id):
 		return false # Prevent duplicate reward
-	if order.status == BusinessOrder.Status.PAID or order.status == BusinessOrder.Status.FAILED or order.status == BusinessOrder.Status.CANCELLED:
+	if order.status != BusinessOrder.Status.COMPLETED:
 		return false
 	
 	completed_order_ids[order.order_id] = true
@@ -205,6 +205,24 @@ func complete_order(order: BusinessOrder) -> bool:
 	_on_customer_depart(order)
 	return true
 
+# Purchased stock is optional: the shop can always use ordinary supplier stock.
+# The player's item is consumed only when the matching action actually happens.
+func consume_household_stock(product_id: String) -> bool:
+	var econ := get_tree().get_first_node_in_group("economy_manager") as EconomyManager
+	if not is_instance_valid(econ) or not econ.inventory:
+		return false
+	if not econ.inventory.remove_item(product_id, 1):
+		return false
+	if econ.auto_save_on_change:
+		econ.save_economy_state()
+	return true
+
+func stock_hint(product_id: String) -> String:
+	var econ := get_tree().get_first_node_in_group("economy_manager") as EconomyManager
+	if is_instance_valid(econ) and econ.inventory and econ.inventory.has_item(product_id):
+		return " · Dùng đồ trong kho (+tiền thưởng)"
+	return " · Dùng vật tư thường của tiệm"
+
 func _on_hour_ticked(hour: int) -> void:
 	_check_operating_hours(float(hour))
 
@@ -257,12 +275,39 @@ func close_shop() -> void:
 	_update_status_display()
 	is_closing = false
 
+func get_persistent_stats() -> Dictionary:
+	return {
+		"total_earnings": total_earnings, "total_tips": total_tips,
+		"customers_served": customers_served, "customers_lost": customers_lost,
+		"business_level": business_level, "reputation_score": reputation_score,
+		"streak_count": streak_count, "daily_revenue": daily_revenue,
+		"daily_customers_served": daily_customers_served,
+		"daily_customers_lost": daily_customers_lost, "daily_expenses": daily_expenses
+	}
+
+func apply_persistent_stats(data: Dictionary) -> void:
+	if data.is_empty(): return
+	total_earnings = maxi(0, int(data.get("total_earnings", total_earnings)))
+	total_tips = maxi(0, int(data.get("total_tips", total_tips)))
+	customers_served = maxi(0, int(data.get("customers_served", customers_served)))
+	customers_lost = maxi(0, int(data.get("customers_lost", customers_lost)))
+	business_level = clampi(int(data.get("business_level", business_level)), 1, 5)
+	reputation_score = clampf(float(data.get("reputation_score", reputation_score)), 0.0, 100.0)
+	streak_count = maxi(0, int(data.get("streak_count", streak_count)))
+	daily_revenue = maxi(0, int(data.get("daily_revenue", 0)))
+	daily_customers_served = maxi(0, int(data.get("daily_customers_served", 0)))
+	daily_customers_lost = maxi(0, int(data.get("daily_customers_lost", 0)))
+	daily_expenses = maxi(0, int(data.get("daily_expenses", 0)))
+	_update_status_display()
+
 func reset_daily_state() -> void:
 	daily_revenue = 0
 	daily_customers_served = 0
 	daily_customers_lost = 0
 	daily_expenses = 0
 	manual_closed = false
+	for order in active_orders:
+		order.status = BusinessOrder.Status.CANCELLED
 	active_orders.clear()
 	_update_status_display()
 

@@ -7,14 +7,18 @@ var house_progression: HouseProgressionManager
 var wallet: HouseholdWallet
 var room_node: Node3D
 
-var awaiting_confirmation_level: int = 0
-var confirmation_timer: float = 0.0
-
 func _ready() -> void:
 	kind = "upgrade_board"
+	interaction_radius = 2.0
 	display_name = "Bảng Nâng Cấp Nhà"
 	add_to_group("interactables")
 	_build_visual()
+
+func _ensure_wallet() -> void:
+	if not wallet and is_inside_tree():
+		var econ: EconomyManager = get_tree().get_first_node_in_group("economy_manager") as EconomyManager
+		if is_instance_valid(econ):
+			wallet = econ.wallet
 
 func _build_visual() -> void:
 	# Wooden board on wall
@@ -39,46 +43,11 @@ func _build_visual() -> void:
 	paper.position = Vector3(0, 1.4, 0.04)
 	add_child(paper)
 
-func _process(delta: float) -> void:
-	if awaiting_confirmation_level > 0:
-		confirmation_timer -= delta
-		if confirmation_timer <= 0.0:
-			awaiting_confirmation_level = 0
-
 func prompt(_player: Node3D) -> String:
-	if not house_progression: return "Bảng Nâng Cấp Nhà"
-	
-	var check := house_progression.can_upgrade(wallet)
-	if not check["can_upgrade"]:
-		if check["reason"] == "MAX_LEVEL":
-			return "Nhà đã đạt Cấp 3 tối đa (Biệt thự sân vườn)"
-		return check["message"]
-	
-	var next_lvl: int = check["next_level"]
-	var cost: int = check["cost"]
-	var title: String = check["title"]
-	
-	if awaiting_confirmation_level == next_lvl:
-		return "⚠️ Nhấn E lần nữa để XÁC NHẬN nâng cấp lên %s (%s)" % [title, HouseholdWallet.format_money(cost)]
-	
-	return "Nâng cấp lên %s (Phí: %s)" % [title, HouseholdWallet.format_money(cost)]
+	return "Xem nâng cấp nhà và giá"
 
-func interact(_player: Node3D) -> void:
-	if not house_progression: return
-	
-	var check := house_progression.can_upgrade(wallet)
-	if not check["can_upgrade"]:
-		return
-	
-	var next_lvl: int = check["next_level"]
-	if awaiting_confirmation_level == next_lvl:
-		# Player confirmed! Execute upgrade!
-		awaiting_confirmation_level = 0
-		var res := house_progression.upgrade_house(wallet)
-		if res["success"]:
-			if room_node and room_node.has_method("rebuild_house"):
-				room_node.call("rebuild_house")
-	else:
-		# First click: request confirmation
-		awaiting_confirmation_level = next_lvl
-		confirmation_timer = 6.0
+func interact(player: Node3D) -> void:
+	if not is_inside_tree(): return
+	var shop_ui := ShoppingUI.get_or_create(get_tree())
+	if is_instance_valid(shop_ui):
+		shop_ui.open_shop("Bảng Nâng Cấp Nhà", "house_upgrade", "house", self, player)

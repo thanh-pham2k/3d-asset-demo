@@ -20,12 +20,22 @@ Updated 2026-11-09. Status is deliberately conservative: **PLACEHOLDER** is inco
 | P1 Decorations | `scripts/room.gd`, `assets/furniture/*.obj` | PLACEHOLDER + Kenney models INTEGRATED; overview image | Additional polish, consistency and art review. |
 | P1 Physics props | `scripts/physics_prop.gd`, spawned in `scripts/game_manager.gd` | INTEGRATED: Kenney GLB cup, bottle and stackable boxes; slipper, toy and container remain PLACEHOLDER. Pickup/throw tests cover each kind; two boxes remain supported in the automated stacking test; chair can be pushed by player. | Production meshes, colliders, individual motion/rolling/scatter, stacking and manual testing. |
 
+## Current additions — not runtime validated
+
+| Asset | Files | Status and limits |
+|---|---|---|
+| Orange tabby and pet props | `scenes/pets/`, `scripts/pets/`, `assets/pets/` | Procedural and low-poly placeholders, with scene wrappers and a procedural animation adapter. Cat movement, feeding, resting and appearance require gameplay and visual review; no rigged character GLB is claimed. |
+| Crops and gardening props | `scenes/farming/`, `scripts/farming/`, `assets/farming/` | Low-poly farming scenes and crop stages are present. Integration, scale, collisions, watering and growth require runtime review. |
+| Home decorative details | `scenes/house/home_detail_visual.tscn`, `scripts/house/home_detail_visual.gd` | Reusable procedural clock, rice cooker, shelf and bedside lamp; integrated as decoration. Scale and placement have not been visually validated. Bathroom and utility furniture are available as procedural placeable decorations through the catalog; washing, showering and similar utility actions are not implemented. Scale, placement and collision still require runtime review. |
+| Business interaction props | `scenes/business/noodle_bowl_visual.tscn`, `scripts/neighborhood/business/` | Procedural noodle bowl changes with preparation and topping selection; decorative cookware, trays and held repair tools are source-integrated. Placement, hand alignment and visual quality have not been checked in a running game. |
+| Purchased furniture | `scripts/house/furniture_data.gd` | Procedural models and interaction components are present for catalog entries. Placement, poses, saved states and clear pathways require runtime review. |
+
 ## Next steps and dependencies
 
 1. Review/fix the Kenney GLB visual's orientation, scale and fit to the requested chibi style and hand position. If it does not fit, retain the procedural visual until suitable Boy/Girl art is available; do not claim either option production-complete without review.
 2. Replace remaining primitive prop and furniture visuals with CC0 low-poly assets or authored meshes, with collision and pivot tests; preserve the current single-player controls and layout. Verify stacked boxes remain stable and breakable fragments clean up.
 3. Connect action-specific animation clips and polish anticipation, expressions and recovery; validate each transition in an actual playing session, including hold and hammer.
-4. Tune and review audio and VFX in real playback, UI scaling and navigation, then repeat all regression tests. No multiplayer should be added.
+4. Tune and review audio and VFX in real playback, UI scaling and navigation, then repeat regression tests when requested. Keep the current prototype single-player by default; existing optional co-op code is not validated by this work.
 5. Complete an item-by-item visual, interaction and sound audit before changing any remaining PLACEHOLDER status to complete.
 
 ## Validation evidence and reproducibility

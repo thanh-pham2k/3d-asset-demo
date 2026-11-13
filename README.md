@@ -25,6 +25,12 @@ Chọn **KHÁM PHÁ KHU PHỐ** tại menu chính để khám phá bản đồ. 
 
 Nhân vật procedural dùng Skeleton3D và marker tay. Có thể thử model GLB Kenney bằng `COUPLE_VISUAL=kenney /Applications/Godot.app/Contents/MacOS/Godot --path .`; model này cần tiếp tục kiểm tra phong cách và animation. `scripts/animation_controller.gd` nhận trạng thái gameplay chung. Scene visual có thể triển khai `update_pose(move, running, holding, throwing, resting, lying, reacting, time)` để chuyển các trạng thái sang AnimationPlayer/AnimationTree và ánh xạ tên animation của GLB. Placeholder được animate qua adapter riêng. Một visual không có adapter vẫn hiển thị và gameplay vẫn chạy, nhưng sẽ không có animation. Test `tests/swap_visual.tscn` minh họa interface; chưa thử với GLB thực tế.
 
+## Gameplay đang phát triển
+
+Cửa hàng mở bằng E, cho xem danh mục và xác nhận mua; hàng nội thất được nhận tại thùng giao hàng trong nhà; đứng gần thùng và dùng R để chọn món nếu có nhiều món. Khi đặt đồ, dùng R để xoay, E để xác nhận, F hoặc Esc để hủy; đứng gần đồ đã đặt và nhấn G để sắp xếp lại. Ở luống đất trống, R đổi loại hạt đang chọn; đứng gần mèo và nhấn N để đổi tên. WASD, Shift trái, Space, E và F giữ chức năng di chuyển, chạy, lướt, tương tác và ném thông thường.
+
+Mã nguồn hiện có hệ thống mèo, vườn rau, mục tiêu hằng ngày và lưu tiến trình dùng chung. Đây là phần đang tích hợp: chưa xác minh các vòng chơi, điều hướng, dữ liệu lưu hay giao diện bằng runtime trong đợt thay đổi này. Các asset mèo và cây dùng hình học procedural hoặc low-poly và còn cần kiểm tra hình ảnh. Trong mã nguồn, nguyên liệu và vật tư trong kho được dùng ở bước tương ứng tại hai cơ sở; khi hết hàng, cơ sở dùng vật tư thường để vòng chơi tiếp tục. Phần này chưa được xác minh bằng runtime.
+
 ## Kiểm tra
 
 ```

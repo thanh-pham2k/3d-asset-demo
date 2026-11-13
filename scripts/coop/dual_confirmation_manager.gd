@@ -27,6 +27,14 @@ func request_purchase(
 	on_approved: Callable,
 	threshold: int = 50000
 ) -> bool:
+	# Verify funds first if EconomyManager is present in the tree
+	if is_inside_tree():
+		var econ: EconomyManager = get_tree().get_first_node_in_group("economy_manager") as EconomyManager
+		if is_instance_valid(econ) and is_instance_valid(econ.wallet):
+			if not econ.wallet.can_afford(cost):
+				confirmation_declined.emit(initiator_id, product_name, "INSUFFICIENT_FUNDS")
+				return false
+
 	# If not co-op or cost is under threshold, approve immediately
 	if not is_coop_active or cost < threshold:
 		if on_approved.is_valid():
@@ -74,6 +82,14 @@ func approve_request() -> void:
 	var req := active_request
 	active_request = {}
 	
+	# Re-verify funds at moment of approval
+	if is_inside_tree():
+		var econ: EconomyManager = get_tree().get_first_node_in_group("economy_manager") as EconomyManager
+		if is_instance_valid(econ) and is_instance_valid(econ.wallet):
+			if not econ.wallet.can_afford(req["cost"]):
+				confirmation_declined.emit(req["initiator_id"], req["product_name"], "INSUFFICIENT_FUNDS")
+				return
+
 	if req.get("callback", Callable()).is_valid():
 		req["callback"].call()
 		

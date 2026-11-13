@@ -92,6 +92,12 @@ func _ready() -> void:
 	_build_expanded_map()
 
 func _input(event: InputEvent) -> void:
+	var shop := get_tree().get_first_node_in_group("shopping_ui") as ShoppingUI
+	var summary := get_tree().get_first_node_in_group("daily_summary_dialog") as DailySummaryDialog
+	if (is_instance_valid(shop) and shop.is_open) or (is_instance_valid(summary) and summary.is_showing):
+		return
+	if is_instance_valid(player) and player.has_meta("pet_rename_open"):
+		return
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode == KEY_M:
 			toggle_expanded_map(!is_expanded)
@@ -110,6 +116,20 @@ func toggle_expanded_map(enable: Variant = null) -> void:
 		modal_window.visible = is_expanded
 	if is_expanded:
 		_update_expanded_labels()
+	_set_player_map_state(is_expanded)
+
+func _set_player_map_state(open: bool) -> void:
+	if not is_inside_tree(): return
+	for actor in get_tree().get_nodes_in_group("players"):
+		if open:
+			actor.set_meta("map_open", true)
+			if actor is CharacterBody3D: actor.velocity = Vector3.ZERO
+		else:
+			if actor.has_meta("map_open"): actor.remove_meta("map_open")
+			actor.set_meta("ui_input_block_until_msec", Time.get_ticks_msec() + 200)
+
+func _exit_tree() -> void:
+	if is_expanded: _set_player_map_state(false)
 
 func close_expanded_map() -> void:
 	toggle_expanded_map(false)

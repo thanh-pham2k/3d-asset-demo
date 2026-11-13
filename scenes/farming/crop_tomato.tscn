@@ -1,0 +1,36 @@
+[gd_scene load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://scripts/farming/crop_visual.gd" id="1"]
+[ext_resource type="PackedScene" path="res://assets/farming/soil_empty.glb" id="2"]
+[ext_resource type="PackedScene" path="res://assets/farming/crop_tomato_seeded.glb" id="3"]
+[ext_resource type="PackedScene" path="res://assets/farming/crop_tomato_sprout.glb" id="4"]
+[ext_resource type="PackedScene" path="res://assets/farming/crop_tomato_growing.glb" id="5"]
+[ext_resource type="PackedScene" path="res://assets/farming/crop_tomato_mature.glb" id="6"]
+
+[node name="CropTomato" type="Node3D"]
+script = ExtResource("1")
+crop_type = "tomato"
+current_stage = 0
+
+[node name="Soil" type="Node3D" parent="."]
+
+[node name="SoilModel" parent="Soil" instance=ExtResource("2")]
+
+[node name="StageSeeded" type="Node3D" parent="."]
+
+[node name="ModelSeeded" parent="StageSeeded" instance=ExtResource("3")]
+
+[node name="StageSprout" type="Node3D" parent="."]
+visible = false
+
+[node name="ModelSprout" parent="StageSprout" instance=ExtResource("4")]
+
+[node name="StageGrowing" type="Node3D" parent="."]
+visible = false
+
+[node name="ModelGrowing" parent="StageGrowing" instance=ExtResource("5")]
+
+[node name="StageMature" type="Node3D" parent="."]
+visible = false
+
+[node name="ModelMature" parent="StageMature" instance=ExtResource("6")]

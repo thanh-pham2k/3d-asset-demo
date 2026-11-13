@@ -43,6 +43,9 @@ var dialogue_timer: float = 0.0
 
 var internal_time: float = 0.0
 var current_activity: String = "idle"
+var pending_schedule: Dictionary = {}
+var reserved_seat: Interactable
+var seated: bool = false
 
 func _init(p_data: NPCData = null) -> void:
 	if p_data: data = p_data
@@ -134,13 +137,13 @@ func _physics_process(delta: float) -> void:
 		State.INTERACTING:
 			_process_interacting(delta)
 	
-	_apply_separation(delta)
-	
-	if current_state != State.INTERACTING:
-		move_and_slide()
+	if not seated:
+		_apply_separation(delta)
+		if current_state != State.INTERACTING:
+			move_and_slide()
 	
 	var cur_speed := Vector2(velocity.x, velocity.z).length()
-	visual.update_animation(cur_speed, internal_time, current_state == State.INTERACTING)
+	visual.update_animation(cur_speed, internal_time, current_state == State.INTERACTING, current_activity, seated)
 
 func _process_idle(delta: float) -> void:
 	velocity = Vector3.ZERO
@@ -159,6 +162,7 @@ func _process_walking(delta: float) -> void:
 		wait_timer = max_wait_time
 		velocity = Vector3.ZERO
 		stuck_timer = 0.0
+		_try_sit_reserved_seat()
 		return
 	
 	var next_path_pos := nav_agent.get_next_path_position()
@@ -237,10 +241,27 @@ func set_destination(dest: Vector3) -> void:
 
 func apply_schedule_entry(entry: Dictionary, force_warp := false) -> void:
 	if not entry.has("position"): return
+	if current_state == State.INTERACTING:
+		pending_schedule = entry.duplicate(true)
+		return
+	_release_seat()
 	
 	var base_dest: Vector3 = entry["position"]
 	var scatter := Vector3(randf_range(-0.5, 0.5), 0, randf_range(-0.5, 0.5))
 	var final_dest := base_dest + scatter
+	if entry.get("activity", "") == "leisure":
+		var nearest_distance := 7.0
+		for node in get_tree().get_nodes_in_group("park_seats"):
+			var seat := node as Interactable
+			if not is_instance_valid(seat) or seat.user != null: continue
+			var distance := seat.global_position.distance_to(base_dest)
+			if distance < nearest_distance:
+				nearest_distance = distance
+				reserved_seat = seat
+		if is_instance_valid(reserved_seat):
+			reserved_seat.user = self
+			var bench := reserved_seat.get_parent() as Node3D
+			final_dest = bench.to_global(reserved_seat.stand_point)
 	
 	current_activity = entry.get("activity", "idle")
 	current_dialogue_key = entry.get("dialogue_key", "morning")
@@ -252,8 +273,47 @@ func apply_schedule_entry(entry: Dictionary, force_warp := false) -> void:
 		last_progress_position = final_dest
 		current_state = State.IDLE
 		wait_timer = randf_range(2.0, 5.0)
+		_try_sit_reserved_seat()
 	else:
 		set_destination(final_dest)
+
+func _try_sit_reserved_seat() -> void:
+	if not is_instance_valid(reserved_seat) or reserved_seat.user != self:
+		return
+	var bench := reserved_seat.get_parent() as Node3D
+	if not is_instance_valid(bench): return
+	var stand_pos := bench.to_global(reserved_seat.stand_point)
+	if global_position.distance_to(stand_pos) > 1.6:
+		_release_seat()
+		return
+	var seat_pos := bench.to_global(reserved_seat.seat_point)
+	var player := get_tree().get_first_node_in_group("players") as Node3D
+	if is_instance_valid(player) and player.global_position.distance_to(seat_pos) < 0.9:
+		_release_seat()
+		return
+	global_position = seat_pos
+	rotation.y = bench.global_rotation.y
+	velocity = Vector3.ZERO
+	collision_layer = 0
+	collision_mask = 0
+	seated = true
+
+func _release_seat() -> void:
+	if is_instance_valid(reserved_seat):
+		if seated:
+			var bench := reserved_seat.get_parent() as Node3D
+			if is_instance_valid(bench):
+				global_position = bench.to_global(reserved_seat.stand_point)
+		if reserved_seat.user == self:
+			reserved_seat.user = null
+	reserved_seat = null
+	if seated:
+		collision_layer = 4
+		collision_mask = 1
+	seated = false
+
+func _exit_tree() -> void:
+	_release_seat()
 
 func _attempt_unstuck() -> void:
 	if is_instance_valid(nav_agent):
@@ -318,3 +378,7 @@ func end_interaction() -> void:
 	interacting_player = null
 	current_state = previous_state if previous_state != State.INTERACTING else State.IDLE
 	wait_timer = 2.0
+	if not pending_schedule.is_empty():
+		var next_entry := pending_schedule
+		pending_schedule = {}
+		apply_schedule_entry(next_entry)

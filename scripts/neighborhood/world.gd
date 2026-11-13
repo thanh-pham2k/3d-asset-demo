@@ -28,6 +28,7 @@ var economy_manager: EconomyManager
 var daily_loop_manager: Node
 var wallet_label: Label
 var goal_label: Label
+var street_lights: Array[OmniLight3D] = []
 
 func slab(parent: Node, pos: Vector3, size: Vector3, color: Color, collision := false) -> void:
  var mesh := MeshInstance3D.new()
@@ -49,6 +50,23 @@ func slab(parent: Node, pos: Vector3, size: Vector3, color: Color, collision := 
   body.position = pos
   body.add_child(shape)
   parent.add_child(body)
+
+func _add_street_lamp(parent: Node3D, location: Vector3) -> void:
+ var lamp := add_piece(parent, "lamp", location)
+ var glow := OmniLight3D.new()
+ glow.name = "NightGlow"
+ glow.position = Vector3(0, 4.25, 0)
+ glow.light_color = Color("ffd99c")
+ glow.light_energy = 0.65
+ glow.omni_range = 7.0
+ glow.shadow_enabled = false
+ glow.visible = false
+ lamp.add_child(glow)
+ street_lights.append(glow)
+
+func _on_street_light_period_changed(period: String) -> void:
+ for glow in street_lights:
+  if is_instance_valid(glow): glow.visible = period == "night"
 
 func _create_parking_bay(p_parent: Node, p_pos: Vector3, p_rot_y: float, p_title: String, p_color: Color) -> Node3D:
  var bay := Node3D.new()
@@ -274,7 +292,20 @@ func _ready() -> void:
  add_piece(park,"gazebo",Vector3(27,0,40))
  for p in [Vector3(19,0,47),Vector3(62,0,55),Vector3(35,0,76)]: add_piece(park,"flower_bed",p)
  for p in [Vector3(21,0,32),Vector3(58,0,34),Vector3(21,0,76),Vector3(64,0,78),Vector3(53,0,46)]: add_piece(park,"tree",p,Color("81ae77"))
- for p in [Vector3(37,0,38),Vector3(47,0,57)]: add_piece(park,"bench",p)
+ for p in [Vector3(37,0,38),Vector3(47,0,57)]:
+  var bench := add_piece(park,"bench",p)
+  var seat := Interactable.new()
+  seat.name = "ParkSeat"
+  seat.add_to_group("park_seats")
+  seat.kind = "chair"
+  seat.display_name = "Ghế công viên"
+  seat.seat_point = Vector3(0, 0.64, 0)
+  seat.stand_point = Vector3(0, 0, -1.0)
+  seat.interaction_radius = 1.8
+  bench.add_child(seat)
+ var wildlife := preload("res://scripts/neighborhood/park_wildlife.gd").new()
+ wildlife.name = "ParkWildlife"
+ park.add_child(wildlife)
  var school := zone("08_School")
  slab(school,Vector3(105,0.04,-75),Vector3(35,0.08,60),Color("e8cbb4"))
  add_piece(school,"school",Vector3(105,0,-95),Color("f4daa5"),PI)
@@ -332,10 +363,10 @@ func _ready() -> void:
   for z in [-10.0,10.0]:
    if x == -65.0 and z == -10.0:
     add_piece(street,"tree",Vector3(-78,0,z),Color("86ae7c"))
-    add_piece(street,"lamp",Vector3(-74,0,z))
+    _add_street_lamp(street, Vector3(-74,0,z))
     continue
    add_piece(street,"tree",Vector3(x,0,z),Color("86ae7c"))
-   add_piece(street,"lamp",Vector3(x+4,0,z))
+   _add_street_lamp(street, Vector3(x+4,0,z))
  for p in [Vector3(-70,0,-10),Vector3(10,0,10),Vector3(70,0,-10),Vector3(35,0,28)]: add_piece(street,"trash_bin",p)
  for p in [Vector3(-20,0,-15),Vector3(20,0,-15),Vector3(70,0,-15),Vector3(-70,0,15),Vector3(70,0,15)]:
   add_piece(street,"utility_pole",p)
@@ -417,6 +448,8 @@ func _ready() -> void:
  time_manager.directional_light = light
  time_manager.world_environment = env
  add_child(time_manager)
+ time_manager.period_changed.connect(_on_street_light_period_changed)
+ _on_street_light_period_changed(time_manager.current_period)
  npc_manager = NPCManager.new()
  npc_manager.name = "NPCManager"
  npc_manager.time_manager = time_manager
@@ -441,12 +474,21 @@ func _ready() -> void:
  daily_loop_manager.garage_business = garage_business
  daily_loop_manager.hutieu_business = hutieu_business
  add_child(daily_loop_manager)
+ var objective_manager := DailyObjectiveManager.new()
+ objective_manager.name = "DailyObjectiveManager"
+ add_child(objective_manager)
  var furn_kiosk := ShopKiosk.new()
  furn_kiosk.name = "Kiosk_Furniture"
  furn_kiosk.kiosk_title = "Tiệm Nội Thất"
  furn_kiosk.product_category = "furniture"
  furn_kiosk.position = Vector3(105, 0, -18)
  add_child(furn_kiosk)
+ var pet_kiosk := ShopKiosk.new()
+ pet_kiosk.name = "Kiosk_PetShop"
+ pet_kiosk.kiosk_title = "Tiệm Thú Cưng Miu Miu"
+ pet_kiosk.product_category = "pet"
+ pet_kiosk.position = Vector3(88, 0, -18)
+ add_child(pet_kiosk)
  var market_kiosk := ShopKiosk.new()
  market_kiosk.name = "Kiosk_Market"
  market_kiosk.kiosk_title = "Chợ & Tạp Hóa"
@@ -536,7 +578,14 @@ func _ready() -> void:
  add_help()
 
 func _unhandled_key_input(event: InputEvent) -> void:
- if not integrated and event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_TAB:
+ if integrated or not (event is InputEventKey and event.pressed and not event.echo): return
+ if event.keycode == KEY_ESCAPE:
+  if is_instance_valid(economy_manager) and economy_manager.auto_save_on_change:
+   economy_manager.save_economy_state()
+  get_tree().paused = false
+  get_tree().change_scene_to_file("res://scenes/main.tscn")
+  get_viewport().set_input_as_handled()
+ elif event.keycode == KEY_TAB:
   overview = not overview
   camera.size = 330 if overview else 20
 
@@ -613,10 +662,7 @@ func enable_neighborhood_coop() -> void:
 
 func _input(event: InputEvent) -> void:
  if not integrated and event is InputEventKey and event.pressed and not event.echo:
-  if event.keycode == KEY_ESCAPE:
-   get_tree().paused = false
-   get_tree().change_scene_to_file("res://scenes/main.tscn")
-  elif event.keycode == KEY_F2:
+  if event.keycode == KEY_F2:
    enable_neighborhood_coop()
   elif event.keycode == KEY_F11:
    var fullscreen := DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN

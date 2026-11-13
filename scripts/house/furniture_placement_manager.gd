@@ -20,7 +20,7 @@ var last_validation_reason: String = ""
 
 var original_node: Node3D = null
 var original_transform: Transform3D
-var original_collider_layer: int = 1
+var original_collision_layers: Dictionary = {}
 
 # Materials for preview
 var mat_valid: StandardMaterial3D
@@ -38,6 +38,9 @@ func _init() -> void:
 	mat_invalid.albedo_color = Color(0.95, 0.2, 0.2, 0.6)
 	mat_invalid.emission_enabled = true
 	mat_invalid.emission = Color(0.5, 0.1, 0.1)
+
+func _ready() -> void:
+	add_to_group("furniture_placement_manager")
 
 func is_active() -> bool:
 	return state != State.IDLE
@@ -63,7 +66,8 @@ func start_rearrange(placed_node: Node3D) -> bool:
 	state = State.REARRANGING
 	
 	# Disable collision and hide original while rearranging
-	_set_node_collision_active(original_node, false)
+	original_collision_layers.clear()
+	_set_node_collision_active(original_node, false, true)
 	original_node.visible = false
 	
 	_spawn_preview(fid)
@@ -80,10 +84,12 @@ func _spawn_preview(furniture_id: String) -> void:
 	_cleanup_preview()
 	preview_node = Node3D.new()
 	preview_node.name = "PlacementPreview"
+	preview_node.set_meta("is_furniture_preview", true)
 	
 	var visual := FurnitureData.create_visual_model(furniture_id)
 	preview_node.add_child(visual)
 	add_child(preview_node)
+	_set_node_collision_active(preview_node, false)
 	
 	_apply_preview_material(mat_valid)
 
@@ -193,11 +199,13 @@ func confirm_placement(
 		return null
 	
 	# Valid placement: instantiate real furniture
-	var placed := FurnitureData.create_placed_instance(active_furniture_id, snapped_pos, current_rotation)
+	var old_state := FurnitureData.capture_state(original_node) if state == State.REARRANGING else {}
+	var placed := FurnitureData.create_placed_instance(active_furniture_id, snapped_pos, current_rotation, old_state)
 	
 	if state == State.REARRANGING and is_instance_valid(original_node):
 		original_node.queue_free()
 		original_node = null
+		original_collision_layers.clear()
 		
 	var placed_id := active_furniture_id
 	_cleanup_preview()
@@ -212,8 +220,9 @@ func cancel_placement() -> void:
 	
 	if state == State.REARRANGING and is_instance_valid(original_node):
 		original_node.visible = true
-		_set_node_collision_active(original_node, true)
+		_set_node_collision_active(original_node, true, true)
 		original_node = null
+		original_collision_layers.clear()
 	
 	var cancelled_id := active_furniture_id
 	_cleanup_preview()
@@ -221,8 +230,11 @@ func cancel_placement() -> void:
 	active_furniture_id = ""
 	placement_cancelled.emit(cancelled_id)
 
-func _set_node_collision_active(n: Node, active: bool) -> void:
+func _set_node_collision_active(n: Node, active: bool, remember_original: bool = false) -> void:
 	if n is CollisionObject3D:
-		n.collision_layer = 1 if active else 0
+		var body := n as CollisionObject3D
+		if remember_original and not active:
+			original_collision_layers[body] = body.collision_layer
+		body.collision_layer = int(original_collision_layers.get(body, body.collision_layer)) if active else 0
 	for child in n.get_children():
-		_set_node_collision_active(child, active)
+		_set_node_collision_active(child, active, remember_original)

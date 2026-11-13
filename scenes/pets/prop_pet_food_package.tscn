@@ -1,0 +1,56 @@
+[gd_scene load_steps=9 format=3]
+
+[ext_resource type="Script" path="res://scripts/pets/pet_prop.gd" id="1"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_bag"]
+size = Vector3(0.20, 0.28, 0.14)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_bag"]
+albedo_color = Color(1.0, 0.88, 0.51, 1)
+roughness = 0.85
+
+[sub_resource type="BoxMesh" id="BoxMesh_bag"]
+material = SubResource("StandardMaterial3D_bag")
+size = Vector3(0.18, 0.25, 0.12)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_crimped"]
+albedo_color = Color(0.95, 0.70, 0.25, 1)
+roughness = 0.8
+
+[sub_resource type="BoxMesh" id="BoxMesh_crimp"]
+material = SubResource("StandardMaterial3D_crimped")
+size = Vector3(0.19, 0.02, 0.03)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_label"]
+albedo_color = Color(0.35, 0.75, 0.70, 1)
+roughness = 0.85
+
+[sub_resource type="BoxMesh" id="BoxMesh_fish"]
+material = SubResource("StandardMaterial3D_label")
+size = Vector3(0.08, 0.04, 0.005)
+
+[node name="PropPetFoodPackage" type="StaticBody3D"]
+collision_layer = 1
+collision_mask = 0
+script = ExtResource("1")
+prop_type = "food_package"
+display_name = "Gói thức ăn hạt cá hồi dinh dưỡng"
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.14, 0)
+shape = SubResource("BoxShape3D_bag")
+
+[node name="BagMesh" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.125, 0)
+mesh = SubResource("BoxMesh_bag")
+
+[node name="CrimpedTop" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.26, 0)
+mesh = SubResource("BoxMesh_crimp")
+
+[node name="FishLabel" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.13, 0.062)
+mesh = SubResource("BoxMesh_fish")
+
+[node name="InteractionMarker" type="Marker3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.22)

@@ -14,9 +14,11 @@ var economy_mgr: EconomyManager
 var available_products: Array[EconomyProduct] = []
 var selected_index: int = 0
 var info_label: Label3D
+var pending_coop_product: EconomyProduct = null
 
 func _ready() -> void:
 	kind = "shop_kiosk"
+	interaction_radius = 2.0
 	add_to_group("interactables")
 	
 	info_label = Label3D.new()
@@ -44,8 +46,50 @@ func _setup_catalog() -> void:
 		else:
 			available_products = prods
 
+	_connect_dual_manager()
+
+func _connect_dual_manager() -> void:
+	var dual_mgr := get_tree().get_first_node_in_group("dual_confirmation_manager") as DualConfirmationManager
+	if is_instance_valid(dual_mgr):
+		if not dual_mgr.confirmation_approved.is_connected(_on_coop_approved):
+			dual_mgr.confirmation_approved.connect(_on_coop_approved)
+		if not dual_mgr.confirmation_declined.is_connected(_on_coop_declined):
+			dual_mgr.confirmation_declined.connect(_on_coop_declined)
+
+func _on_coop_approved(_initiator_id: int, _product_name: String, _cost: int) -> void:
+	pending_coop_product = null
+
+func _on_coop_declined(initiator_id: int, product_name: String, reason: String) -> void:
+	if pending_coop_product == null or pending_coop_product.name != product_name:
+		return
+	pending_coop_product = null
+
+	match reason:
+		"DECLINED_BY_PARTNER":
+			var other_id := 2 if initiator_id == 1 else 1
+			_show_feedback("❌ P%d đã từ chối mua '%s'!" % [other_id, product_name], Color("ff5252"))
+		"TIMEOUT":
+			_show_feedback("⌛ Hết thời gian chờ xác nhận mua '%s'!" % product_name, Color("ffb74d"))
+		"INSUFFICIENT_FUNDS":
+			_show_feedback("⚠️ Không đủ tiền trong ví gia đình!", Color("ff5252"))
+		_:
+			_show_feedback("⚠️ Yêu cầu mua '%s' đã bị hủy!" % product_name, Color("ff5252"))
+
 func available(player_node: Node3D) -> bool:
 	return enabled and (user == null or user == player_node)
+
+func is_product_owned(prod: EconomyProduct) -> bool:
+	return is_instance_valid(economy_mgr) and economy_mgr.is_product_owned(prod)
+
+func _get_held_produce_count() -> int:
+	if not is_instance_valid(economy_mgr):
+		economy_mgr = get_tree().get_first_node_in_group("economy_manager") as EconomyManager
+	if not is_instance_valid(economy_mgr):
+		return 0
+	var count := 0
+	for pid in ["produce_lettuce", "produce_tomato", "produce_carrot"]:
+		count += economy_mgr.inventory.get_item_count(pid)
+	return count
 
 func prompt(_player: Node3D) -> String:
 	if available_products.is_empty():
@@ -53,49 +97,21 @@ func prompt(_player: Node3D) -> String:
 	var wallet_str := ""
 	if is_instance_valid(economy_mgr):
 		wallet_str = " (Ví: %s)" % HouseholdWallet.format_money(economy_mgr.wallet.balance)
-	if available_products.is_empty():
-		return "Mua sắm tại %s%s" % [kiosk_title, wallet_str]
-	var prod: EconomyProduct = available_products[selected_index % available_products.size()]
-	var status_str := ""
-	if is_instance_valid(economy_mgr):
-		if (prod.category == "business_upgrade" or prod.category == "house_upgrade") and economy_mgr.inventory.is_upgrade_owned(prod.id):
-			status_str = " [ĐÃ SỞ HỮU]"
-		elif prod.category == "furniture" and prod.is_unique and economy_mgr.inventory.is_furniture_owned(prod.id):
-			status_str = " [ĐÃ SỞ HỮU]"
-	return "Mua sắm %s: %s%s%s" % [prod.name, HouseholdWallet.format_money(prod.price), status_str, wallet_str]
+	var base_str := "Mua sắm tại %s%s" % [kiosk_title, wallet_str]
+	return base_str
 
 func interact(player_node: Node3D) -> void:
+	if not is_inside_tree():
+		return
 	if not is_instance_valid(economy_mgr):
 		economy_mgr = get_tree().get_first_node_in_group("economy_manager") as EconomyManager
-		if not is_instance_valid(economy_mgr): return
 	
-	if available_products.is_empty():
-		available_products = economy_mgr.get_products_by_category(product_category)
-	if available_products.is_empty():
-		_show_feedback("Cửa hàng hiện chưa có sản phẩm!", Color("cfd8dc"))
-		return
-	
-	var product: EconomyProduct = available_products[selected_index % available_products.size()]
-	
-	var player_id := 1
-	if is_instance_valid(player_node) and "player_id" in player_node:
-		player_id = player_node.player_id
-	
-	var dual_mgr := get_tree().get_first_node_in_group("dual_confirmation_manager") as DualConfirmationManager
-	if is_instance_valid(dual_mgr) and dual_mgr.is_coop_active and product.base_price >= 50000:
-		var executed := dual_mgr.request_purchase(
-			player_id,
-			product.title,
-			product.base_price,
-			Callable(self, "_execute_purchase").bind(product)
-		)
-		if not executed:
-			_show_feedback("⏳ Chờ người chơi P%d xác nhận mua '%s'!" % [2 if player_id == 1 else 1, product.title], Color("fff59d"))
-			return
-
-	_execute_purchase(product)
+	var shop_ui := ShoppingUI.get_or_create(get_tree())
+	if is_instance_valid(shop_ui):
+		shop_ui.open_shop(kiosk_title, product_category, target_system, self, player_node)
 
 func _execute_purchase(product: EconomyProduct) -> void:
+	pending_coop_product = null
 	if not is_instance_valid(economy_mgr): return
 	var result: Dictionary = economy_mgr.purchase_product(product.id, 1)
 	if result["success"]:

@@ -21,6 +21,11 @@ const LEVEL_TITLES: Dictionary = {
 @export var house_level: int = 1
 var unlocked_areas: Array[String] = ["main_room"]
 
+# Functional flags for standalone house upgrades
+var has_tile_yard: bool = false
+var has_flower_garden: bool = false
+var has_modern_kitchen: bool = false
+
 ## Array of dictionaries: [ {"id": "furn_...", "pos": [x, y, z], "rot_y": float} ]
 var placed_furniture: Array = []
 
@@ -46,6 +51,45 @@ func get_next_level() -> int:
 
 func get_upgrade_cost(target_level: int) -> int:
 	return UPGRADE_COSTS.get(target_level, 0)
+
+func apply_tile_yard_upgrade() -> void:
+	has_tile_yard = true
+	_update_unlocked_areas()
+
+func apply_flower_garden_upgrade() -> void:
+	has_flower_garden = true
+	_update_unlocked_areas()
+
+func apply_modern_kitchen_upgrade() -> void:
+	has_modern_kitchen = true
+	_update_unlocked_areas()
+
+func is_area_unlocked(area_name: String) -> bool:
+	return area_name in unlocked_areas
+
+func has_upgrade(upgrade_id: String) -> bool:
+	match upgrade_id:
+		"upg_house_level_2": return house_level >= 2
+		"upg_house_level_3": return house_level >= 3
+		"upg_house_tile_yard": return has_tile_yard
+		"upg_house_flower_garden": return has_flower_garden
+		"upg_house_modern_kitchen": return has_modern_kitchen
+		_: return false
+
+func sync_with_economy(econ: EconomyManager) -> void:
+	if not is_instance_valid(econ) or not is_instance_valid(econ.inventory): return
+	if econ.inventory.is_upgrade_owned("upg_house_level_3"):
+		house_level = maxi(house_level, 3)
+	elif econ.inventory.is_upgrade_owned("upg_house_level_2"):
+		house_level = maxi(house_level, 2)
+
+	if econ.inventory.is_upgrade_owned("upg_house_tile_yard"):
+		has_tile_yard = true
+	if econ.inventory.is_upgrade_owned("upg_house_flower_garden"):
+		has_flower_garden = true
+	if econ.inventory.is_upgrade_owned("upg_house_modern_kitchen"):
+		has_modern_kitchen = true
+	_update_unlocked_areas()
 
 func can_upgrade(wallet: HouseholdWallet) -> Dictionary:
 	if house_level >= 3:
@@ -132,6 +176,13 @@ func _update_unlocked_areas() -> void:
 		3:
 			unlocked_areas = ["main_room", "tiled_kitchen", "dining_room", "sunroom_wing", "courtyard_garden"]
 
+	if has_tile_yard and not "tile_yard" in unlocked_areas:
+		unlocked_areas.append("tile_yard")
+	if has_flower_garden and not "flower_garden" in unlocked_areas:
+		unlocked_areas.append("flower_garden")
+	if has_modern_kitchen and not "modern_kitchen" in unlocked_areas:
+		unlocked_areas.append("modern_kitchen")
+
 func register_placed_furniture(furniture_id: String, pos: Vector3, rot_y: float) -> void:
 	placed_furniture.append({
 		"id": furniture_id,
@@ -156,12 +207,26 @@ func get_save_data() -> Dictionary:
 	return {
 		"level": house_level,
 		"unlocked_areas": unlocked_areas,
-		"placed_furniture": placed_furniture
+		"placed_furniture": placed_furniture,
+		"has_tile_yard": has_tile_yard,
+		"has_flower_garden": has_flower_garden,
+		"has_modern_kitchen": has_modern_kitchen
 	}
 
 func apply_save_data(data: Dictionary) -> void:
 	if typeof(data) != TYPE_DICTIONARY: return
 	house_level = clampi(int(data.get("level", 1)), 1, 3)
+	has_tile_yard = bool(data.get("has_tile_yard", false))
+	has_flower_garden = bool(data.get("has_flower_garden", false))
+	has_modern_kitchen = bool(data.get("has_modern_kitchen", false))
+
+	# Maintain compatibility with legacy saves storing unlocked_areas
+	var loaded_areas = data.get("unlocked_areas", [])
+	if typeof(loaded_areas) == TYPE_ARRAY:
+		if "tile_yard" in loaded_areas: has_tile_yard = true
+		if "flower_garden" in loaded_areas: has_flower_garden = true
+		if "modern_kitchen" in loaded_areas: has_modern_kitchen = true
+
 	_update_unlocked_areas()
 	
 	if is_inside_tree():
@@ -169,6 +234,11 @@ func apply_save_data(data: Dictionary) -> void:
 		if is_instance_valid(econ):
 			if house_level >= 2: econ.inventory.unlock_upgrade("upg_house_level_2")
 			if house_level >= 3: econ.inventory.unlock_upgrade("upg_house_level_3")
+			if has_tile_yard: econ.inventory.unlock_upgrade("upg_house_tile_yard")
+			if has_flower_garden: econ.inventory.unlock_upgrade("upg_house_flower_garden")
+			if has_modern_kitchen: econ.inventory.unlock_upgrade("upg_house_modern_kitchen")
+			# Legacy saves can store upgrades only in the shared inventory.
+			sync_with_economy(econ)
 	
 	var loaded_furn = data.get("placed_furniture", [])
 	if typeof(loaded_furn) == TYPE_ARRAY:

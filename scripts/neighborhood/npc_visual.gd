@@ -182,10 +182,18 @@ func _pose_joint(bone_name: String, euler: Vector3) -> void:
 	if idx >= 0:
 		skeleton.set_bone_pose_rotation(idx, Quaternion.from_euler(euler))
 
-func update_animation(walk_speed: float, time: float, is_talking: bool) -> void:
+func update_animation(walk_speed: float, time: float, is_talking: bool, activity: String = "idle", seated: bool = false) -> void:
 	if not is_instance_valid(skeleton): return
 	
-	if walk_speed > 0.05:
+	if seated:
+		# Seat origin is at cushion height; move the rig down to put hips on it.
+		skeleton.position.y = -0.48
+		_pose_joint("left_leg", Vector3(-1.35, 0, 0))
+		_pose_joint("right_leg", Vector3(-1.35, 0, 0))
+		_pose_joint("left_arm", Vector3(-0.35, 0, 0.1))
+		_pose_joint("right_arm", Vector3(-0.35, 0, -0.1))
+		_pose_joint("head", Vector3(0, sin(time * 0.8) * 0.08, 0))
+	elif walk_speed > 0.05:
 		# Walking cycle
 		var swing := sin(time * 8.5)
 		_pose_joint("left_leg", Vector3(swing * 0.55, 0, 0))
@@ -206,6 +214,11 @@ func update_animation(walk_speed: float, time: float, is_talking: bool) -> void:
 			_pose_joint("left_arm", Vector3(-0.35 + talk_cycle * 0.12, 0, 0.15))
 			_pose_joint("right_arm", Vector3(-0.45 - talk_cycle * 0.15, 0, -0.15))
 			_pose_joint("head", Vector3(talk_cycle * 0.08, 0, 0))
+		elif activity == "lunch":
+			# A small eating gesture; seating is not implied without a chair anchor.
+			_pose_joint("left_arm", Vector3(-0.45, 0, 0.12))
+			_pose_joint("right_arm", Vector3(-0.65 + sin(time * 2.3) * 0.2, 0, -0.1))
+			_pose_joint("head", Vector3(0.1, 0, 0))
 		else:
 			_pose_joint("left_arm", Vector3(0, 0, 0))
 			_pose_joint("right_arm", Vector3(0, 0, 0))

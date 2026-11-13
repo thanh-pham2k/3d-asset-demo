@@ -32,6 +32,19 @@ static func ball(parent: Node3D, pos: Vector3, radius: float, color: Color, scal
  parent.add_child(mesh)
  return mesh
 
+static func cylinder(parent: Node3D, pos: Vector3, radius: float, height: float, color: Color) -> MeshInstance3D:
+ var mesh = MeshInstance3D.new()
+ var shape = CylinderMesh.new()
+ shape.top_radius = radius
+ shape.bottom_radius = radius
+ shape.height = height
+ shape.radial_segments = 12
+ mesh.mesh = shape
+ mesh.material_override = material(color)
+ mesh.position = pos
+ parent.add_child(mesh)
+ return mesh
+
 static func solid(parent: Node3D, pos: Vector3, size: Vector3) -> StaticBody3D:
  var body = StaticBody3D.new()
  body.position = pos

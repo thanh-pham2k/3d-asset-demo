@@ -40,6 +40,24 @@ func _init() -> void:
 func _ready() -> void:
 	add_to_group("coop_manager")
 	_setup_hud()
+	if is_instance_valid(dual_confirmation):
+		dual_confirmation.confirmation_approved.connect(_on_dual_confirmation_approved)
+		dual_confirmation.confirmation_declined.connect(_on_dual_confirmation_declined)
+
+func _on_dual_confirmation_approved(_initiator_id: int, product_name: String, cost: int) -> void:
+	show_banner("✅ Đã đồng ý yêu cầu mua '%s' (%s)." % [product_name, HouseholdWallet.format_money(cost)], 3.0)
+
+func _on_dual_confirmation_declined(initiator_id: int, product_name: String, reason: String) -> void:
+	match reason:
+		"DECLINED_BY_PARTNER":
+			var other_id := 2 if initiator_id == 1 else 1
+			show_banner("❌ P%d đã từ chối mua '%s'!" % [other_id, product_name], 3.0)
+		"TIMEOUT":
+			show_banner("⌛ Hết thời gian chờ xác nhận mua '%s'!" % product_name, 3.0)
+		"INSUFFICIENT_FUNDS":
+			show_banner("⚠️ Không đủ tiền trong ví gia đình để mua '%s'!" % product_name, 3.0)
+		_:
+			show_banner("⚠️ Yêu cầu mua '%s' đã bị hủy!" % product_name, 3.0)
 
 func _setup_hud() -> void:
 	banner_hud = CanvasLayer.new()
@@ -114,3 +132,5 @@ func _process(_delta: float) -> void:
 	if not is_coop_active: return
 	if dual_confirmation.has_pending_request():
 		status_label.text = dual_confirmation.get_prompt_text()
+	elif status_label.text.begins_with("🤝"):
+		status_label.text = ""

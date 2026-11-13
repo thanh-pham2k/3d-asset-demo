@@ -9,6 +9,8 @@ signal npc_interaction_started(npc: NPCController, player: Node3D)
 
 @export var time_manager: NeighborhoodTimeManager
 var npcs: Dictionary = {} # id -> NPCController
+var _schedule_keys: Dictionary = {}
+var _last_schedule_slot: int = -1
 
 func _ready() -> void:
 	if not is_instance_valid(time_manager):
@@ -17,6 +19,7 @@ func _ready() -> void:
 	if is_instance_valid(time_manager):
 		time_manager.hour_ticked.connect(_on_hour_ticked)
 		time_manager.period_changed.connect(_on_period_changed)
+		time_manager.time_updated.connect(_on_time_updated)
 	
 	call_deferred("spawn_all_default_npcs")
 
@@ -42,6 +45,7 @@ func spawn_npc(data: NPCData, spawn_pos: Vector3, initial_schedule: Dictionary =
 	npcs[data.id] = npc
 	
 	if not initial_schedule.is_empty():
+		_schedule_keys[data.id] = _schedule_key(initial_schedule)
 		npc.apply_schedule_entry(initial_schedule, true)
 	
 	npc_spawned.emit(npc)
@@ -66,11 +70,26 @@ func _on_period_changed(_new_period: String) -> void:
 	if is_instance_valid(time_manager):
 		_update_all_schedules(time_manager.current_hour)
 
+func _on_time_updated(hour: float) -> void:
+	# Quarter-hour checks also handle schedules starting at half hours.
+	var slot := int(floor(hour * 4.0))
+	if slot == _last_schedule_slot:
+		return
+	_last_schedule_slot = slot
+	_update_all_schedules(hour)
+
+func _schedule_key(entry: Dictionary) -> String:
+	return "%s|%s|%s|%s" % [entry.get("start_hour", 0.0), entry.get("end_hour", 24.0), entry.get("activity", ""), entry.get("position", Vector3.ZERO)]
+
 func _update_all_schedules(hour: float) -> void:
 	for id in npcs:
 		var npc: NPCController = npcs[id]
 		if not is_instance_valid(npc) or not npc.data: continue
 		var entry := npc.data.get_schedule_for_hour(hour)
+		var key := _schedule_key(entry)
+		if _schedule_keys.get(id, "") == key:
+			continue
+		_schedule_keys[id] = key
 		npc.apply_schedule_entry(entry, false)
 
 func set_time_of_day(hour: float, force_teleport := false) -> void:
@@ -80,4 +99,5 @@ func set_time_of_day(hour: float, force_teleport := false) -> void:
 		var npc: NPCController = npcs[id]
 		if not is_instance_valid(npc) or not npc.data: continue
 		var entry := npc.data.get_schedule_for_hour(hour)
+		_schedule_keys[id] = _schedule_key(entry)
 		npc.apply_schedule_entry(entry, force_teleport)

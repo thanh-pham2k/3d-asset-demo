@@ -1,0 +1,66 @@
+[gd_scene load_steps=9 format=3]
+
+[ext_resource type="Script" path="res://scripts/pets/pet_prop.gd" id="1"]
+
+[sub_resource type="CylinderShape3D" id="CylinderShape3D_bed"]
+height = 0.16
+radius = 0.28
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_rim"]
+albedo_color = Color(0.94, 0.60, 0.60, 1)
+roughness = 0.9
+
+[sub_resource type="TorusMesh" id="TorusMesh_rim"]
+material = SubResource("StandardMaterial3D_rim")
+inner_radius = 0.18
+outer_radius = 0.28
+ring_segments = 16
+pipe_segments = 8
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_fleece"]
+albedo_color = Color(1.0, 0.95, 0.88, 1)
+roughness = 0.95
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_fleece"]
+material = SubResource("StandardMaterial3D_fleece")
+top_radius = 0.20
+bottom_radius = 0.22
+height = 0.08
+radial_segments = 16
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_paw"]
+albedo_color = Color(0.96, 0.70, 0.75, 1)
+roughness = 0.9
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_paw"]
+material = SubResource("StandardMaterial3D_paw")
+top_radius = 0.04
+bottom_radius = 0.04
+height = 0.005
+radial_segments = 10
+
+[node name="PropPetBed" type="StaticBody3D"]
+collision_layer = 1
+collision_mask = 0
+script = ExtResource("1")
+prop_type = "pet_bed"
+display_name = "Nệm ngủ êm ái cho thú cưng"
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.08, 0)
+shape = SubResource("CylinderShape3D_bed")
+
+[node name="BedRim" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.08, 0)
+mesh = SubResource("TorusMesh_rim")
+
+[node name="CushionBase" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.04, 0)
+mesh = SubResource("CylinderMesh_fleece")
+
+[node name="PawMotif" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.082, 0)
+mesh = SubResource("CylinderMesh_paw")
+
+[node name="InteractionMarker" type="Marker3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.06, 0)

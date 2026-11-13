@@ -54,7 +54,7 @@ static func create_default_catalog() -> Dictionary:
 		# --- 2. Repair Tools & Supplies (Dụng cụ sửa xe) ---
 		EconomyProduct.new(
 			"tool_patch_strip", "Miếng vá săm cao cấp", "repair_tool",
-			10000, "Bộ 5 miếng vá cao su chịu nhiệt độ bền cao", false, "garage"
+			10000, "Một miếng vá cao su chịu nhiệt độ bền cao", false, "garage"
 		),
 		EconomyProduct.new(
 			"tool_spare_tire", "Lốp xe máy không ruột", "repair_tool",
@@ -111,6 +111,18 @@ static func create_default_catalog() -> Dictionary:
 			30000, "Cây xanh thanh lọc không khí mang tài lộc", false, "house"
 		),
 		
+		# Decorative bathroom and utility furniture
+		EconomyProduct.new("furn_bath_sink", "Chậu rửa phòng tắm", "furniture", 60000, "Đồ trang trí low-poly cho ngôi nhà", true, "house"),
+		EconomyProduct.new("furn_bath_mirror", "Gương phòng tắm", "furniture", 35000, "Đồ trang trí low-poly cho ngôi nhà", true, "house"),
+		EconomyProduct.new("furn_shower", "Vòi sen", "furniture", 80000, "Đồ trang trí low-poly cho ngôi nhà", true, "house"),
+		EconomyProduct.new("furn_toilet", "Bồn cầu", "furniture", 90000, "Đồ trang trí low-poly cho ngôi nhà", true, "house"),
+		EconomyProduct.new("furn_towel_rack", "Giá treo khăn", "furniture", 30000, "Đồ trang trí low-poly cho ngôi nhà", true, "house"),
+		EconomyProduct.new("furn_washing_machine", "Máy giặt", "furniture", 120000, "Đồ trang trí low-poly cho ngôi nhà", true, "house"),
+		EconomyProduct.new("furn_laundry_basket", "Giỏ đồ giặt", "furniture", 25000, "Đồ trang trí low-poly cho ngôi nhà", true, "house"),
+		EconomyProduct.new("furn_clothes_hanger", "Giá treo quần áo", "furniture", 40000, "Đồ trang trí low-poly cho ngôi nhà", true, "house"),
+		EconomyProduct.new("furn_broom", "Chổi quét nhà", "furniture", 12000, "Đồ trang trí low-poly cho ngôi nhà", true, "house"),
+		EconomyProduct.new("furn_mop", "Cây lau nhà", "furniture", 14000, "Đồ trang trí low-poly cho ngôi nhà", true, "house"),
+
 		# --- 4. Business Upgrades (Nâng cấp tiệm kinh doanh) ---
 		# Motorcycle Shop: Additional bay, Better tools, Faster service
 		EconomyProduct.new(
@@ -160,6 +172,66 @@ static func create_default_catalog() -> Dictionary:
 		EconomyProduct.new(
 			"upg_house_modern_kitchen", "Mở rộng gian bếp hiện đại", "house_upgrade",
 			350000, "Kệ bếp ốp đá hoa cương sang trọng", true, "house"
+		),
+
+		# --- 6. Pet System (Thú cưng & Vật dụng chăm sóc) ---
+		EconomyProduct.new(
+			"pet_cat_adoption", "Nhận nuôi mèo vàng Miu Miu", "pet",
+			100000, "Nhận nuôi chú mèo mướp lông vàng đáng yêu về bầu bạn cùng gia đình", true, "house"
+		),
+		EconomyProduct.new(
+			"pet_food_salmon", "Gói hạt cá hồi dinh dưỡng", "pet",
+			15000, "Thức ăn hạt cá hồi tươi ngon bổ dưỡng cho mèo cưng", false, "house"
+		),
+		EconomyProduct.new(
+			"furn_pet_food_bowl", "Bát ăn gốm sứ cho mèo", "pet",
+			25000, "Bát ăn gốm sứ men ngọc chống trượt đựng hạt cá hồi", true, "house"
+		),
+		EconomyProduct.new(
+			"furn_pet_water_bowl", "Bát nước mát gốm sứ", "pet",
+			20000, "Bát đựng nước uống trong lành sạch sẽ cho thú cưng", true, "house"
+		),
+		EconomyProduct.new(
+			"furn_pet_bed", "Nệm ngủ thú cưng êm ái", "pet",
+			60000, "Nệm tròn lót bông nỉ mềm mại cho mèo cuộn tròn ngủ ngon", true, "house"
+		),
+		EconomyProduct.new(
+			"furn_pet_toy_wand", "Cần câu lông vũ đùa mèo", "pet",
+			30000, "Đồ chơi tương tác cần câu lông vũ đung đưa kèm chuông", true, "house"
+		),
+		EconomyProduct.new(
+			"furn_pet_scratching_post", "Trụ cào móng dây thừng", "pet",
+			50000, "Trụ quấn dây thừng tự nhiên cho mèo mài móng và tập thể dục", true, "house"
+		),
+		EconomyProduct.new(
+			"furn_pet_toy_ball", "Quả bóng len lục lạc", "pet",
+			15000, "Quả bóng len lăn tròn phát ra tiếng chuông vui nhộn", true, "house"
+		),
+
+		# --- 7. Farming System (Hạt giống & Nông sản vườn nhà) ---
+		EconomyProduct.new(
+			"seed_lettuce", "Hạt giống rau cải xanh", "farming_seed",
+			5000, "Túi hạt giống cải xanh ngọt, lớn nhanh sau 1 ngày chăm sóc", false, "house"
+		),
+		EconomyProduct.new(
+			"seed_tomato", "Hạt giống cà chua bi", "farming_seed",
+			8000, "Túi hạt giống cà chua bi đỏ mọng sai trĩu quả", false, "house"
+		),
+		EconomyProduct.new(
+			"seed_carrot", "Hạt giống cà rốt ngọt", "farming_seed",
+			6000, "Túi hạt giống cà rốt củ to giòn ngọt giàu vitamin", false, "house"
+		),
+		EconomyProduct.new(
+			"produce_lettuce", "Rau cải xanh tươi", "produce",
+			12000, "Bó rau cải xanh tươi mơn mởn thu hoạch từ vườn nhà", false, "house"
+		),
+		EconomyProduct.new(
+			"produce_tomato", "Cà chua bi chín mọng", "produce",
+			18000, "Cà chua bi đỏ mọng ngọt thanh thu hoạch từ vườn nhà", false, "house"
+		),
+		EconomyProduct.new(
+			"produce_carrot", "Củ cà rốt tươi giòn", "produce",
+			15000, "Củ cà rốt cam tươi giòn ngọt thu hoạch từ vườn nhà", false, "house"
 		)
 	]
 	

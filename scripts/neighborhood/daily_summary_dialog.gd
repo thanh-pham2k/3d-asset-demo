@@ -19,6 +19,7 @@ var revenue_label: Label
 var expenses_label: Label
 var profit_label: Label
 var wallet_label: Label
+var objectives_label: Label
 var continue_button: Button
 
 var is_showing: bool = false
@@ -27,6 +28,7 @@ func _init() -> void:
 	layer = 100
 
 func _ready() -> void:
+	add_to_group("daily_summary_dialog")
 	_build_ui()
 	visible = false
 
@@ -153,6 +155,12 @@ func _build_ui() -> void:
 	wallet_label.add_theme_color_override("font_color", Color("a7ffeb"))
 	w_box.add_child(wallet_label)
 	
+	objectives_label = Label.new()
+	objectives_label.add_theme_font_size_override("font_size", 13)
+	objectives_label.add_theme_color_override("font_color", Color("fff3cf"))
+	objectives_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	vbox.add_child(objectives_label)
+
 	var spacer := Control.new()
 	spacer.custom_minimum_size = Vector2(0, 6)
 	vbox.add_child(spacer)
@@ -175,11 +183,11 @@ func show_summary(data: Dictionary) -> void:
 	title_label.text = "📋 TỔNG KẾT NGÀY LÀM VIỆC — NGÀY %d" % day
 	subtitle_label.text = "Ca làm việc tại: %s" % shop
 	customers_label.text = "%d khách" % served
-	revenue_label.text = "+%s đ" % HouseholdWallet.format_money(revenue)
-	expenses_label.text = "-%s đ" % HouseholdWallet.format_money(expenses)
+	revenue_label.text = "+%s" % HouseholdWallet.format_money(revenue)
+	expenses_label.text = "-%s" % HouseholdWallet.format_money(expenses)
 	
 	var sign_str := "+" if profit >= 0 else "-"
-	profit_label.text = "%s%s đ" % [sign_str, HouseholdWallet.format_money(absi(profit))]
+	profit_label.text = "%s%s" % [sign_str, HouseholdWallet.format_money(absi(profit))]
 	if profit > 0:
 		profit_label.add_theme_color_override("font_color", Color("69f0ae"))
 	elif profit < 0:
@@ -187,10 +195,17 @@ func show_summary(data: Dictionary) -> void:
 	else:
 		profit_label.add_theme_color_override("font_color", Color("ffd54f"))
 	
-	wallet_label.text = "%s đ" % HouseholdWallet.format_money(wallet_bal)
+	wallet_label.text = HouseholdWallet.format_money(wallet_bal)
+	var completed := 0
+	var objectives: Array = data.get("objectives", [])
+	for objective in objectives:
+		if objective is Dictionary and objective.get("is_completed", false):
+			completed += 1
+	objectives_label.text = "🎯 Mục tiêu hoàn thành: %d/%d" % [completed, objectives.size()]
 	
 	visible = true
 	is_showing = true
+	_set_player_modal_state(true)
 	if is_instance_valid(continue_button):
 		continue_button.grab_focus()
 
@@ -198,7 +213,22 @@ func hide_summary() -> void:
 	if not visible: return
 	visible = false
 	is_showing = false
+	_set_player_modal_state(false)
 	dismissed.emit()
+
+func _set_player_modal_state(open: bool) -> void:
+	if not is_inside_tree(): return
+	for player in get_tree().get_nodes_in_group("players"):
+		if open:
+			player.set_meta("daily_summary_open", true)
+			if player is CharacterBody3D: player.velocity = Vector3.ZERO
+		else:
+			if player.has_meta("daily_summary_open"):
+				player.remove_meta("daily_summary_open")
+			player.set_meta("ui_input_block_until_msec", Time.get_ticks_msec() + 200)
+
+func _exit_tree() -> void:
+	if is_showing: _set_player_modal_state(false)
 
 func _unhandled_input(event: InputEvent) -> void:
 	if not visible: return

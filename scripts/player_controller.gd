@@ -27,6 +27,7 @@ var target_zone: Node3D = null
 var prompt_label: Label3D
 @export var config: PlayerConfig = PlayerConfig.new()
 var animation_controller: Node
+var movement_disabled: bool = false
 
 func _ready() -> void:
  add_to_group("players")
@@ -105,6 +106,10 @@ func _physics_process(delta: float) -> void:
  slip_timer = maxf(0.0, slip_timer - delta)
  slip_cooldown = maxf(0.0, slip_cooldown - delta)
  var prefix = "p%d_" % player_id
+ if movement_disabled or has_meta("shopping_open") or has_meta("pet_rename_open") or has_meta("daily_summary_open") or has_meta("map_open") or Time.get_ticks_msec() < int(get_meta("ui_input_block_until_msec", 0)):
+  velocity = Vector3.ZERO
+  update_animation(0.0, false)
+  return
  if resting:
   velocity = Vector3.ZERO
   if Input.is_action_just_pressed(prefix + "interact") and interaction_cooldown <= 0:
@@ -192,6 +197,10 @@ func _physics_process(delta: float) -> void:
    fx.play_event("footstep", global_position)
    if running: fx.play_event("running_dust", global_position)
   footstep_timer = 0.26 if running else 0.4
+ var placement_mgr = get_tree().get_first_node_in_group("furniture_placement_manager")
+ if (is_instance_valid(placement_mgr) and placement_mgr.is_active()) or Time.get_ticks_msec() < int(get_meta("placement_input_block_until", 0)):
+  update_animation(direction.length(), running, false)
+  return
  find_target()
  if Input.is_action_just_pressed(prefix + "interact") and interaction_cooldown <= 0:
   if held_pillow:
@@ -352,13 +361,14 @@ func update_animation(move: float, running: bool, is_riding: bool = false) -> vo
  else:
   hold_anchor.position = config.hold_offset
 
-func enter_rest(item: Interactable, point: Vector3, lying: bool) -> void:
+func enter_rest(item: Interactable, point: Vector3, lying: bool, rot_y: float = 0.0) -> void:
  resting = item
  global_position = point
  collision_layer = 0
  collision_mask = 0
  visual.rotation.x = -PI/2 if lying else 0.0
- visual.rotation.y = 0
+ visual.rotation.y = rot_y
+ facing = Vector3(sin(rot_y), 0, cos(rot_y))
 
 func leave_rest(point: Vector3) -> bool:
  var shape = CapsuleShape3D.new()
@@ -368,7 +378,7 @@ func leave_rest(point: Vector3) -> bool:
  query.shape = shape
  query.collision_mask = 7
  query.exclude = [get_rid()]
- for offset in [Vector3.ZERO, Vector3(0.5,0,0), Vector3(-0.5,0,0), Vector3(0,0,0.5), Vector3(0,0,-0.5)]:
+ for offset in [Vector3.ZERO, Vector3(0.5,0,0), Vector3(-0.5,0,0), Vector3(0,0,0.5), Vector3(0,0,-0.5), Vector3(0,0,0.8), Vector3(0,0,-0.8)]:
   var candidate: Vector3 = point + offset
   query.transform = Transform3D(Basis.IDENTITY, candidate + Vector3(0,0.60,0))
   if get_world_3d().direct_space_state.intersect_shape(query, 1).is_empty():
@@ -378,6 +388,7 @@ func leave_rest(point: Vector3) -> bool:
    collision_mask = 7
    resting = null
    return true
+ # Keep the player seated if every exit position is obstructed.
  return false
 
 func slip(direction: Vector3) -> bool:

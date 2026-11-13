@@ -18,6 +18,7 @@ var prep_state: PrepState = PrepState.CLOSED
 var prep_progress: float = 0.0 # 0 to 100
 var prep_station: NoodleStation
 var prep_billboard: Label3D
+var close_sign_label: Label3D
 const PREP_SPEED: float = 33.34 # Exactly 3.0s to complete 0% to 100%
 var current_prep_speed: float = 33.34
 
@@ -37,13 +38,16 @@ class NoodleStation extends Interactable:
 	var hutieu: HuTieuBusiness
 	var station_type: String = "" # "table", "blanch_pot", "broth_pot", "topping_counter", "prep_station"
 	var table_index: int = 0
-	var interaction_radius: float = 2.4
+	func _init() -> void:
+		interaction_radius = 2.4
 	
 	func available(player_node: Node3D) -> bool:
 		if not enabled or not is_instance_valid(hutieu):
 			return false
 		if station_type == "prep_station":
 			return hutieu.prep_state != HuTieuBusiness.PrepState.OPEN
+		if station_type == "close_sign":
+			return hutieu.prep_state == HuTieuBusiness.PrepState.OPEN
 		return hutieu.is_open
 	
 	func prompt(player_node: Node3D) -> String:
@@ -74,6 +78,9 @@ var table_status_labels: Dictionary = {}
 # Current bowl cooking state on counter
 var current_bowl_state: BowlState = BowlState.EMPTY
 var current_bowl_dish: String = "" # e.g. "Hủ tiếu Nam Vang"
+var current_bowl_stock_bonus: int = 0
+var bowl_visual: Node3D
+var bowl_carrier: Node3D
 var selected_recipe_index: int = 0 # 0: Nam Vang, 1: Sườn heo, 2: Tôm thịt
 var blanch_timer: float = 0.0
 const BLANCH_DURATION: float = 1.6
@@ -87,6 +94,7 @@ var menu_catalog: Array[Dictionary] = [
 		"patience": 55.0,
 		"blanch_time": 1.5,
 		"ingredients": "Tôm, thịt băm, trứng cút & tỏi phi",
+		"stock_item": "ing_cracklings",
 		"broth_desc": "Nước lèo xương hầm ngọt thanh"
 	},
 	{
@@ -96,6 +104,7 @@ var menu_catalog: Array[Dictionary] = [
 		"patience": 50.0,
 		"blanch_time": 1.8,
 		"ingredients": "Sườn non ninh mềm & hành lá",
+		"stock_item": "ing_pork_ribs",
 		"broth_desc": "Nước lèo sườn béo ngậy đậm đà"
 	},
 	{
@@ -105,7 +114,18 @@ var menu_catalog: Array[Dictionary] = [
 		"patience": 55.0,
 		"blanch_time": 1.2,
 		"ingredients": "Tôm luộc, xá xíu & giá hẹ tươi",
+		"stock_item": "ing_fresh_shrimp",
 		"broth_desc": "Nước dùng thanh đạm tự nhiên"
+	},
+	{
+		"type": "noodle_greens",
+		"title": "Hủ tiếu rau cải vườn nhà",
+		"reward": 40000,
+		"patience": 55.0,
+		"blanch_time": 1.5,
+		"ingredients": "Rau cải xanh, hành lá & tỏi phi",
+		"stock_item": "produce_lettuce",
+		"broth_desc": "Nước dùng rau củ thanh ngọt"
 	}
 ]
 
@@ -114,6 +134,7 @@ var customer_names: Array[String] = [
 ]
 
 func _ready() -> void:
+	add_to_group("hutieu_business")
 	shop_id = "hutieu"
 	shop_name = "Quán Hủ Tiếu Cô Bảy"
 	open_hour = 6.0
@@ -122,6 +143,10 @@ func _ready() -> void:
 	super._ready()
 	
 	_create_kitchen_and_table_stations()
+	_build_cooking_details()
+	bowl_visual = preload("res://scenes/business/noodle_bowl_visual.tscn").instantiate()
+	bowl_visual.name = "PreparedBowlVisual"
+	add_child(bowl_visual)
 
 func _get_peak_hour_ranges() -> Array[Vector2]:
 	return [
@@ -197,7 +222,74 @@ func _create_kitchen_and_table_stations() -> void:
 	add_child(prep_billboard)
 	_update_prep_billboard()
 
+	# A separate sign remains reachable after opening, without hiding the broth pot.
+	var close_sign := NoodleStation.new()
+	close_sign.name = "CloseShopSign"
+	close_sign.hutieu = self
+	close_sign.station_type = "close_sign"
+	close_sign.position = Vector3(-53.0, 0, -15.4)
+	add_child(close_sign)
+	var sign_label := Label3D.new()
+	sign_label.text = "ĐÓNG QUÁN · E"
+	sign_label.position = Vector3(0, 1.4, 0)
+	sign_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	sign_label.font_size = 22
+	sign_label.pixel_size = 0.004
+	sign_label.outline_size = 6
+	close_sign.add_child(sign_label)
+	close_sign_label = sign_label
+	close_sign_label.visible = prep_state == PrepState.OPEN
+
+func _build_cooking_details() -> void:
+	# Decorative meshes stay separate from the existing stations and colliders.
+	var details := Node3D.new()
+	details.name = "CookingDetails"
+	add_child(details)
+	var metal := Art.material(Color("aabcb9"))
+	for x in [-51.8, -50.0]:
+		var pot := MeshInstance3D.new()
+		var mesh := CylinderMesh.new()
+		mesh.top_radius = 0.32
+		mesh.bottom_radius = 0.29
+		mesh.height = 0.35
+		mesh.radial_segments = 12
+		pot.mesh = mesh
+		pot.material_override = metal
+		pot.position = Vector3(x, 1.30, -17.2)
+		details.add_child(pot)
+		var rim := MeshInstance3D.new()
+		var rim_mesh := TorusMesh.new()
+		rim_mesh.inner_radius = 0.27
+		rim_mesh.outer_radius = 0.34
+		rim_mesh.rings = 12
+		rim_mesh.ring_segments = 6
+		rim.mesh = rim_mesh
+		rim.material_override = metal
+		rim.position = Vector3(x, 1.49, -17.2)
+		details.add_child(rim)
+	# Trays of ingredients and two condiment bottles.
+	for i in range(4):
+		var x := -48.8 + float(i) * 0.37
+		Art.box(details, Vector3(x, 1.15, -17.15), Vector3(0.32, 0.08, 0.38), Color("d7dfd7"))
+		var colors := [Color("e89579"), Color("b9765a"), Color("8bac6d"), Color("f0ddad")]
+		for j in range(3):
+			Art.ball(details, Vector3(x + (float(j) - 1.0) * 0.08, 1.22, -17.15), 0.06, colors[i], Vector3(1, 0.6, 1))
+	for i in range(2):
+		Art.box(details, Vector3(-47.55 + float(i) * 0.18, 1.29, -17.28), Vector3(0.13, 0.29, 0.13), Color("b85842") if i == 0 else Color("e3ad62"))
+	var menu := Label3D.new()
+	menu.text = "HỦ TIẾU SA ĐÉC\nNam Vang · Sườn · Tôm thịt · Rau cải"
+	menu.position = Vector3(-50, 2.4, -16.46)
+	menu.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	menu.font_size = 26
+	menu.pixel_size = 0.004
+	menu.modulate = Color("fff1cf")
+	menu.outline_size = 6
+	menu.outline_modulate = Color("593f34")
+	details.add_child(menu)
+
 func _update_prep_billboard() -> void:
+	if is_instance_valid(close_sign_label):
+		close_sign_label.visible = prep_state == PrepState.OPEN
 	if not is_instance_valid(prep_billboard): return
 	match prep_state:
 		PrepState.CLOSED:
@@ -234,6 +326,7 @@ func reset_daily_state() -> void:
 	prep_progress = 0.0
 	current_bowl_state = BowlState.EMPTY
 	current_bowl_dish = ""
+	current_bowl_stock_bonus = 0
 	super.reset_daily_state()
 	_safe_clear_remaining_customers()
 	_update_prep_billboard()
@@ -244,12 +337,13 @@ func _safe_clear_remaining_customers() -> void:
 		if is_instance_valid(cust) and cust.current_state != HuTieuCustomer.State.LEAVING and cust.current_state != HuTieuCustomer.State.DESPAWNED:
 			cust.notify_order_failed("shop_closed")
 	table_orders.clear()
-	table_occupied.clear()
+	# Keep tables occupied until their current customers finish departing.
 	for tbl in table_status_labels:
 		if is_instance_valid(table_status_labels[tbl]):
 			table_status_labels[tbl].visible = false
 	current_bowl_state = BowlState.EMPTY
 	current_bowl_dish = ""
+	current_bowl_stock_bonus = 0
 
 func _process(delta: float) -> void:
 	super._process(delta)
@@ -269,8 +363,28 @@ func _process(delta: float) -> void:
 			current_bowl_state = BowlState.NOODLES_DONE
 			_show_feedback(Vector3(-51.8, 0, -17.2), "🍜 Sợi hủ tiếu chín dai ngon! Vớt ra tô nào!", Color("ffe082"))
 	
+	_update_bowl_visual()
 	for table in table_orders:
 		_update_table_display(table)
+
+func _update_bowl_visual() -> void:
+	if not is_instance_valid(bowl_visual): return
+	var stage := 0
+	match current_bowl_state:
+		BowlState.BLANCHING: stage = 1
+		BowlState.NOODLES_DONE: stage = 2
+		BowlState.BROTH_ADDED: stage = 3
+		BowlState.FULLY_PREPARED: stage = 4
+	bowl_visual.call("set_content", stage, current_bowl_dish)
+	var anchor: Node3D = null
+	if is_instance_valid(bowl_carrier) and "hold_anchor" in bowl_carrier and "held_pillow" in bowl_carrier and not bowl_carrier.get("held_pillow"):
+		anchor = bowl_carrier.get("hold_anchor") as Node3D
+	if stage == 4 and is_instance_valid(anchor):
+		bowl_visual.global_position = anchor.global_position
+		bowl_visual.global_rotation = Vector3.ZERO
+	else:
+		bowl_visual.position = Vector3(-48.2, 1.12, -17.0) if stage >= 3 else Vector3(-51.8, 1.12, -17.0)
+		bowl_visual.rotation = Vector3.ZERO
 
 func _try_spawn_customer() -> void:
 	if prep_state != PrepState.OPEN or not is_open:
@@ -286,7 +400,7 @@ func _try_spawn_customer() -> void:
 	table_occupied[free_table] = true
 	var dish: Dictionary = menu_catalog[randi() % menu_catalog.size()]
 	var cust_name: String = customer_names[randi() % customer_names.size()]
-	var order_id := "hutieu_%d_%d" % [free_table, Time.get_ticks_msec()]
+	var order_id := "hutieu_%d_%d_%d_%d" % [free_table, int(Time.get_unix_time_from_system()), Time.get_ticks_usec(), randi()]
 	
 	var adjusted_patience: float = float(dish["patience"]) * get_patience_multiplier()
 	var order := BusinessOrder.new(
@@ -331,6 +445,7 @@ func _try_spawn_customer() -> void:
 	
 	customer.departed_from_table.connect(func(tbl_idx: int):
 		if not is_instance_valid(self): return
+		if table_customers.get(tbl_idx) != customer: return
 		table_occupied.erase(tbl_idx)
 		table_customers.erase(tbl_idx)
 		table_orders.erase(tbl_idx)
@@ -525,7 +640,7 @@ func complete_order(order: BusinessOrder) -> bool:
 	if not is_instance_valid(order): return false
 	if not active_orders.has(order) or completed_order_ids.has(order.order_id):
 		return false
-	if order.status == BusinessOrder.Status.PAID or order.status == BusinessOrder.Status.FAILED or order.status == BusinessOrder.Status.CANCELLED:
+	if order.status != BusinessOrder.Status.COMPLETED:
 		return false
 	
 	var tbl := order.table_index
@@ -612,9 +727,12 @@ func get_station_prompt(station: NoodleStation, _player: Node3D) -> String:
 				PrepState.OPEN:
 					return "Đóng cửa quán hủ tiếu (kết thúc ngày)"
 		
+		"close_sign":
+			return "Đóng cửa quán hủ tiếu (kết thúc ngày)"
+
 		"blanch_pot":
 			if current_bowl_state == BowlState.EMPTY:
-				return "Trụng hủ tiếu tươi vào nồi nước sôi"
+				return "Trụng hủ tiếu tươi vào nồi nước sôi" + stock_hint("ing_rice_noodle")
 			elif current_bowl_state == BowlState.BLANCHING:
 				return "Đang trụng hủ tiếu... (chờ sôi)"
 			elif current_bowl_state == BowlState.NOODLES_DONE:
@@ -645,7 +763,7 @@ func get_station_prompt(station: NoodleStation, _player: Node3D) -> String:
 			
 			if current_bowl_state == BowlState.BROTH_ADDED:
 				var next_dish: String = str(menu_catalog[(selected_recipe_index + 1) % menu_catalog.size()]["title"])
-				return "Thêm topping: %s%s [E] · [F] Đổi món (%s)" % [cur_recipe["title"], hint, next_dish]
+				return "Thêm topping: %s%s [E] · [F] Đổi món (%s)%s" % [cur_recipe["title"], hint, next_dish, stock_hint(cur_recipe.get("stock_item", ""))]
 			elif current_bowl_state == BowlState.FULLY_PREPARED:
 				return "Tô %s đã xong! Mang phục vụ khách" % current_bowl_dish
 			else:
@@ -671,7 +789,7 @@ func get_station_prompt(station: NoodleStation, _player: Node3D) -> String:
 
 func on_station_interacted(station: NoodleStation, player_node: Node3D) -> void:
 	match station.station_type:
-		"prep_station":
+		"prep_station", "close_sign":
 			match prep_state:
 				PrepState.CLOSED:
 					prep_state = PrepState.PREPARING
@@ -692,6 +810,7 @@ func on_station_interacted(station: NoodleStation, player_node: Node3D) -> void:
 		"blanch_pot":
 			if current_bowl_state == BowlState.EMPTY:
 				current_bowl_state = BowlState.BLANCHING
+				current_bowl_stock_bonus = 18000 if consume_household_stock("ing_rice_noodle") else 0
 				blanch_timer = current_blanch_duration
 				var dish_name: String = menu_catalog[selected_recipe_index]["title"]
 				_show_feedback(station.global_position, "💧 Đang trụng sợi hủ tiếu cho món '%s'..." % dish_name, Color("80d8ff"))
@@ -702,6 +821,7 @@ func on_station_interacted(station: NoodleStation, player_node: Node3D) -> void:
 				current_bowl_state = BowlState.EMPTY
 				var discarded := current_bowl_dish if current_bowl_dish != "" else "tô dở dang"
 				current_bowl_dish = ""
+				current_bowl_stock_bonus = 0
 				_show_feedback(station.global_position, "Đã dọn sạch %s để nấu lại!" % discarded, Color("ffd54f"))
 			else:
 				_show_feedback(station.global_position, "Tô đã có bánh hủ tiếu rồi!", Color("cfd8dc"))
@@ -719,8 +839,15 @@ func on_station_interacted(station: NoodleStation, player_node: Node3D) -> void:
 		"topping_counter":
 			if current_bowl_state == BowlState.BROTH_ADDED:
 				current_bowl_state = BowlState.FULLY_PREPARED
+				bowl_carrier = player_node
 				# Strict assignment: Exactly matches the player's selected recipe!
 				current_bowl_dish = menu_catalog[selected_recipe_index]["title"]
+				var ingredient_id: String = menu_catalog[selected_recipe_index].get("stock_item", "")
+				if ingredient_id != "" and consume_household_stock(ingredient_id):
+					var econ := get_tree().get_first_node_in_group("economy_manager") as EconomyManager
+					var product: EconomyProduct = econ.get_product(ingredient_id) if is_instance_valid(econ) else null
+					if product:
+						current_bowl_stock_bonus += product.price + 3000
 				var ings: String = menu_catalog[selected_recipe_index].get("ingredients", "topping thơm ngon")
 				_show_feedback(station.global_position, "✨ Đã rắc topping (%s)!\nTô '%s' đã sẵn sàng phục vụ!" % [ings, current_bowl_dish], Color("69f0ae"))
 			elif current_bowl_state == BowlState.FULLY_PREPARED:
@@ -735,7 +862,7 @@ func on_station_interacted(station: NoodleStation, player_node: Node3D) -> void:
 				return
 			
 			var order: BusinessOrder = table_orders[tbl]
-			if order.status == BusinessOrder.Status.FAILED or order.status == BusinessOrder.Status.CANCELLED or order.status == BusinessOrder.Status.PAID:
+			if not active_orders.has(order) or not order.is_actionable():
 				_show_feedback(station.global_position, "⚠️ Không thể phục vụ Bàn %d!" % (tbl + 1), Color("ffab40"))
 				return
 			
@@ -749,9 +876,18 @@ func on_station_interacted(station: NoodleStation, player_node: Node3D) -> void:
 				_show_feedback(station.global_position, "❌ Món ăn không đúng! Khách gọi '%s', nhưng tô này là '%s'!" % [order.service_title, current_bowl_dish], Color("ff5252"))
 				return # Rejected without completing order, paying reward, or consuming bowl!
 			
-			# Complete the order
+			# Keep the prepared bowl if the order cannot be completed.
+			var previous_status := order.status
+			var previous_tip := order.tip_money
+			order.tip_money += current_bowl_stock_bonus
+			order.status = BusinessOrder.Status.COMPLETED
+			if not complete_order(order):
+				order.status = previous_status
+				order.tip_money = previous_tip
+				_show_feedback(station.global_position, "⚠️ Không thể hoàn tất đơn này.", Color("ffab40"))
+				return
 			current_bowl_state = BowlState.EMPTY
 			current_bowl_dish = ""
-			order.status = BusinessOrder.Status.COMPLETED
-			complete_order(order)
+			bowl_carrier = null
+			current_bowl_stock_bonus = 0
 			_show_feedback(station.global_position, "😋 Khách ăn ngon miệng khen hết lời!", Color("69f0ae"))

@@ -78,3 +78,10 @@ func get_all_owned_furniture() -> Array[String]:
 	for k in owned_furniture.keys():
 		list.append(str(k))
 	return list
+
+func ensure_starter_supplies() -> void:
+	# Called only for a new save, never when an existing inventory is empty.
+	add_item("seed_lettuce", 2)
+	add_item("pet_food_salmon", 2)
+	add_item("tool_patch_strip", 2)
+	add_item("ing_rice_noodle", 2)

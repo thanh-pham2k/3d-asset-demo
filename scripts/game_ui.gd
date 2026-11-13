@@ -364,8 +364,14 @@ func resume_game() -> void:
  get_tree().paused = false
 
 func restart_round() -> void:
+ _save_before_scene_change()
  get_tree().paused = false
  get_tree().reload_current_scene()
+
+func _save_before_scene_change() -> void:
+ var econ := get_tree().get_first_node_in_group("economy_manager") as EconomyManager
+ if is_instance_valid(econ) and econ.auto_save_on_change:
+  econ.save_economy_state()
 
 func _on_cleaning_time_tick(time_remaining: float, _total: float) -> void:
  if game_mode != "cleaning": return
@@ -563,5 +569,6 @@ func _unhandled_key_input(event: InputEvent) -> void:
   get_viewport().set_input_as_handled()
 
 func open_neighborhood() -> void:
+ _save_before_scene_change()
  get_tree().paused = false
  get_tree().change_scene_to_file("res://scenes/neighborhood.tscn")

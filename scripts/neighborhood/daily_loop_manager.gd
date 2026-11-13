@@ -74,6 +74,8 @@ func _ready() -> void:
 	
 	_build_morning_toast()
 	_discover_dependencies()
+	if is_instance_valid(economy_manager):
+		apply_save_data(economy_manager.pending_daily_state)
 	call_deferred("_discover_dependencies")
 
 func _discover_dependencies() -> void:
@@ -105,12 +107,16 @@ func _connect_business_signals() -> void:
 	if is_instance_valid(garage_business):
 		if not garage_business.order_completed.is_connected(_on_garage_order_completed):
 			garage_business.order_completed.connect(_on_garage_order_completed)
+		if not garage_business.order_failed.is_connected(_on_order_failed):
+			garage_business.order_failed.connect(_on_order_failed)
 		if not garage_business.shop_status_changed.is_connected(_on_garage_status_changed):
 			garage_business.shop_status_changed.connect(_on_garage_status_changed)
 	
 	if is_instance_valid(hutieu_business):
 		if not hutieu_business.order_completed.is_connected(_on_hutieu_order_completed):
 			hutieu_business.order_completed.connect(_on_hutieu_order_completed)
+		if not hutieu_business.order_failed.is_connected(_on_order_failed):
+			hutieu_business.order_failed.connect(_on_order_failed)
 		if not hutieu_business.shop_status_changed.is_connected(_on_hutieu_status_changed):
 			hutieu_business.shop_status_changed.connect(_on_hutieu_status_changed)
 
@@ -121,6 +127,11 @@ func _on_garage_order_completed(_order: BusinessOrder, reward: int) -> void:
 func _on_hutieu_order_completed(_order: BusinessOrder, reward: int) -> void:
 	daily_customers_served += 1
 	daily_revenue += reward
+
+func _on_order_failed(_order: BusinessOrder, _reason: String) -> void:
+	daily_customers_lost += 1
+	# The business has already updated reputation and loss counters.
+	call_deferred("_save_natural_day_transition")
 
 func _on_garage_status_changed(is_open: bool) -> void:
 	if is_transitioning_day: return
@@ -150,6 +161,29 @@ func set_day(day: int) -> void:
 	current_day = maxi(1, day)
 	if is_instance_valid(time_manager):
 		time_manager.current_day = current_day
+
+func get_save_data() -> Dictionary:
+	return {
+		"day": current_day, "customers_served": daily_customers_served,
+		"revenue": daily_revenue, "expenses": daily_expenses,
+		"customers_lost": daily_customers_lost, "summary_shown": summary_shown_today
+	}
+
+func apply_save_data(data: Dictionary) -> void:
+	if data.is_empty() or int(data.get("day", current_day)) != current_day:
+		return
+	daily_customers_served = maxi(0, int(data.get("customers_served", 0)))
+	daily_revenue = maxi(0, int(data.get("revenue", 0)))
+	daily_expenses = maxi(0, int(data.get("expenses", 0)))
+	daily_customers_lost = maxi(0, int(data.get("customers_lost", 0)))
+	summary_shown_today = bool(data.get("summary_shown", false))
+
+func _reset_daily_counters() -> void:
+	daily_customers_served = 0
+	daily_revenue = 0
+	daily_expenses = 0
+	daily_customers_lost = 0
+	summary_shown_today = false
 
 func get_active_business(player_node: Node3D = null) -> BusinessShop:
 	var p := player_node
@@ -191,6 +225,8 @@ func close_workplace(shop: BusinessShop = null) -> Dictionary:
 	if not summary_shown_today:
 		summary_shown_today = true
 		show_summary_dialog(summary)
+		if is_instance_valid(economy_manager) and economy_manager.auto_save_on_change:
+			economy_manager.save_economy_state()
 	
 	is_closing_workplace = false
 	return summary
@@ -210,8 +246,11 @@ func get_daily_summary() -> Dictionary:
 	
 	var exp_val := daily_expenses
 	var prof := rev - exp_val
-	
+	var objective_mgr := get_tree().get_first_node_in_group("daily_objective_manager") as DailyObjectiveManager
+	var objective_list: Array = objective_mgr.get_summary_list() if is_instance_valid(objective_mgr) else []
+
 	return {
+		"objectives": objective_list,
 		"day": current_day,
 		"customers_served": served,
 		"revenue": rev,
@@ -274,22 +313,16 @@ func on_player_sleep(player_node: CharacterBody3D) -> bool:
 	if is_instance_valid(hutieu_business):
 		hutieu_business.reset_daily_state()
 	
-	daily_customers_served = 0
-	daily_revenue = 0
-	daily_expenses = 0
-	daily_customers_lost = 0
-	summary_shown_today = false
+	_reset_daily_counters()
 	
 	# 4. Safely reposition commuter scooters at home parking bays
 	_reset_scooters_to_home()
 	
-	# 5. Persist economy, house, and day to disk
-	if is_instance_valid(economy_manager):
-		economy_manager.save_economy_state()
-	
-	# 6. Morning wake-up
+	# 5. Morning wake-up and persist the completed day transition.
 	set_phase(Phase.WAKE_UP)
 	day_started.emit(current_day)
+	if is_instance_valid(economy_manager):
+		economy_manager.save_economy_state()
 	
 	show_morning_announcement()
 	is_transitioning_day = false
@@ -298,15 +331,25 @@ func on_player_sleep(player_node: CharacterBody3D) -> bool:
 func _reset_scooters_to_home() -> void:
 	for sc in get_tree().get_nodes_in_group("player_scooters"):
 		if sc is PlayerScooter:
+			if sc.is_mounted and is_instance_valid(sc.rider):
+				sc.dismount(sc.home_parking_pos)
 			sc.global_position = sc.home_parking_pos
-			sc.is_mounted = false
-			sc.rider = null
 
 func _on_time_manager_day_advanced(new_day: int) -> void:
 	if current_day != new_day:
 		current_day = new_day
 		if not is_transitioning_day:
-			day_advanced.emit(current_day)
+			_reset_daily_counters()
+			if is_instance_valid(garage_business): garage_business.reset_daily_state()
+			if is_instance_valid(hutieu_business): hutieu_business.reset_daily_state()
+			set_phase(Phase.WAKE_UP)
+		day_advanced.emit(current_day)
+		if not is_transitioning_day:
+			call_deferred("_save_natural_day_transition")
+
+func _save_natural_day_transition() -> void:
+	if is_instance_valid(economy_manager) and economy_manager.auto_save_on_change:
+		economy_manager.save_economy_state()
 
 func _build_morning_toast() -> void:
 	morning_toast = CanvasLayer.new()

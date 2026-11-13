@@ -21,11 +21,13 @@ var current_state: State = State.WALKING_TO_TABLE
 
 var table_index: int = 0
 var customer_name: String = "Bác Năm"
+var customer_type: int = BusinessOrder.CustomerType.NORMAL
 var table_position: Vector3 = Vector3.ZERO
 var chair_position: Vector3 = Vector3.ZERO
 
 var diner: NPCVisual
 var speech_label: Label3D
+var vip_marker: Label3D
 var eating_bowl: Node3D
 
 var waypoints: Array[Vector3] = []
@@ -65,22 +67,39 @@ func _build_visuals() -> void:
 	diner = NPCVisual.new()
 	diner.gender = "girl" if (randi() % 2 == 0) else "boy"
 	diner.accessory = ["conical_hat", "glasses", "headband", "none"][randi() % 4]
-	diner.shirt_color = [Color("80deea"), Color("ce93d8"), Color("ffcc80"), Color("a5d6a7")][randi() % 4]
+	if customer_type == BusinessOrder.CustomerType.VIP:
+		diner.shirt_color = Color("ffd54f")
+	elif customer_type == BusinessOrder.CustomerType.EXPRESS:
+		diner.shirt_color = Color("ff7043")
+	else:
+		diner.shirt_color = [Color("80deea"), Color("ce93d8"), Color("ffcc80"), Color("a5d6a7")][randi() % 4]
 	diner.pants_color = Color("455a64")
 	diner.hair_color = Color("212121")
 	add_child(diner)
 	
-	# 2. Speech bubble
+	# 2. Speech bubble (offset above table status label to avoid overlap)
 	speech_label = Label3D.new()
-	speech_label.position = Vector3(0, 2.05, 0)
+	speech_label.position = Vector3(0, 3.0, 0)
 	speech_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	speech_label.font_size = 22
+	speech_label.font_size = 20
 	speech_label.pixel_size = 0.004
 	speech_label.outline_size = 6
 	speech_label.modulate = Color("fff9c4")
 	speech_label.outline_modulate = Color("212121")
 	speech_label.visible = false
 	add_child(speech_label)
+	
+	if customer_type == BusinessOrder.CustomerType.VIP:
+		vip_marker = Label3D.new()
+		vip_marker.text = "👑 VIP"
+		vip_marker.position = Vector3(0, 2.05, 0)
+		vip_marker.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		vip_marker.font_size = 24
+		vip_marker.pixel_size = 0.004
+		vip_marker.outline_size = 8
+		vip_marker.modulate = Color("ffd54f")
+		vip_marker.outline_modulate = Color("1a1a1a")
+		diner.add_child(vip_marker)
 	
 	# 3. Eating bowl on table (appears when served)
 	eating_bowl = Node3D.new()
@@ -162,7 +181,12 @@ func _on_reached_table() -> void:
 	# Sit down neatly on chair
 	_sit_down_pose()
 	current_state = State.SEATED_ORDERING
-	_show_speech("Cô Bảy ơi, cho một tô hủ tiếu nóng nhé!", 2.5)
+	if customer_type == BusinessOrder.CustomerType.VIP:
+		_show_speech("Nghe tiếng quán ngon đã lâu, cho tôi một tô đặc biệt!", 2.8)
+	elif customer_type == BusinessOrder.CustomerType.EXPRESS:
+		_show_speech("Cho tôi một tô thật nhanh nhé, đang vội!", 2.5)
+	else:
+		_show_speech("Cô Bảy ơi, cho một tô hủ tiếu nóng nhé!", 2.5)
 	
 	arrived_at_table.emit(table_index)
 

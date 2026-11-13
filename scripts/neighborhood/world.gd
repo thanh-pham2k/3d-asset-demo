@@ -7,15 +7,21 @@ const DailyLoopManager = preload("res://scripts/neighborhood/daily_loop_manager.
 const EconomyManager = preload("res://scripts/economy/economy_manager.gd")
 const EconomySaveSystem = preload("res://scripts/economy/economy_save_system.gd")
 const CoopManager = preload("res://scripts/coop/coop_manager.gd")
+const CoupleMessInteractable = preload("res://scripts/coop/couple_mess_interactable.gd")
 @export var integrated := false
 @export var economy_save_path := EconomySaveSystem.DEFAULT_SAVE_PATH
 var camera: Camera3D
 var player: CharacterBody3D
+var boy_player: CharacterBody3D
+var girl_player: CharacterBody3D
+var active_character_id: String = "boy"
 var player_2: CharacterBody3D
 var coop_manager: CoopManager
 var is_coop: bool = false
 var coop_obstacle: Node3D
 var coop_bench: Node3D
+var home_sofa_carrier: CoopFurnitureCarrier
+var couple_mess: CoupleMessInteractable
 var guidance: WorkplaceGuidance
 var boy_scooter: PlayerScooter
 var girl_scooter: PlayerScooter
@@ -28,6 +34,10 @@ var economy_manager: EconomyManager
 var daily_loop_manager: Node
 var wallet_label: Label
 var goal_label: Label
+var character_badge_label: Label
+var _camera_focus_pos: Vector3 = Vector3.ZERO
+var _switch_cooldown: float = 0.0
+var _couple_greet_cooldown: float = 0.0
 var street_lights: Array[OmniLight3D] = []
 
 func slab(parent: Node, pos: Vector3, size: Vector3, color: Color, collision := false) -> void:
@@ -66,7 +76,7 @@ func _add_street_lamp(parent: Node3D, location: Vector3) -> void:
 
 func _on_street_light_period_changed(period: String) -> void:
  for glow in street_lights:
-  if is_instance_valid(glow): glow.visible = period == "night"
+  if is_instance_valid(glow): glow.visible = (period == "evening" or period == "night")
 
 func _create_parking_bay(p_parent: Node, p_pos: Vector3, p_rot_y: float, p_title: String, p_color: Color) -> Node3D:
  var bay := Node3D.new()
@@ -122,12 +132,13 @@ func zone(label: String) -> Node3D:
  return n
 
 func _ready() -> void:
+ add_to_group("couple_world")
  # The indoor game manager normally installs these bindings at startup.
- for action in {"p1_left":KEY_A,"p1_right":KEY_D,"p1_up":KEY_W,"p1_down":KEY_S,"p1_interact":KEY_E,"p1_throw":KEY_F,"p1_dash":KEY_SPACE,"p1_swing":KEY_Q,"p1_run":KEY_SHIFT}:
+ for action in {"p1_left":KEY_A,"p1_right":KEY_D,"p1_up":KEY_W,"p1_down":KEY_S,"p1_interact":KEY_E,"p1_throw":KEY_F,"p1_dash":KEY_SPACE,"p1_swing":KEY_Q,"p1_run":KEY_SHIFT,"switch_character":KEY_C}:
   if not InputMap.has_action(action):
    InputMap.add_action(action)
    var key := InputEventKey.new()
-   key.physical_keycode = {"p1_left":KEY_A,"p1_right":KEY_D,"p1_up":KEY_W,"p1_down":KEY_S,"p1_interact":KEY_E,"p1_throw":KEY_F,"p1_dash":KEY_SPACE,"p1_swing":KEY_Q,"p1_run":KEY_SHIFT}[action]
+   key.physical_keycode = {"p1_left":KEY_A,"p1_right":KEY_D,"p1_up":KEY_W,"p1_down":KEY_S,"p1_interact":KEY_E,"p1_throw":KEY_F,"p1_dash":KEY_SPACE,"p1_swing":KEY_Q,"p1_run":KEY_SHIFT,"switch_character":KEY_C}[action]
    if action == "p1_run":
     key.physical_keycode = 0
     key.keycode = KEY_SHIFT
@@ -423,9 +434,25 @@ func _ready() -> void:
   marker.position = spec[1]
   spawns.add_child(marker)
  if not integrated:
-  player = preload("res://scenes/player.tscn").instantiate()
-  player.position = Vector3(-45,0.2,70)
-  add_child(player)
+  boy_player = preload("res://scenes/player.tscn").instantiate()
+  boy_player.name = "BoyPlayer"
+  boy_player.player_id = 1
+  boy_player.position = Vector3(-45,0.2,70)
+  add_child(boy_player)
+  boy_player.select_character("boy")
+  boy_player.is_active_controlled = true
+  boy_player.add_to_group("active_player")
+
+  girl_player = preload("res://scenes/player.tscn").instantiate()
+  girl_player.name = "GirlPlayer"
+  girl_player.player_id = 1
+  girl_player.position = Vector3(-43.0,0.2,70)
+  add_child(girl_player)
+  girl_player.select_character("girl")
+  girl_player.is_active_controlled = false
+
+  player = boy_player
+  _camera_focus_pos = player.position
  var light := DirectionalLight3D.new()
  light.rotation_degrees = Vector3(-55,-35,0)
  light.light_energy = 0.55
@@ -479,6 +506,9 @@ func _ready() -> void:
  var objective_manager := DailyObjectiveManager.new()
  objective_manager.name = "DailyObjectiveManager"
  add_child(objective_manager)
+ var event_manager := preload("res://scripts/neighborhood/daily_event_manager.gd").new()
+ event_manager.name = "DailyEventManager"
+ add_child(event_manager)
  var furn_kiosk := ShopKiosk.new()
  furn_kiosk.name = "Kiosk_Furniture"
  furn_kiosk.kiosk_title = "Tiệm Nội Thất"
@@ -497,6 +527,12 @@ func _ready() -> void:
  market_kiosk.product_category = "food_ingredient"
  market_kiosk.position = Vector3(-105, 0, 32)
  add_child(market_kiosk)
+ var wet_market_kiosk := ShopKiosk.new()
+ wet_market_kiosk.name = "Kiosk_WetMarket"
+ wet_market_kiosk.kiosk_title = "Chợ Dân Sinh & Nông Sản"
+ wet_market_kiosk.product_category = "food_ingredient"
+ wet_market_kiosk.position = Vector3(38, 0, -24)
+ add_child(wet_market_kiosk)
  var tool_kiosk := ShopKiosk.new()
  tool_kiosk.name = "Kiosk_Tools"
  tool_kiosk.kiosk_title = "Cửa Hàng Dụng Cụ Sửa Xe"
@@ -531,6 +567,30 @@ func _ready() -> void:
  coop_bench.name = "CoopAssemblyBench"
  coop_bench.position = Vector3(95, 0, -18)
  add_child(coop_bench)
+ home_sofa_carrier = CoopFurnitureCarrier.new()
+ home_sofa_carrier.name = "HomeSofaCarrier"
+ home_sofa_carrier.display_name = "Sofa lớn trước sân"
+ home_sofa_carrier.position = Vector3(-39.5, 0, 68.5)
+ add_child(home_sofa_carrier)
+ var sofa_visual := MeshInstance3D.new()
+ var sofa_box := BoxMesh.new()
+ sofa_box.size = Vector3(1.6, 0.7, 0.85)
+ sofa_visual.mesh = sofa_box
+ var sofa_mat := StandardMaterial3D.new()
+ sofa_mat.albedo_color = Color("43a047")
+ sofa_visual.material_override = sofa_mat
+ sofa_visual.position = Vector3(0, 0.35, 0)
+ home_sofa_carrier.add_child(sofa_visual)
+ home_sofa_carrier.duo_lift_started.connect(func():
+  _trigger_couple_celebration("💪 Cả hai cùng khiêng sofa quá ăn ý!")
+ )
+ couple_mess = CoupleMessInteractable.new()
+ couple_mess.name = "CoupleMess"
+ couple_mess.position = Vector3(-44.0, 0, 67.0)
+ add_child(couple_mess)
+ couple_mess.mess_cleaned.connect(func(_by_couple: bool):
+  _trigger_couple_celebration("🧹 Nhà cửa gọn gàng rồi! (+5,000 đ)")
+ )
  # Dedicated parking bays with painted lines and 3D signposts
  _create_parking_bay(self, Vector3(-48.0, 0, 72.0), PI, "Bãi Đậu Xe Boy", Color("80cbc4"))
  _create_parking_bay(self, Vector3(-42.0, 0, 72.0), PI, "Bãi Đậu Xe Girl", Color("ffab91"))
@@ -578,6 +638,11 @@ func _ready() -> void:
  minimap.guidance = guidance
  add_child(minimap)
  add_help()
+ if is_instance_valid(economy_manager) and not economy_manager.pending_couple_state.is_empty():
+  apply_couple_save_data(economy_manager.pending_couple_state)
+ var house_mgr := get_tree().get_first_node_in_group("house_progression_manager") as HouseProgressionManager
+ if is_instance_valid(house_mgr) and not house_mgr.house_upgraded.is_connected(_on_house_upgraded_celebration):
+  house_mgr.house_upgraded.connect(_on_house_upgraded_celebration)
 
 func _unhandled_key_input(event: InputEvent) -> void:
  if integrated or not (event is InputEventKey and event.pressed and not event.echo): return
@@ -591,13 +656,17 @@ func _unhandled_key_input(event: InputEvent) -> void:
   overview = not overview
   camera.size = 330 if overview else 20
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
+ _switch_cooldown = maxf(0.0, _switch_cooldown - delta)
+ _couple_greet_cooldown = maxf(0.0, _couple_greet_cooldown - delta)
  if not overview and is_instance_valid(player) and is_instance_valid(camera):
-  camera.position = player.position + Vector3(0,25,22)
-  camera.look_at(player.position)
+  _camera_focus_pos = _camera_focus_pos.lerp(player.position, 1.0 - exp(-10.0 * delta))
+  camera.position = _camera_focus_pos + Vector3(0,25,22)
+  camera.look_at(_camera_focus_pos)
  elif overview and is_instance_valid(camera):
   camera.position = Vector3(185,230,185)
   camera.look_at(Vector3.ZERO)
+ _check_couple_home_greeting()
  if is_instance_valid(clock_label) and is_instance_valid(time_manager):
   clock_label.text = "🕒 " + time_manager.get_time_formatted()
  if is_instance_valid(wallet_label) and is_instance_valid(economy_manager):
@@ -639,19 +708,162 @@ func add_help() -> void:
  goal_label.text = "🎯 Mục tiêu: Đang tải..."
  goal_label.modulate = Color("fff59d")
  box.add_child(goal_label)
+ character_badge_label = Label.new()
+ character_badge_label.modulate = Color("b2dfdb")
+ box.add_child(character_badge_label)
+ _refresh_character_badge()
  var text := Label.new()
- text.text = "WASD: di chuyển · Shift: chạy · Space: lướt\nE: tương tác · F: ném · Esc: menu"
+ text.text = "WASD: di chuyển · Shift: chạy · Space: lướt\nE: tương tác · F: ném · C: đổi Boy/Girl · Esc: menu"
  box.add_child(text)
+
+func _refresh_character_badge() -> void:
+ if not is_instance_valid(character_badge_label):
+  return
+ if is_coop:
+  character_badge_label.text = "👥 Co-op: Boy (P1) & Girl (P2)"
+ elif active_character_id == "girl":
+  character_badge_label.text = "👧 Đang điều khiển: Girl (Hủ tiếu & Vườn) [C]"
+ else:
+  character_badge_label.text = "👦 Đang điều khiển: Boy (Sửa xe & Giao hàng) [C]"
+
+func can_switch_character() -> Dictionary:
+ if integrated:
+  return {"ok": false, "reason": ""}
+ if is_coop:
+  return {"ok": false, "reason": "Đang ở chế độ Co-op 2 người — không cần chuyển nhân vật!"}
+ if _switch_cooldown > 0.0:
+  return {"ok": false, "reason": "Đang chuyển góc nhìn..."}
+ if not is_instance_valid(boy_player) or not is_instance_valid(girl_player) or not is_instance_valid(player):
+  return {"ok": false, "reason": "Nhân vật chưa sẵn sàng!"}
+ if player.has_meta("riding_scooter"):
+  return {"ok": false, "reason": "Hãy xuống xe máy (E) trước khi chuyển nhân vật!"}
+ if player.movement_disabled or player.has_meta("shopping_open") or player.has_meta("pet_rename_open") or player.has_meta("daily_summary_open") or player.has_meta("map_open"):
+  return {"ok": false, "reason": "Hãy đóng bảng hiện tại trước khi chuyển nhân vật!"}
+ if float(player.get("dash_remaining")) > 0.0 or float(player.get("reaction")) > 0.0 or float(player.get("slip_timer")) > 0.0 or player.get("resting") != null:
+  return {"ok": false, "reason": "Đang trong hành động — hãy hoàn tất trước khi chuyển!"}
+ var garage := get_tree().get_first_node_in_group("garage_business") as GarageBusiness
+ if is_instance_valid(garage) and garage.is_repairing:
+  return {"ok": false, "reason": "Đang sửa xe — hãy hoàn tất sửa trước khi chuyển!"}
+ return {"ok": true, "reason": ""}
+
+func switch_character(force: bool = false) -> bool:
+ if not force:
+  var check := can_switch_character()
+  if not bool(check.get("ok", false)):
+   var reason := str(check.get("reason", ""))
+   if reason != "":
+    var fx = get_tree().get_first_node_in_group("chaos_feedback")
+    if is_instance_valid(fx) and fx.has_method("show_toast"):
+     fx.show_toast("⚠️ " + reason)
+   return false
+
+ var prev_player := player
+ var next_id := "girl" if active_character_id == "boy" else "boy"
+ var next_player := girl_player if next_id == "girl" else boy_player
+ if not is_instance_valid(next_player):
+  return false
+
+ if is_instance_valid(prev_player):
+  prev_player.is_active_controlled = false
+  prev_player.remove_from_group("active_player")
+  prev_player.target = null
+
+ next_player.player_id = 1
+ next_player.is_active_controlled = true
+ next_player.add_to_group("active_player")
+ player = next_player
+ active_character_id = next_id
+ _switch_cooldown = 0.25
+
+ if is_instance_valid(guidance):
+  guidance.player = player
+ var minimap_node := get_node_or_null("InteractiveMinimap")
+ if is_instance_valid(minimap_node) and "player" in minimap_node:
+  minimap_node.player = player
+
+ _refresh_character_badge()
+ var fx = get_tree().get_first_node_in_group("chaos_feedback")
+ if is_instance_valid(fx) and fx.has_method("show_toast"):
+  fx.show_toast("🔄 Đã chuyển sang điều khiển %s" % ("Girl (Hủ tiếu & Vườn)" if next_id == "girl" else "Boy (Tiệm sửa xe)"))
+ return true
+
+func _trigger_couple_celebration(msg: String) -> void:
+ if is_instance_valid(boy_player) and boy_player.has_method("play_couple_celebration"):
+  boy_player.play_couple_celebration()
+ if is_instance_valid(girl_player) and girl_player.has_method("play_couple_celebration"):
+  girl_player.play_couple_celebration()
+ var fx = get_tree().get_first_node_in_group("chaos_feedback")
+ if is_instance_valid(fx) and fx.has_method("show_toast"):
+  fx.show_toast(msg)
+
+func _on_house_upgraded_celebration(new_level: int, _level_name: String) -> void:
+ _trigger_couple_celebration("🎉 Nhà đã lên cấp %d! Boy & Girl cùng ăn mừng nào!" % new_level)
+
+func _check_couple_home_greeting() -> void:
+ if _couple_greet_cooldown > 0.0 or is_coop or not is_instance_valid(boy_player) or not is_instance_valid(girl_player):
+  return
+ var dist := boy_player.global_position.distance_to(girl_player.global_position)
+ if dist <= 2.4 and boy_player.global_position.distance_to(Vector3(-44, 0, 70)) <= 14.0:
+  _couple_greet_cooldown = 25.0
+  var lines := [
+   "💬 Boy → Girl: 'Hôm nay tiệm hủ tiếu thơm nức mũi luôn!'",
+   "💬 Girl → Boy: 'Anh sửa xe xong nhớ nghỉ tay uống nước nhé!'",
+   "💬 Cả hai chạm tay nhau: 'Cùng cố gắng cho tổ ấm nhỏ nào!'",
+  ]
+  var msg: String = lines[randi() % lines.size()]
+  _trigger_couple_celebration(msg)
+
+func get_couple_save_data() -> Dictionary:
+ var boy_pos := [boy_player.position.x, boy_player.position.y, boy_player.position.z] if is_instance_valid(boy_player) else [-45.0, 0.2, 70.0]
+ var girl_pos := [girl_player.position.x, girl_player.position.y, girl_player.position.z] if is_instance_valid(girl_player) else [-43.0, 0.2, 70.0]
+ return {
+  "active_character": active_character_id,
+  "boy_position": boy_pos,
+  "girl_position": girl_pos,
+  "couple_mess_cleaned": couple_mess.is_cleaned if is_instance_valid(couple_mess) else false,
+ }
+
+func apply_couple_save_data(data: Dictionary) -> void:
+ if data.is_empty():
+  return
+ if is_instance_valid(boy_player) and data.get("boy_position", null) is Array:
+  var bp: Array = data["boy_position"]
+  if bp.size() >= 3:
+   boy_player.position = Vector3(float(bp[0]), float(bp[1]), float(bp[2]))
+ if is_instance_valid(girl_player) and data.get("girl_position", null) is Array:
+  var gp: Array = data["girl_position"]
+  if gp.size() >= 3:
+   girl_player.position = Vector3(float(gp[0]), float(gp[1]), float(gp[2]))
+ if is_instance_valid(couple_mess) and data.has("couple_mess_cleaned"):
+  couple_mess.set_cleaned(bool(data["couple_mess_cleaned"]))
+ var saved_active := str(data.get("active_character", "boy"))
+ if saved_active in ["boy", "girl"] and saved_active != active_character_id:
+  switch_character(true)
+ if is_instance_valid(player):
+  _camera_focus_pos = player.position
 
 func enable_neighborhood_coop() -> void:
  if is_coop: return
  is_coop = true
- player_2 = preload("res://scenes/player.tscn").instantiate()
- player_2.name = "Player2"
+ if active_character_id != "boy":
+  switch_character(true)
+ if is_instance_valid(girl_player):
+  player_2 = girl_player
+  player_2.name = "Player2"
+ else:
+  player_2 = preload("res://scenes/player.tscn").instantiate()
+  player_2.name = "Player2"
+  player_2.position = boy_player.position + Vector3(2.0, 0, 0)
+  add_child(player_2)
+  player_2.select_character("girl")
  player_2.player_id = 2
- player_2.position = player.position + Vector3(2.0, 0, 0)
- add_child(player_2)
- player_2.select_character("girl")
+ player_2.is_active_controlled = true
+ player_2.add_to_group("active_player")
+ if is_instance_valid(boy_player):
+  boy_player.player_id = 1
+  boy_player.is_active_controlled = true
+  boy_player.add_to_group("active_player")
+ _refresh_character_badge()
  
  if is_instance_valid(camera):
   camera.current = false
@@ -663,6 +875,10 @@ func enable_neighborhood_coop() -> void:
  coop_manager.initialize_coop(player, player_2, self, get_viewport().world_3d, false)
 
 func _input(event: InputEvent) -> void:
+ if not integrated and event.is_action_pressed("switch_character"):
+  switch_character()
+  get_viewport().set_input_as_handled()
+  return
  if not integrated and event is InputEventKey and event.pressed and not event.echo:
   if event.keycode == KEY_F2:
    enable_neighborhood_coop()

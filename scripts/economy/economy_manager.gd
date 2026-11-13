@@ -22,6 +22,7 @@ var hutieu_business: Node
 var house_manager: Node
 var _save_failure_reported := false
 var pending_daily_state: Dictionary = {}
+var pending_couple_state: Dictionary = {}
 
 func _init() -> void:
 	wallet = HouseholdWallet.new()
@@ -162,7 +163,8 @@ func sell_produce(product_id: String, count: int = 1) -> Dictionary:
 	if not inventory.has_item(product_id) or inventory.get_item_count(product_id) < count:
 		return { "success": false, "reason": "INSUFFICIENT_ITEMS", "message": "Không đủ nông sản trong túi đồ để bán!" }
 
-	var earnings := product.price * count
+	var effective_unit_price := get_effective_product_price(product)
+	var earnings := effective_unit_price * count
 	inventory.remove_item(product_id, count)
 
 	var tx_id := "sell_%s_%d_%d" % [product_id, Time.get_ticks_usec(), randi() % 1000000]
@@ -221,7 +223,8 @@ func purchase_product(product_id: String, count := 1) -> Dictionary:
 			purchase_failed.emit(product_id, err["reason"], err["message"])
 			return err
 	
-	var total_cost := product.price * count
+	var effective_unit_price := get_effective_product_price(product)
+	var total_cost := effective_unit_price * count
 	if not wallet.can_afford(total_cost):
 		var err := {
 			"success": false,
@@ -313,6 +316,9 @@ func _apply_upgrade_effect(product: EconomyProduct) -> void:
 					house_manager.progression_manager._update_unlocked_areas()
 					if house_manager.has_method("rebuild_house"):
 						house_manager.rebuild_house()
+				elif house_manager is HouseProgressionManager and house_manager.house_level < 2:
+					house_manager.house_level = 2
+					house_manager._update_unlocked_areas()
 		"upg_house_level_3":
 			if is_instance_valid(house_manager):
 				if "progression_manager" in house_manager and house_manager.progression_manager.house_level < 3:
@@ -320,6 +326,9 @@ func _apply_upgrade_effect(product: EconomyProduct) -> void:
 					house_manager.progression_manager._update_unlocked_areas()
 					if house_manager.has_method("rebuild_house"):
 						house_manager.rebuild_house()
+				elif house_manager is HouseProgressionManager and house_manager.house_level < 3:
+					house_manager.house_level = 3
+					house_manager._update_unlocked_areas()
 		"upg_house_tile_yard":
 			if is_instance_valid(house_manager):
 				if "progression_manager" in house_manager and house_manager.progression_manager.has_method("apply_tile_yard_upgrade"):
@@ -493,6 +502,25 @@ func save_economy_state(path := "") -> bool:
 		if is_instance_valid(objective_mgr) and objective_mgr.has_method("get_save_data"):
 			b_data["objectives"] = objective_mgr.get_save_data()
 
+	b_data["daily_event"] = EconomySaveSystem.load_daily_event_data(p)
+	if is_inside_tree():
+		var event_mgr = get_tree().get_first_node_in_group("daily_event_manager")
+		if is_instance_valid(event_mgr) and event_mgr.has_method("get_save_data"):
+			b_data["daily_event"] = event_mgr.get_save_data()
+
+	b_data["relationships"] = EconomySaveSystem.load_relationship_data(p)
+	if is_inside_tree():
+		var npc_mgr = get_tree().get_first_node_in_group("npc_manager")
+		if is_instance_valid(npc_mgr) and npc_mgr.has_method("get_save_data"):
+			b_data["relationships"] = npc_mgr.get_save_data()
+
+	if is_inside_tree():
+		var couple_world = get_tree().get_first_node_in_group("couple_world")
+		if is_instance_valid(couple_world) and couple_world.has_method("get_couple_save_data"):
+			b_data["couple_state"] = couple_world.get_couple_save_data()
+	if not b_data.has("couple_state") and not pending_couple_state.is_empty():
+		b_data["couple_state"] = pending_couple_state
+
 	var h_data := {}
 	if is_instance_valid(house_manager) and house_manager.has_method("get_save_data"):
 		h_data = house_manager.get_save_data()
@@ -535,6 +563,14 @@ func load_economy_state(path := "") -> bool:
 		pending_daily_state = b_data["daily_state"]
 	else:
 		pending_daily_state = {}
+	if b_data.get("couple_state", null) is Dictionary:
+		pending_couple_state = b_data["couple_state"]
+	else:
+		pending_couple_state = {}
+	if is_inside_tree() and get_tree():
+		var couple_world = get_tree().get_first_node_in_group("couple_world")
+		if is_instance_valid(couple_world) and couple_world.has_method("apply_couple_save_data") and not pending_couple_state.is_empty():
+			couple_world.apply_couple_save_data(pending_couple_state)
 	if is_instance_valid(garage_business) and b_data.get("garage_stats", null) is Dictionary:
 		garage_business.apply_persistent_stats(b_data["garage_stats"])
 	if is_instance_valid(hutieu_business) and b_data.get("hutieu_stats", null) is Dictionary:
@@ -582,5 +618,75 @@ func load_economy_state(path := "") -> bool:
 			garden_mgr.apply_save_data(farm_data if farm_data.has("plots") else {"plots": []})
 
 	apply_all_owned_upgrades()
+
+	if b_data.has("daily_event") and b_data["daily_event"] is Dictionary and is_inside_tree() and get_tree():
+		var event_mgr = get_tree().get_first_node_in_group("daily_event_manager")
+		if is_instance_valid(event_mgr) and event_mgr.has_method("apply_save_data"):
+			event_mgr.apply_save_data(b_data["daily_event"])
+
+	if b_data.has("relationships") and b_data["relationships"] is Dictionary and is_inside_tree() and get_tree():
+		var npc_mgr = get_tree().get_first_node_in_group("npc_manager")
+		if is_instance_valid(npc_mgr) and npc_mgr.has_method("apply_save_data"):
+			npc_mgr.apply_save_data(b_data["relationships"])
 	
 	return true
+
+func get_effective_product_price(product: EconomyProduct) -> int:
+	if not product:
+		return 0
+	var event_mgr = get_tree().get_first_node_in_group("daily_event_manager") if is_inside_tree() and get_tree() else null
+	if not is_instance_valid(event_mgr):
+		return product.price
+	if product.category == "produce":
+		return maxi(1, int(round(float(product.price) * event_mgr.get_market_sell_multiplier())))
+	return event_mgr.get_discounted_price(product.id, product.price)
+
+func get_product_discount_percent(product: EconomyProduct) -> int:
+	if not product or product.category == "produce":
+		return 0
+	var event_mgr = get_tree().get_first_node_in_group("daily_event_manager") if is_inside_tree() and get_tree() else null
+	if not is_instance_valid(event_mgr):
+		return 0
+	return event_mgr.get_discount_percent(product.id)
+
+func get_next_meaningful_goal() -> Dictionary:
+	var bal := wallet.balance if is_instance_valid(wallet) else 0
+	var candidate_ids := [
+		"upg_garage_tools",
+		"upg_hutieu_quick_stove",
+		"upg_house_level_2",
+		"upg_garage_second_bay",
+		"upg_hutieu_extra_table",
+		"upg_house_level_3"
+	]
+	for pid in candidate_ids:
+		var prod := get_product(pid)
+		if prod and not is_product_owned(prod):
+			var pct := clampi(int(round((float(bal) / maxf(1.0, float(prod.price))) * 100.0)), 0, 100)
+			return {
+				"id": prod.id,
+				"title": prod.name,
+				"target_cost": prod.price,
+				"current_balance": bal,
+				"progress_pct": pct,
+				"ready_to_buy": bal >= prod.price
+			}
+	for prod in catalog:
+		if prod.category == "furniture" and prod.is_unique and not is_product_owned(prod):
+			var pct := clampi(int(round((float(bal) / maxf(1.0, float(prod.price))) * 100.0)), 0, 100)
+			return {
+				"id": prod.id,
+				"title": "Mua nội thất: " + prod.name,
+				"target_cost": prod.price,
+				"current_balance": bal,
+				"progress_pct": pct,
+				"ready_to_buy": bal >= prod.price
+			}
+	return {
+		"id": "free_wealth",
+		"title": "Tích lũy quỹ gia đình & tận hưởng cuộc sống",
+		"target_cost": 0,
+		"current_balance": bal,
+		"progress_pct": 100,
+		"ready_to_buy": false
+	}

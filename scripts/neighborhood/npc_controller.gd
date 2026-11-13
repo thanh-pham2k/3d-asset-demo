@@ -287,7 +287,9 @@ func _try_sit_reserved_seat() -> void:
 		_release_seat()
 		return
 	var seat_pos := bench.to_global(reserved_seat.seat_point)
-	var player := get_tree().get_first_node_in_group("players") as Node3D
+	var player := get_tree().get_first_node_in_group("active_player") as Node3D
+	if not is_instance_valid(player):
+		player = get_tree().get_first_node_in_group("players") as Node3D
 	if is_instance_valid(player) and player.global_position.distance_to(seat_pos) < 0.9:
 		_release_seat()
 		return
@@ -344,6 +346,8 @@ func interact(player_node: Node3D) -> void:
 	interacting_player = player_node
 	user = player_node
 	dialogue_index = 0
+	if get_parent() and get_parent().has_signal("npc_interaction_started"):
+		get_parent().emit_signal("npc_interaction_started", self, player_node)
 	_show_current_dialogue()
 
 func _show_current_dialogue() -> void:
@@ -354,6 +358,15 @@ func _show_current_dialogue() -> void:
 		lines = data.dialogues.get("morning", ["Chào bạn! Chúc một ngày tốt lành!"])
 	
 	var text: String = lines[dialogue_index % lines.size()]
+	var npc_mgr := get_parent() as NPCManager
+	if is_instance_valid(npc_mgr):
+		npc_mgr.add_relationship(data.id, 4, "talk")
+		var score := npc_mgr.get_relationship_score(data.id)
+		if score >= 80 and dialogue_index == 0:
+			text = "Bạn thân mến! " + text
+		elif score >= 50 and dialogue_index == 0:
+			text = "Chào người bạn quen! " + text
+		npc_mgr.show_neighbor_card(self, text)
 	dialogue_label.text = text
 	dialogue_label.visible = true
 	dialogue_timer = 6.0
@@ -374,6 +387,9 @@ func _advance_dialogue() -> void:
 
 func end_interaction() -> void:
 	dialogue_label.visible = false
+	var npc_mgr := get_parent() as NPCManager
+	if is_instance_valid(npc_mgr):
+		npc_mgr.hide_neighbor_card()
 	user = null
 	interacting_player = null
 	current_state = previous_state if previous_state != State.INTERACTING else State.IDLE

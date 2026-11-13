@@ -113,7 +113,8 @@ func validate_placement(
 	rot_y: float,
 	space_state: PhysicsDirectSpaceState3D,
 	room_bounds: AABB,
-	player: Node3D = null
+	player: Node3D = null,
+	blocked_zones: Array[AABB] = []
 ) -> Dictionary:
 	var def := FurnitureData.get_definition(active_furniture_id)
 	var fp: Vector3 = def.get("footprint", Vector3(1, 1, 1))
@@ -127,6 +128,21 @@ func validate_placement(
 	   target_pos.z - half_z < room_bounds.position.z or \
 	   target_pos.z + half_z > room_bounds.end.z:
 		return {"valid": false, "reason": "OUT_OF_BOUNDS", "message": "Ngoài phạm vi sàn nhà!"}
+
+	# 1b. Prevent blocking doors or important interaction zones
+	var furn_aabb := AABB(
+		Vector3(target_pos.x - half_x, 0.0, target_pos.z - half_z),
+		Vector3(half_x * 2.0, maxf(0.5, fp.y), half_z * 2.0)
+	)
+	for zone in blocked_zones:
+		if furn_aabb.intersects(zone):
+			return {"valid": false, "reason": "BLOCKING_INTERACTION", "message": "Không được chắn cửa ra vào hoặc khu vực tương tác!"}
+
+	# 1c. Prevent duplicate unique furniture when placing a new item
+	if state == State.PLACING and active_furniture_id in HouseProgressionManager.UNIQUE_FURNITURE_IDS:
+		var house_mgr := get_tree().get_first_node_in_group("house_progression_manager") as HouseProgressionManager if is_inside_tree() else null
+		if is_instance_valid(house_mgr) and house_mgr.has_placed_furniture(active_furniture_id):
+			return {"valid": false, "reason": "DUPLICATE_UNIQUE", "message": "Món nội thất đặc biệt này chỉ được đặt 1 cái trong nhà!"}
 	
 	# 2. Physics shape query (check overlap with walls or other furniture)
 	if space_state:
@@ -159,7 +175,8 @@ func update_placement(
 	target_pos: Vector3,
 	space_state: PhysicsDirectSpaceState3D,
 	room_bounds: AABB,
-	player: Node3D = null
+	player: Node3D = null,
+	blocked_zones: Array[AABB] = []
 ) -> bool:
 	if not is_active() or not is_instance_valid(preview_node): return false
 	
@@ -172,7 +189,7 @@ func update_placement(
 	preview_node.global_position = snapped_pos
 	preview_node.rotation.y = current_rotation
 	
-	var res := validate_placement(snapped_pos, current_rotation, space_state, room_bounds, player)
+	var res := validate_placement(snapped_pos, current_rotation, space_state, room_bounds, player, blocked_zones)
 	current_valid = res["valid"]
 	last_validation_reason = res["reason"]
 	
@@ -183,7 +200,8 @@ func confirm_placement(
 	target_pos: Vector3,
 	space_state: PhysicsDirectSpaceState3D,
 	room_bounds: AABB,
-	player: Node3D = null
+	player: Node3D = null,
+	blocked_zones: Array[AABB] = []
 ) -> Node3D:
 	if not is_active(): return null
 	
@@ -193,7 +211,7 @@ func confirm_placement(
 		snappedf(target_pos.z, 0.25)
 	)
 	
-	var res := validate_placement(snapped_pos, current_rotation, space_state, room_bounds, player)
+	var res := validate_placement(snapped_pos, current_rotation, space_state, room_bounds, player, blocked_zones)
 	if not res["valid"]:
 		placement_rejected.emit(res["reason"], res["message"])
 		return null

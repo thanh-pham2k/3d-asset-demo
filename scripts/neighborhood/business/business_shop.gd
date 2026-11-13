@@ -34,11 +34,13 @@ var daily_expenses: int = 0
 
 # Progression & Reputation
 var business_level: int = 1 # 1 to 5
+var auto_level_up_enabled: bool = true
 var reputation_score: float = 100.0 # 0.0 to 100.0
 var streak_count: int = 0 # Consecutive successful orders
 
-# Peak Hours
+# Peak & Quiet Hours
 var is_peak_hour: bool = false
+var is_quiet_hour: bool = false
 var peak_multiplier: float = 1.2 # +20% during rush hour
 
 var active_orders: Array[BusinessOrder] = []
@@ -87,7 +89,10 @@ func _process(delta: float) -> void:
 	_update_status_display()
 
 func _get_peak_hour_ranges() -> Array[Vector2]:
-	return [] # Subclasses override
+	return [Vector2(7.0, 9.0), Vector2(17.0, 19.0)]
+
+func _get_quiet_hour_ranges() -> Array[Vector2]:
+	return [Vector2(14.0, 16.0)]
 
 func _check_peak_hours(hour: float) -> void:
 	var ranges := _get_peak_hour_ranges()
@@ -97,6 +102,13 @@ func _check_peak_hours(hour: float) -> void:
 			in_peak = true
 			break
 	is_peak_hour = in_peak
+	var quiet_ranges := _get_quiet_hour_ranges()
+	var in_quiet := false
+	for qr in quiet_ranges:
+		if hour >= qr.x and hour < qr.y:
+			in_quiet = true
+			break
+	is_quiet_hour = in_quiet and not is_peak_hour
 
 func get_effective_spawn_interval() -> float:
 	var base := spawn_interval
@@ -107,8 +119,15 @@ func get_effective_spawn_interval() -> float:
 	
 	if is_peak_hour:
 		base *= 0.65 # Faster arrivals in peak hour
+	elif is_quiet_hour:
+		base *= 1.45 # Relaxed afternoon quiet period (14:00-16:00)
 	
-	return maxf(6.0, base)
+	var event_mgr := get_tree().get_first_node_in_group("daily_event_manager") if is_inside_tree() else null
+	if is_instance_valid(event_mgr) and event_mgr.has_method("get_arrival_multiplier"):
+		var mult := maxf(0.25, float(event_mgr.call("get_arrival_multiplier", shop_id)))
+		base /= mult
+	
+	return maxf(4.0, base)
 
 func get_patience_multiplier() -> float:
 	match business_level:
@@ -140,6 +159,32 @@ func _update_orders_patience(delta: float) -> void:
 
 var is_closing: bool = false
 
+func roll_customer_type() -> BusinessOrder.CustomerType:
+	var event_mgr := get_tree().get_first_node_in_group("daily_event_manager") if is_inside_tree() else null
+	var vip_chance: float = float(event_mgr.call("get_vip_chance")) if is_instance_valid(event_mgr) and event_mgr.has_method("get_vip_chance") else 0.08
+	if reputation_score >= 85.0:
+		vip_chance += 0.08
+	var roll := randf()
+	if roll < vip_chance:
+		return BusinessOrder.CustomerType.VIP
+	elif roll < vip_chance + 0.22:
+		return BusinessOrder.CustomerType.EXPRESS
+	return BusinessOrder.CustomerType.NORMAL
+
+func apply_customer_type_to_order(order: BusinessOrder, base_reward: int, base_patience: float) -> void:
+	if not is_instance_valid(order):
+		return
+	var cfg: Dictionary = BusinessOrder.CUSTOMER_TYPE_CONFIG.get(order.customer_type, BusinessOrder.CUSTOMER_TYPE_CONFIG[BusinessOrder.CustomerType.NORMAL])
+	order.reward_money = int(round(float(base_reward) * float(cfg["reward_mult"])))
+	var adjusted_patience := base_patience * float(cfg["patience_mult"])
+	order.patience_max = adjusted_patience
+	order.patience_remaining = adjusted_patience
+	order.express_deadline = float(cfg["express_deadline"])
+	if order.customer_type == BusinessOrder.CustomerType.VIP and not order.customer_name.begins_with("🌟"):
+		order.customer_name = "🌟 [VIP] " + order.customer_name
+	elif order.customer_type == BusinessOrder.CustomerType.EXPRESS and not order.customer_name.begins_with("⚡"):
+		order.customer_name = "⚡ [Gấp] " + order.customer_name
+
 func complete_order(order: BusinessOrder) -> bool:
 	if not is_instance_valid(order):
 		return false
@@ -154,23 +199,55 @@ func complete_order(order: BusinessOrder) -> bool:
 	order.status = BusinessOrder.Status.PAID
 	active_orders.erase(order)
 	
-	# Satisfaction and streak calculation
+	# Satisfaction, reputation, and streak calculation
 	var stars := order.get_star_rating()
 	var rating_text := order.get_satisfaction_label()
+	streak_count += 1
 	
 	if stars >= 4:
-		streak_count += 1
 		reputation_score = minf(100.0, reputation_score + (2.5 if stars == 5 else 1.5))
 		if stars == 5:
 			order.tip_money += int(float(order.reward_money) * 0.20)
 		else:
 			order.tip_money += int(float(order.reward_money) * 0.10)
+	elif stars == 3:
+		reputation_score = minf(100.0, reputation_score + 0.5)
 	else:
-		streak_count = 0
-		reputation_score = maxf(10.0, reputation_score - 1.0)
+		reputation_score = maxf(10.0, reputation_score - 2.0)
+	
+	# High reputation occasional grateful tip
+	if reputation_score >= 85.0 and randf() < 0.30:
+		order.tip_money += 3000
+	
+	# Express fast-service bonus (completed within target deadline, default 15s)
+	var express_hit := false
+	if order.customer_type == BusinessOrder.CustomerType.EXPRESS and order.express_deadline > 0.0 and order.time_spent <= order.express_deadline:
+		var exp_cfg: Dictionary = BusinessOrder.CUSTOMER_TYPE_CONFIG[BusinessOrder.CustomerType.EXPRESS]
+		order.express_bonus = int(exp_cfg["express_bonus"])
+		express_hit = true
+	
+	# Streak milestone feedback & flat 5-streak achievement bonus
+	var streak_bonus_msg := ""
+	if streak_count == 3:
+		streak_bonus_msg = "\n🔥 Đắt Khách ✨ (3 khách liên tiếp!)"
+	elif streak_count == 5:
+		order.tip_money += 10000
+		streak_bonus_msg = "\n🏆 Đắt Khách Vàng! Chuỗi 5 khách (+10,000 đ)"
+	elif streak_count > 5:
+		streak_bonus_msg = "\n🔥 Đắt Khách ✨ (Chuỗi x%d)" % streak_count
 	
 	if order.is_peak_hour and peak_multiplier > 1.0:
-		order.peak_bonus = int(float(order.reward_money) * (peak_multiplier - 1.0))
+		order.peak_bonus = int(round(float(order.reward_money) * (peak_multiplier - 1.0)))
+
+	var event_mgr := get_tree().get_first_node_in_group("daily_event_manager") if is_inside_tree() else null
+	if is_instance_valid(event_mgr) and order.tip_money > 0 and event_mgr.has_method("get_tips_multiplier"):
+		var tip_mult := float(event_mgr.call("get_tips_multiplier", shop_id))
+		if not is_equal_approx(tip_mult, 1.0):
+			order.tip_money = int(round(float(order.tip_money) * tip_mult))
+
+	if _is_couple_working_together(order.target_spot):
+		order.tip_money += 2000
+		streak_bonus_msg += "\n🤝 Phối hợp cặp đôi (+2,000 đ)"
 	
 	var total_payout: int = order.get_total_payout()
 	total_tips += order.tip_money
@@ -180,7 +257,7 @@ func complete_order(order: BusinessOrder) -> bool:
 	daily_customers_served += 1
 	
 	# Business progression check
-	if customers_served >= business_level * 4 and business_level < 5:
+	if auto_level_up_enabled and customers_served >= business_level * 4 and business_level < 5:
 		business_level += 1
 		level_up.emit(business_level)
 		_show_feedback(global_position + Vector3(0, 3.0, 0), "🎉 Cửa hàng thăng hạng CẤP %d! ⭐" % business_level, Color("ffd54f"))
@@ -188,16 +265,17 @@ func complete_order(order: BusinessOrder) -> bool:
 	earnings_changed.emit(total_earnings)
 	order_completed.emit(order, total_payout)
 	
-	var streak_msg := (" 🔥 Chuỗi x%d!" % streak_count) if streak_count >= 3 else ""
+	var express_msg := (" · ⚡ Nhanh (+%s đ)" % format_money(order.express_bonus)) if express_hit else ""
 	var tip_msg := (" (+%s đ Tip)" % format_money(order.tip_money)) if order.tip_money > 0 else ""
 	_show_feedback(
 		order.target_spot,
-		"+%s đ · %s%s\n%s%s" % [
+		"+%s đ · %s%s%s\n%s%s" % [
 			format_money(total_payout),
 			order.service_title,
 			tip_msg,
+			express_msg,
 			rating_text,
-			streak_msg
+			streak_bonus_msg
 		],
 		Color("69f0ae")
 	)
@@ -321,7 +399,7 @@ func _update_status_display() -> void:
 		status_billboard.modulate = Color("e0e0e0")
 	else:
 		var queue_count := active_orders.size()
-		var peak_str := " | ⚡ CAO ĐIỂM" if is_peak_hour else ""
+		var peak_str := " | ⚡ CAO ĐIỂM" if is_peak_hour else (" | ☕ CHIỀU THƯ THẢ" if is_quiet_hour else "")
 		var streak_str := " | 🔥x%d" % streak_count if streak_count >= 2 else ""
 		status_billboard.text = "%s (Cấp %d%s)\nDoanh thu: %s đ | Khách chờ: %d%s" % [
 			shop_name,
@@ -363,6 +441,16 @@ func format_money(val: int) -> String:
 # Virtual methods for subclasses:
 func _try_spawn_customer() -> void:
 	pass
+
+func _is_couple_working_together(spot: Vector3) -> bool:
+	if not is_inside_tree():
+		return false
+	var nearby_count := 0
+	for p in get_tree().get_nodes_in_group("players"):
+		if is_instance_valid(p) and p is Node3D:
+			if (p as Node3D).global_position.distance_to(spot) <= 14.0:
+				nearby_count += 1
+	return nearby_count >= 2
 
 func _on_customer_depart(_order: BusinessOrder) -> void:
 	pass

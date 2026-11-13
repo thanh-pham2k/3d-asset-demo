@@ -244,6 +244,7 @@ func harvest_crop(player_node: Node) -> bool:
 	if not is_instance_valid(econ) or not econ.inventory:
 		return false
 	econ.inventory.add_item(crop_def.produce_item_id, qty)
+	var total_in_bag := econ.inventory.get_item_count(crop_def.produce_item_id)
 		
 	var harvested_id := crop_id
 	crop_id = ""
@@ -257,7 +258,7 @@ func harvest_crop(player_node: Node) -> bool:
 	var fx = get_tree().get_first_node_in_group("chaos_feedback")
 	if is_instance_valid(fx):
 		fx.play_event("pickup", global_position + Vector3(0, 0.35, 0))
-		fx.show_toast("🎉 Thu hoạch thành công! +%d %s đã được cất vào túi đồ! 🧺" % [qty, crop_def.display_name])
+		fx.show_toast("🎉 Thu hoạch thành công! +%d %s (Trong kho: %d) 🧺" % [qty, crop_def.display_name, total_in_bag])
 		
 	crop_harvested.emit(plot_id, harvested_id, qty)
 	_save_state()
@@ -338,7 +339,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	if is_instance_valid(placement_mgr) and placement_mgr.is_active(): return
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode == KEY_R and crop_id == "" and is_tilled:
-			var pl := get_tree().get_first_node_in_group("players") as CharacterBody3D
+			var pl := get_tree().get_first_node_in_group("active_player") as CharacterBody3D
+			if not is_instance_valid(pl):
+				pl = get_tree().get_first_node_in_group("players") as CharacterBody3D
 			if is_instance_valid(pl) and pl.get("target") == self and not pl.has_meta("shopping_open") and not pl.has_meta("pet_rename_open") and not pl.has_meta("daily_summary_open") and not pl.has_meta("map_open") and global_position.distance_to(pl.global_position) <= interaction_radius:
 				var available_seeds := _get_available_seed_crops()
 				if available_seeds.size() > 1:

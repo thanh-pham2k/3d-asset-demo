@@ -60,6 +60,7 @@ var activity_elapsed: float = 0.0
 var sleeping_on_bed: bool = false
 var bed_exit_position: Vector3 = Vector3.ZERO
 var sleep_search_delay: float = 8.0
+var exploring_garden: bool = false
 
 func _ready() -> void:
 	add_to_group("pets")
@@ -284,14 +285,22 @@ func _process_idle(delta: float) -> void:
 		if state_timer >= wander_interval:
 			state_timer = 0.0
 			wander_interval = randf_range(4.0, 8.0)
-			# Random decision: sit, stretch, or walk somewhere
+			# Random decision: sit, explore garden, or walk in room
 			var roll := randf()
-			if roll < 0.3:
+			if roll < 0.25:
 				play_animation("sit")
-			elif roll < 0.6:
+				exploring_garden = false
+			elif roll < 0.45 and hunger >= 35.0 and thirst >= 35.0:
+				exploring_garden = true
+				target_nav_point = _pick_random_garden_point()
+				show_mood_emote("🌿")
+				play_animation("walk")
+			elif roll < 0.75:
+				exploring_garden = false
 				target_nav_point = _pick_random_room_point()
 				play_animation("walk")
 			else:
+				exploring_garden = false
 				play_animation("idle")
 
 func _process_following(delta: float) -> void:
@@ -523,10 +532,15 @@ func _is_point_blocked_or_out_of_bounds(p: Vector3) -> bool:
 	var local := _room_to_local(p)
 	if local.x < SAFE_ROOM_MIN.x or local.x > SAFE_ROOM_MAX.x:
 		return true
-	if local.z < SAFE_ROOM_MIN.y or local.z > SAFE_ROOM_MAX.y or _is_in_doorway(p):
+	var min_z := -6.8 if exploring_garden else SAFE_ROOM_MIN.y
+	if local.z < min_z or local.z > SAFE_ROOM_MAX.y or (not exploring_garden and _is_in_doorway(p)):
 		return true
 	var query := PhysicsRayQueryParameters3D.create(global_position + Vector3.UP * 0.2, p + Vector3.UP * 0.2, 1, [get_rid()])
 	return not get_world_3d().direct_space_state.intersect_ray(query).is_empty()
+
+func _pick_random_garden_point() -> Vector3:
+	var pt := Vector3(randf_range(-2.2, 2.2), 0.0, randf_range(-6.6, -4.8))
+	return _room_to_global(pt)
 
 func _is_in_doorway(p: Vector3) -> bool:
 	var local := _room_to_local(p)

@@ -28,6 +28,12 @@ var prompt_label: Label3D
 @export var config: PlayerConfig = PlayerConfig.new()
 var animation_controller: Node
 var movement_disabled: bool = false
+var is_active_controlled: bool = true
+
+func play_couple_celebration() -> void:
+ if is_instance_valid(visual):
+  visual.scale = Vector3(1.22, 0.78, 1.22)
+ velocity.y = maxf(velocity.y, 3.2)
 
 func _ready() -> void:
  add_to_group("players")
@@ -106,6 +112,21 @@ func _physics_process(delta: float) -> void:
  slip_timer = maxf(0.0, slip_timer - delta)
  slip_cooldown = maxf(0.0, slip_cooldown - delta)
  var prefix = "p%d_" % player_id
+ if not is_active_controlled:
+  velocity.x = move_toward(velocity.x, 0.0, config.acceleration * delta)
+  velocity.z = move_toward(velocity.z, 0.0, config.acceleration * delta)
+  if not is_on_floor(): velocity.y -= 18.0 * delta
+  else: velocity.y = -0.1
+  if is_instance_valid(visual):
+   visual.scale = visual.scale.lerp(Vector3.ONE, 1.0 - exp(-14.0 * delta))
+  move_and_slide()
+  update_animation(0.0, false)
+  if is_instance_valid(prompt_label):
+   prompt_label.text = ""
+   prompt_label.visible = false
+  return
+ if is_instance_valid(prompt_label):
+  prompt_label.visible = true
  if movement_disabled or has_meta("shopping_open") or has_meta("pet_rename_open") or has_meta("daily_summary_open") or has_meta("map_open") or Time.get_ticks_msec() < int(get_meta("ui_input_block_until_msec", 0)):
   velocity = Vector3.ZERO
   update_animation(0.0, false)
@@ -128,6 +149,12 @@ func _physics_process(delta: float) -> void:
  var riding_scooter = get_meta("riding_scooter") if has_meta("riding_scooter") else null
  if riding_scooter != null and is_instance_valid(riding_scooter):
   speed = 13.0 if running else 8.5
+ else:
+  var house_mgr := get_tree().get_first_node_in_group("house_progression_manager") as HouseProgressionManager
+  var loop_mgr := get_tree().get_first_node_in_group("daily_loop_manager")
+  var cur_day := int(loop_mgr.current_day) if (is_instance_valid(loop_mgr) and "current_day" in loop_mgr) else 1
+  if is_instance_valid(house_mgr) and house_mgr.has_dinner_speed_buff(cur_day):
+   speed *= 1.05
  if Input.is_action_just_pressed(prefix + "dash") and dash_cooldown_remaining <= 0.0 and riding_scooter == null:
   dash_direction = direction.normalized() if direction.length() > 0.08 else facing
   dash_remaining = config.dash_duration

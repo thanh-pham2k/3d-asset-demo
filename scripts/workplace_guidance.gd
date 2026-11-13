@@ -10,6 +10,10 @@ const GARAGE_DEFAULT := Vector3(-63, 0, -11)
 const TOOL_SHOP_POS := Vector3(-56.0, 0, -14.0)
 const NOODLE_DEFAULT := Vector3(-50, 0, -17)
 const HOUSE_EXIT := Vector3(-45, 0, 68)
+const WAYPOINT_ARRIVAL_RADIUS := 4.0
+
+signal waypoint_changed(active: bool, waypoint_id: String, title: String, pos: Vector3)
+signal waypoint_arrived(waypoint_id: String, title: String)
 
 var player: CharacterBody3D
 var camera: Camera3D
@@ -38,6 +42,28 @@ var has_navigation_target: bool = true
 var arrived: bool = false
 var smoothed_angle: float = 0.0
 var smoothed_world_yaw: float = 0.0
+
+# Priority 1: Mandatory story/tutorial objective
+var has_mandatory_objective: bool = false
+var mandatory_title: String = ""
+var mandatory_pos: Vector3 = Vector3.ZERO
+var mandatory_hint: String = ""
+
+# Priority 2: Player-selected custom waypoint
+var has_custom_waypoint: bool = false
+var custom_waypoint_id: String = ""
+var custom_waypoint_title: String = ""
+var custom_waypoint_pos: Vector3 = Vector3.ZERO
+var custom_waypoint_hint: String = ""
+
+# Navigation path state
+var current_route_points: PackedVector3Array = PackedVector3Array()
+var is_walkable_route: bool = false
+var _last_path_query_msec: int = 0
+var _last_path_from: Vector3 = Vector3.ZERO
+var _last_path_to: Vector3 = Vector3.ZERO
+var _arrival_banner_timer: float = 0.0
+var _arrival_banner_text: String = ""
 
 func _ready() -> void:
 	layer = 90
@@ -198,24 +224,127 @@ func _build_player_arrow() -> void:
 	
 	get_parent().add_child.call_deferred(player_arrow)
 
+func set_mandatory_objective(title: String, pos: Vector3, hint: String = "") -> void:
+	has_mandatory_objective = true
+	mandatory_title = title
+	mandatory_pos = pos
+	mandatory_hint = hint
+	_invalidate_path_cache()
+
+func clear_mandatory_objective() -> void:
+	has_mandatory_objective = false
+	mandatory_title = ""
+	mandatory_pos = Vector3.ZERO
+	mandatory_hint = ""
+	_invalidate_path_cache()
+
+func set_custom_waypoint(waypoint_id: String, title: String, pos: Vector3, hint: String = "") -> void:
+	has_custom_waypoint = true
+	custom_waypoint_id = waypoint_id
+	custom_waypoint_title = title
+	custom_waypoint_pos = pos
+	custom_waypoint_hint = hint if hint != "" else "Điểm đến đã chọn trên bản đồ"
+	_arrival_banner_timer = 0.0
+	_invalidate_path_cache()
+	waypoint_changed.emit(true, custom_waypoint_id, custom_waypoint_title, custom_waypoint_pos)
+
+func clear_custom_waypoint(notify: bool = false) -> void:
+	if not has_custom_waypoint:
+		return
+	var old_title := custom_waypoint_title
+	has_custom_waypoint = false
+	custom_waypoint_id = ""
+	custom_waypoint_title = ""
+	custom_waypoint_pos = Vector3.ZERO
+	custom_waypoint_hint = ""
+	_invalidate_path_cache()
+	waypoint_changed.emit(false, "", "", Vector3.ZERO)
+	if notify and is_inside_tree():
+		var fx := get_tree().get_first_node_in_group("chaos_feedback")
+		if is_instance_valid(fx) and fx.has_method("show_toast"):
+			fx.show_toast("🗺️ Đã xóa điểm đến '%s' · Quay lại mục tiêu hàng ngày" % old_title)
+
+func _invalidate_path_cache() -> void:
+	_last_path_query_msec = 0
+	current_route_points = PackedVector3Array()
+	is_walkable_route = false
+
 func _process(delta: float) -> void:
-	if not is_instance_valid(player):
+	var active_p := get_tree().get_first_node_in_group("active_player") as CharacterBody3D
+	if is_instance_valid(active_p):
+		player = active_p
+	elif not is_instance_valid(player):
 		player = get_tree().get_first_node_in_group("players") as CharacterBody3D
 	if not is_instance_valid(camera):
 		camera = get_viewport().get_camera_3d()
 	if not is_instance_valid(player) or not is_instance_valid(camera):
 		return
 	
-	var daily_loop = get_tree().get_first_node_in_group("daily_loop_manager")
-	if is_instance_valid(daily_loop) and is_instance_valid(header_label):
-		header_label.text = "🎯 MỤC TIÊU — NGÀY %d" % daily_loop.current_day
+	if _arrival_banner_timer > 0.0:
+		_arrival_banner_timer = maxf(0.0, _arrival_banner_timer - delta)
 	
 	_resolve_current_destination()
+	_check_custom_waypoint_arrival()
+	_update_header_label()
+	_update_navigation_path()
 	_update_beacon(delta)
 	_update_navigation_arrow(delta)
 
+func _update_header_label() -> void:
+	if not is_instance_valid(header_label):
+		return
+	if has_mandatory_objective:
+		header_label.text = "⚠️ NHIỆM VỤ BẮT BUỘC"
+		header_label.add_theme_color_override("font_color", Color("ffab40"))
+	elif has_custom_waypoint:
+		header_label.text = "📍 ĐIỂM ĐẾN TỰ CHỌN"
+		header_label.add_theme_color_override("font_color", Color("40c4ff"))
+	else:
+		var daily_loop = get_tree().get_first_node_in_group("daily_loop_manager")
+		if is_instance_valid(daily_loop):
+			header_label.text = "🎯 MỤC TIÊU — NGÀY %d" % daily_loop.current_day
+		else:
+			header_label.text = "🎯 HƯỚNG DẪN MỤC TIÊU"
+		header_label.add_theme_color_override("font_color", Color("ffd54f"))
+
+func _check_custom_waypoint_arrival() -> void:
+	if has_mandatory_objective or not has_custom_waypoint or not is_instance_valid(player):
+		return
+	var p_xz := Vector2(player.global_position.x, player.global_position.z)
+	var d_xz := Vector2(custom_waypoint_pos.x, custom_waypoint_pos.z)
+	if p_xz.distance_to(d_xz) <= WAYPOINT_ARRIVAL_RADIUS:
+		var arrived_id := custom_waypoint_id
+		var arrived_title := custom_waypoint_title
+		_arrival_banner_text = "✅ Đã đến %s!" % arrived_title
+		_arrival_banner_timer = 3.0
+		var fx := get_tree().get_first_node_in_group("chaos_feedback")
+		if is_instance_valid(fx) and fx.has_method("show_toast"):
+			fx.show_toast("📍 Đã đến %s!" % arrived_title)
+		waypoint_arrived.emit(arrived_id, arrived_title)
+		clear_custom_waypoint(false)
+		_resolve_current_destination()
+
 func _resolve_current_destination() -> void:
 	has_navigation_target = true
+	
+	# Priority 1: Mandatory story/tutorial instruction
+	if has_mandatory_objective:
+		current_destination = mandatory_pos
+		current_title = mandatory_title
+		current_hint = mandatory_hint
+		return
+	
+	# Priority 2: Player-selected custom waypoint
+	if has_custom_waypoint:
+		current_destination = custom_waypoint_pos
+		current_title = custom_waypoint_title
+		current_hint = custom_waypoint_hint
+		return
+	
+	# Priority 3: Suggested daily objective
+	_resolve_daily_destination()
+
+func _resolve_daily_destination() -> void:
 	var char_val = player.get("selected_character")
 	if char_val == null and player.has_meta("selected_character"):
 		char_val = player.get_meta("selected_character")
@@ -235,14 +364,11 @@ func _resolve_current_destination() -> void:
 	
 	if in_house:
 		var daily_loop_node = get_tree().get_first_node_in_group("daily_loop_manager")
-		var ready_sleep: bool = false
-		if is_instance_valid(daily_loop_node):
-			ready_sleep = daily_loop_node.is_ready_to_sleep()
-		else:
-			var econ = get_tree().get_first_node_in_group("economy_manager")
-			ready_sleep = is_instance_valid(econ) and (econ.wallet.total_earned > 0 or econ.wallet.balance > 100000)
+		var time_mgr := get_tree().get_first_node_in_group("time_manager") as NeighborhoodTimeManager
+		var is_evening: bool = is_instance_valid(time_mgr) and (time_mgr.current_hour >= 18.0 or time_mgr.current_hour < 6.0)
+		var suggest_sleep: bool = is_evening or (is_instance_valid(daily_loop_node) and daily_loop_node.has_worked_today())
 		
-		if ready_sleep and p_pos.distance_to(Vector3(-45, 0, 88)) < 6.0:
+		if suggest_sleep and p_pos.distance_to(Vector3(-45, 0, 88)) < 6.0:
 			current_destination = Vector3(-50.5, 0, 90.75)
 			current_title = "🛏️ Giường Ngủ (Lưu Tiến Trình)"
 			current_hint = "Nằm nghỉ trên giường [E] để ngủ và sang ngày mới"
@@ -250,7 +376,7 @@ func _resolve_current_destination() -> void:
 		else:
 			current_destination = HOUSE_EXIT
 			current_title = "Cổng Sân Nhà"
-			current_hint = "Ra sân lấy xe máy đi làm"
+			current_hint = "Ra sân chăm vườn, đi chợ hoặc mở Bản đồ [M] chọn nơi đến"
 			return
 	
 	if not girl:
@@ -446,19 +572,79 @@ func _resolve_current_destination() -> void:
 				current_hint = "Quán đang mở, chờ khách vào bàn"
 				has_navigation_target = false
 
+func _update_navigation_path() -> void:
+	if not has_navigation_target or not is_instance_valid(player):
+		current_route_points = PackedVector3Array()
+		is_walkable_route = false
+		return
+	var now := Time.get_ticks_msec()
+	var p_pos := player.global_position
+	var dest := current_destination
+	if now - _last_path_query_msec < 200 and p_pos.distance_to(_last_path_from) < 1.5 and dest.distance_to(_last_path_to) < 0.5:
+		return
+	_last_path_query_msec = now
+	_last_path_from = p_pos
+	_last_path_to = dest
+	
+	var world_3d := player.get_world_3d()
+	if not world_3d:
+		current_route_points = PackedVector3Array()
+		is_walkable_route = false
+		return
+	var nav_map := world_3d.navigation_map
+	if not nav_map.is_valid() or NavigationServer3D.map_get_iteration_id(nav_map) <= 0:
+		current_route_points = PackedVector3Array()
+		is_walkable_route = false
+		return
+	
+	var path := NavigationServer3D.map_get_path(nav_map, p_pos, dest, true)
+	if path.size() >= 2:
+		var end_xz := Vector2(path[path.size() - 1].x, path[path.size() - 1].z)
+		var dest_xz := Vector2(dest.x, dest.z)
+		if end_xz.distance_to(dest_xz) <= 8.0:
+			current_route_points = path
+			is_walkable_route = true
+			return
+	current_route_points = PackedVector3Array()
+	is_walkable_route = false
+
+func _get_steering_target() -> Vector3:
+	if is_walkable_route and current_route_points.size() >= 2 and is_instance_valid(player):
+		var p_xz := Vector2(player.global_position.x, player.global_position.z)
+		for i in range(1, current_route_points.size()):
+			var pt := current_route_points[i]
+			var pt_xz := Vector2(pt.x, pt.z)
+			if p_xz.distance_to(pt_xz) > 2.2 or i == current_route_points.size() - 1:
+				return pt
+	return current_destination
+
 func _update_beacon(_delta: float) -> void:
 	if not is_instance_valid(ground_beacon) or not ground_beacon.is_inside_tree(): return
 	ground_beacon.global_position = current_destination
+	var col := Color("ffab40") if has_mandatory_objective else (Color("40c4ff") if has_custom_waypoint else Color("69f0ae"))
+	if is_instance_valid(beacon_ring) and beacon_ring.material_override is StandardMaterial3D:
+		var mat := beacon_ring.material_override as StandardMaterial3D
+		mat.albedo_color = Color(col.r, col.g, col.b, 0.85)
+	var pin := ground_beacon.get_node_or_null("BeaconPin") as Label3D
+	if is_instance_valid(pin):
+		pin.modulate = col
 	
 	var t := Time.get_ticks_msec() / 1000.0
 	beacon_ring.scale = Vector3.ONE * (1.0 + 0.12 * sin(t * 4.0))
 	ground_beacon.visible = has_navigation_target and not arrived
 
 func _update_navigation_arrow(delta: float) -> void:
-	var delta_3d := current_destination - player.global_position
+	var dest_delta := current_destination - player.global_position
+	dest_delta.y = 0.0
+	var dist: float = dest_delta.length()
+	var arrival_threshold := WAYPOINT_ARRIVAL_RADIUS if (has_custom_waypoint and not has_mandatory_objective) else 2.4
+	arrived = (not has_navigation_target) or (dist < arrival_threshold)
+	
+	var steer_target := _get_steering_target()
+	var delta_3d := steer_target - player.global_position
 	delta_3d.y = 0.0
-	var dist: float = delta_3d.length()
-	arrived = (not has_navigation_target) or (dist < 2.4)
+	if delta_3d.length_squared() < 0.01:
+		delta_3d = dest_delta
 	
 	# -------------------------------------------------------------
 	# 1. 3D Ground Directional Arrow around Player
@@ -508,7 +694,11 @@ func _update_navigation_arrow(delta: float) -> void:
 	var glyph_idx := posmod(int(round(smoothed_angle / (PI / 4.0))), 8)
 	var arrow_char: String = glyphs[glyph_idx]
 	
-	if not has_navigation_target:
+	if _arrival_banner_timer > 0.0 and not has_custom_waypoint:
+		direction_label.text = _arrival_banner_text
+		direction_label.add_theme_color_override("font_color", Color("69f0ae"))
+		hint_label.text = "Đang tiếp tục: %s" % current_title
+	elif not has_navigation_target:
 		direction_label.text = current_title
 		direction_label.add_theme_color_override("font_color", Color("69f0ae"))
 		hint_label.text = current_hint
@@ -518,8 +708,9 @@ func _update_navigation_arrow(delta: float) -> void:
 		hint_label.text = current_title + " · Tương tác [E]"
 	else:
 		direction_label.text = "%s  %s  ·  %d m" % [arrow_char, current_title, int(round(dist))]
-		direction_label.add_theme_color_override("font_color", Color("fff9c4"))
-		hint_label.text = current_hint
+		direction_label.add_theme_color_override("font_color", Color("80d8ff") if has_custom_waypoint else Color("fff9c4"))
+		var route_tag := "🛤️ Theo lối đi" if is_walkable_route else "🧭 Hướng chim bay"
+		hint_label.text = "%s · %s" % [route_tag, current_hint] if has_custom_waypoint else current_hint
 	
 	# -------------------------------------------------------------
 	# 3. Dynamic Floating Screen-Edge Pointer

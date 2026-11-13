@@ -13,6 +13,43 @@ enum Status {
 	CANCELLED
 }
 
+enum CustomerType {
+	NORMAL,
+	EXPRESS,
+	VIP
+}
+
+const CUSTOMER_TYPE_CONFIG: Dictionary = {
+	CustomerType.NORMAL: {
+		"label": "Khách thường",
+		"icon": "👤",
+		"patience_mult": 1.0,
+		"reward_mult": 1.0,
+		"express_deadline": 0.0,
+		"express_bonus": 0
+	},
+	CustomerType.EXPRESS: {
+		"label": "Khách Gấp (15s)",
+		"icon": "⚡",
+		"patience_mult": 0.65,
+		"reward_mult": 1.0,
+		"express_deadline": 15.0,
+		"express_bonus": 10000
+	},
+	CustomerType.VIP: {
+		"label": "Khách VIP",
+		"icon": "🌟",
+		"patience_mult": 1.15,
+		"reward_mult": 1.5,
+		"express_deadline": 0.0,
+		"express_bonus": 0
+	}
+}
+
+var customer_type: CustomerType = CustomerType.NORMAL
+var express_deadline: float = 0.0
+var express_bonus: int = 0
+
 var order_id: String = ""
 var customer_name: String = "Khách hàng"
 var customer_node: Node3D = null
@@ -30,6 +67,8 @@ var tip_money: int = 0
 var time_spent: float = 0.0
 var is_peak_hour: bool = false
 var peak_bonus: int = 0
+var is_premium: bool = false
+var repair_duration_override: float = 0.0
 
 var required_steps: Array[String] = []
 var completed_steps: Array[String] = []
@@ -92,8 +131,12 @@ func get_current_required_step() -> String:
 		return required_steps[current_step_index]
 	return ""
 
+func get_customer_type_badge() -> String:
+	var cfg: Dictionary = CUSTOMER_TYPE_CONFIG.get(customer_type, CUSTOMER_TYPE_CONFIG[CustomerType.NORMAL])
+	return "%s %s" % [cfg["icon"], cfg["label"]]
+
 func get_total_payout() -> int:
-	return reward_money + tip_money + peak_bonus
+	return reward_money + tip_money + peak_bonus + express_bonus
 
 func is_actionable() -> bool:
 	return status == Status.PENDING or status == Status.IN_PROGRESS

@@ -341,6 +341,40 @@ static func load_objective_data(path: String = "") -> Dictionary:
 			return {}
 	return {}
 
+static func load_daily_event_data(path: String = "") -> Dictionary:
+	var target_path := get_effective_path(path)
+	for candidate in [target_path, target_path + ".bak"]:
+		if not FileAccess.file_exists(candidate):
+			continue
+		var file := FileAccess.open(candidate, FileAccess.READ)
+		if not file:
+			continue
+		var parsed: Variant = JSON.parse_string(file.get_as_text())
+		file.close()
+		if is_usable_save(parsed):
+			var businesses: Variant = parsed.get("businesses", {})
+			if businesses is Dictionary and businesses.get("daily_event", null) is Dictionary:
+				return businesses["daily_event"]
+			return {}
+	return {}
+
+static func load_relationship_data(path: String = "") -> Dictionary:
+	var target_path := get_effective_path(path)
+	for candidate in [target_path, target_path + ".bak"]:
+		if not FileAccess.file_exists(candidate):
+			continue
+		var file := FileAccess.open(candidate, FileAccess.READ)
+		if not file:
+			continue
+		var parsed: Variant = JSON.parse_string(file.get_as_text())
+		file.close()
+		if is_usable_save(parsed):
+			var businesses: Variant = parsed.get("businesses", {})
+			if businesses is Dictionary and businesses.get("relationships", null) is Dictionary:
+				return businesses["relationships"]
+			return {}
+	return {}
+
 static func load_farm_data(path: String = "") -> Dictionary:
 	var target_path := get_effective_path(path)
 	var bak_path := target_path + ".bak"

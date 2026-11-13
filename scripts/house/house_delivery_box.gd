@@ -75,7 +75,9 @@ func interact(player: Node3D) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if not (event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_R): return
 	if not house_storage or not is_inside_tree(): return
-	var player := get_tree().get_first_node_in_group("players") as CharacterBody3D
+	var player := get_tree().get_first_node_in_group("active_player") as CharacterBody3D
+	if not is_instance_valid(player):
+		player = get_tree().get_first_node_in_group("players") as CharacterBody3D
 	if not is_instance_valid(player) or player.get("target") != self or player.has_meta("shopping_open") or player.has_meta("pet_rename_open") or player.has_meta("daily_summary_open") or player.has_meta("map_open"):
 		return
 	var manager := get_tree().get_first_node_in_group("furniture_placement_manager") as FurniturePlacementManager

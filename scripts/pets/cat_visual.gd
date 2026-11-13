@@ -391,7 +391,7 @@ func _create_torus_mesh(outer_r: float, inner_r: float, col: Color) -> MeshInsta
 	t.inner_radius = outer_r - inner_r
 	t.outer_radius = outer_r
 	t.ring_segments = 12
-	t.pipe_segments = 6
+	t.rings = 12
 	m.mesh = t
 	m.material_override = _get_matte_material(col)
 	return m

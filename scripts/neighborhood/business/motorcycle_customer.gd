@@ -21,11 +21,13 @@ var current_state: State = State.APPROACHING
 
 var bay_index: int = 0
 var customer_name: String = "Anh Tuấn"
+var customer_type: int = BusinessOrder.CustomerType.NORMAL
 var order: BusinessOrder = null
 
 var scooter: Node3D
 var driver: NPCVisual
 var speech_label: Label3D
+var vip_marker: Label3D
 var exhaust_particles: CPUParticles3D
 
 var waypoints: Array[Vector3] = []
@@ -81,7 +83,12 @@ func _build_visuals() -> void:
 	driver = NPCVisual.new()
 	driver.gender = "boy" if (randi() % 2 == 0) else "girl"
 	driver.accessory = "cap" if driver.gender == "boy" else "helmet"
-	driver.shirt_color = [Color("e57373"), Color("64b5f6"), Color("81c784"), Color("ffb74d")][randi() % 4]
+	if customer_type == BusinessOrder.CustomerType.VIP:
+		driver.shirt_color = Color("ffd54f")
+	elif customer_type == BusinessOrder.CustomerType.EXPRESS:
+		driver.shirt_color = Color("ff7043")
+	else:
+		driver.shirt_color = [Color("e57373"), Color("64b5f6"), Color("81c784"), Color("ffb74d")][randi() % 4]
 	driver.pants_color = Color("37474f")
 	driver.hair_color = Color("2c3e50")
 	scooter.add_child(driver)
@@ -89,17 +96,29 @@ func _build_visuals() -> void:
 	# Position driver on scooter seat
 	_seat_driver_on_scooter()
 	
-	# 3. Speech bubble (positioned high to avoid overlapping bay status label)
+	# 3. Speech bubble (positioned high above bay status label to prevent overlap)
 	speech_label = Label3D.new()
-	speech_label.position = Vector3(0, 2.9, 0)
+	speech_label.position = Vector3(0, 3.45, 0)
 	speech_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	speech_label.font_size = 22
+	speech_label.font_size = 20
 	speech_label.pixel_size = 0.004
 	speech_label.outline_size = 8
 	speech_label.modulate = Color("fff9c4")
 	speech_label.outline_modulate = Color("212121")
 	speech_label.visible = false
 	add_child(speech_label)
+	
+	if customer_type == BusinessOrder.CustomerType.VIP:
+		vip_marker = Label3D.new()
+		vip_marker.text = "👑 VIP"
+		vip_marker.position = Vector3(0, 2.05, 0)
+		vip_marker.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		vip_marker.font_size = 24
+		vip_marker.pixel_size = 0.004
+		vip_marker.outline_size = 8
+		vip_marker.modulate = Color("ffd54f")
+		vip_marker.outline_modulate = Color("1a1a1a")
+		driver.add_child(vip_marker)
 	
 	# 4. Subtle exhaust smoke
 	exhaust_particles = CPUParticles3D.new()
@@ -217,7 +236,12 @@ func _on_arrived_at_bay() -> void:
 		exhaust_particles.emitting = false
 	
 	_stand_driver_beside_scooter()
-	_show_speech("Chào chú! Xem giúp tôi chiếc xe với!", 2.5)
+	if customer_type == BusinessOrder.CustomerType.VIP:
+		_show_speech("Tiệm uy tín lắm, làm kỹ giúp tôi nhé!", 2.8)
+	elif customer_type == BusinessOrder.CustomerType.EXPRESS:
+		_show_speech("Tôi đang vội lắm, sửa nhanh giúp tôi nhé!", 2.5)
+	else:
+		_show_speech("Chào chú! Xem giúp tôi chiếc xe với!", 2.5)
 	
 	current_state = State.WAITING_FOR_REPAIR
 	arrived_at_bay.emit(bay_index)

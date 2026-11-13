@@ -6,6 +6,10 @@ extends Node
 
 signal house_upgraded(new_level: int, unlocked_areas: Array)
 signal furniture_list_changed()
+signal cozy_score_changed(new_score: int, bonus_pct: float)
+
+const MAX_COZY_PER_CATEGORY: int = 3
+const UNIQUE_FURNITURE_IDS: Array[String] = ["furn_inverter_fridge", "furn_wooden_bed", "furn_sleeping_mat"]
 
 const UPGRADE_COSTS: Dictionary = {
 	2: 75000,   # Level 1 -> 2: Căn hộ ấm cúng
@@ -28,9 +32,12 @@ var has_modern_kitchen: bool = false
 
 ## Array of dictionaries: [ {"id": "furn_...", "pos": [x, y, z], "rot_y": float} ]
 var placed_furniture: Array = []
+var cozy_score: int = 0
+var dinner_buff_active_day: int = 0
 
 func _ready() -> void:
 	add_to_group("house_progression_manager")
+	recalculate_cozy_score()
 
 func get_room_bounds() -> AABB:
 	match house_level:
@@ -150,6 +157,7 @@ func upgrade_house(wallet: HouseholdWallet) -> Dictionary:
 	
 	house_level = next_lvl
 	_update_unlocked_areas()
+	recalculate_cozy_score()
 	
 	if is_inside_tree():
 		var econ: EconomyManager = get_tree().get_first_node_in_group("economy_manager") as EconomyManager
@@ -189,6 +197,7 @@ func register_placed_furniture(furniture_id: String, pos: Vector3, rot_y: float)
 		"pos": [pos.x, pos.y, pos.z],
 		"rot_y": rot_y
 	})
+	recalculate_cozy_score()
 	furniture_list_changed.emit()
 
 func unregister_placed_furniture(furniture_id: String, pos: Vector3) -> bool:
@@ -199,9 +208,84 @@ func unregister_placed_furniture(furniture_id: String, pos: Vector3) -> bool:
 			var vpos := Vector3(ipos[0], ipos[1], ipos[2])
 			if vpos.distance_to(pos) < 0.5:
 				placed_furniture.remove_at(i)
+				recalculate_cozy_score()
 				furniture_list_changed.emit()
 				return true
 	return false
+
+func has_placed_furniture(furniture_id: String) -> bool:
+	for item in placed_furniture:
+		if item is Dictionary and String(item.get("id", "")) == furniture_id:
+			return true
+	return false
+
+static func get_furniture_cozy_points(furniture_id: String) -> int:
+	var def := FurnitureData.get_definition(furniture_id)
+	var cat := String(def.get("category", "decoration"))
+	if furniture_id in ["furn_deluxe_sofa", "furn_wooden_bed", "furn_inverter_fridge"]:
+		return 14
+	if furniture_id in ["furn_oak_table", "furn_basic_sofa", "furn_tv", "furn_bookshelf", "furn_wardrobe"]:
+		return 10
+	match cat:
+		"bed", "sofa":
+			return 12
+		"table":
+			return 9
+		"chair":
+			return 6
+		_:
+			return 7
+
+func recalculate_cozy_score() -> int:
+	var total := 0
+	# Base cozy contribution from house tier & functional upgrades
+	total += (house_level - 1) * 15
+	if has_tile_yard:
+		total += 6
+	if has_flower_garden:
+		total += 8
+	if has_modern_kitchen:
+		total += 8
+
+	var category_counts: Dictionary = {}
+	var id_counts: Dictionary = {}
+	for entry in placed_furniture:
+		if not entry is Dictionary:
+			continue
+		var fid := String(entry.get("id", ""))
+		if fid == "":
+			continue
+		var def := FurnitureData.get_definition(fid)
+		var cat := String(def.get("category", "decoration"))
+		var cat_cnt := int(category_counts.get(cat, 0))
+		if cat_cnt >= MAX_COZY_PER_CATEGORY:
+			continue
+		var id_cnt := int(id_counts.get(fid, 0))
+		# Diminishing returns: 1st = 100%, 2nd = 50%, 3rd+ = 0% for identical items
+		var mult := 1.0 if id_cnt == 0 else (0.5 if id_cnt == 1 else 0.0)
+		if mult > 0.0:
+			total += int(round(float(get_furniture_cozy_points(fid)) * mult))
+		category_counts[cat] = cat_cnt + 1
+		id_counts[fid] = id_cnt + 1
+
+	cozy_score = clampi(total, 0, 100)
+	cozy_score_changed.emit(cozy_score, get_cozy_objective_bonus_pct())
+	return cozy_score
+
+func get_cozy_objective_bonus_pct() -> float:
+	if cozy_score >= 81:
+		return 0.08
+	if cozy_score >= 51:
+		return 0.05
+	if cozy_score >= 21:
+		return 0.03
+	return 0.0
+
+func grant_dinner_buff_for_next_day(current_day: int) -> void:
+	dinner_buff_active_day = maxi(1, current_day) + 1
+
+func has_dinner_speed_buff(current_day: int) -> bool:
+	return dinner_buff_active_day == current_day
 
 func get_save_data() -> Dictionary:
 	return {
@@ -210,7 +294,8 @@ func get_save_data() -> Dictionary:
 		"placed_furniture": placed_furniture,
 		"has_tile_yard": has_tile_yard,
 		"has_flower_garden": has_flower_garden,
-		"has_modern_kitchen": has_modern_kitchen
+		"has_modern_kitchen": has_modern_kitchen,
+		"dinner_buff_active_day": dinner_buff_active_day
 	}
 
 func apply_save_data(data: Dictionary) -> void:
@@ -219,6 +304,7 @@ func apply_save_data(data: Dictionary) -> void:
 	has_tile_yard = bool(data.get("has_tile_yard", false))
 	has_flower_garden = bool(data.get("has_flower_garden", false))
 	has_modern_kitchen = bool(data.get("has_modern_kitchen", false))
+	dinner_buff_active_day = int(data.get("dinner_buff_active_day", 0))
 
 	# Maintain compatibility with legacy saves storing unlocked_areas
 	var loaded_areas = data.get("unlocked_areas", [])
@@ -246,4 +332,5 @@ func apply_save_data(data: Dictionary) -> void:
 		for entry in loaded_furn:
 			if typeof(entry) == TYPE_DICTIONARY and entry.has("id") and entry.has("pos"):
 				placed_furniture.append(entry)
+	recalculate_cozy_score()
 	furniture_list_changed.emit()

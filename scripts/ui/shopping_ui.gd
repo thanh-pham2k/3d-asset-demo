@@ -766,9 +766,18 @@ func _clear_details() -> void:
 	sell_button.visible = false
 
 func _display_product_details(prod: EconomyProduct) -> void:
+	var is_produce := (prod.category == "produce" or prod.id.begins_with("produce_"))
+	var effective_price := economy_mgr.get_effective_product_price(prod) if is_instance_valid(economy_mgr) and economy_mgr.has_method("get_effective_product_price") else prod.price
+	var discount_pct := economy_mgr.get_product_discount_percent(prod) if is_instance_valid(economy_mgr) and economy_mgr.has_method("get_product_discount_percent") else 0
 	item_title_label.text = prod.name
 	item_badge_label.text = "🏷️ %s · Dành cho: %s" % [_get_category_display_name(prod), _get_target_system_label(prod.target_system)]
-	item_price_label.text = HouseholdWallet.format_money(prod.price)
+	if is_produce:
+		var bonus_tag := " (🔥 Sự kiện chợ!)" if effective_price > prod.price else ""
+		item_price_label.text = "Giá bán: %s%s" % [HouseholdWallet.format_money(effective_price), bonus_tag]
+	elif discount_pct > 0:
+		item_price_label.text = "%s (Giảm %d%% · Gốc: %s)" % [HouseholdWallet.format_money(effective_price), discount_pct, HouseholdWallet.format_money(prod.price)]
+	else:
+		item_price_label.text = HouseholdWallet.format_money(effective_price)
 	item_desc_label.text = prod.description
 	
 	# Owned status
@@ -783,10 +792,11 @@ func _display_product_details(prod: EconomyProduct) -> void:
 		
 	# Check Co-op condition
 	var dual_mgr := get_tree().get_first_node_in_group("dual_confirmation_manager") as DualConfirmationManager
-	var needs_coop: bool = is_instance_valid(dual_mgr) and dual_mgr.is_coop_active and prod.price >= 50000
+	var needs_coop: bool = is_instance_valid(dual_mgr) and dual_mgr.is_coop_active and effective_price >= 50000
 	
-	# Buy button state
-	var can_afford := is_instance_valid(economy_mgr) and economy_mgr.wallet.can_afford(prod.price)
+	# Buy button state (hidden for harvested produce, which is sold instead of bought)
+	buy_button.visible = not is_produce
+	var can_afford := is_instance_valid(economy_mgr) and economy_mgr.wallet.can_afford(effective_price)
 	var prerequisite := economy_mgr.purchase_prerequisite_message(prod) if is_instance_valid(economy_mgr) else ""
 	
 	if prod.is_unique and is_owned:
@@ -814,14 +824,20 @@ func _display_product_details(prod: EconomyProduct) -> void:
 		_set_button_color(buy_button, Color("0277bd"))
 	else:
 		buy_button.disabled = false
-		buy_button.text = "MUA HÀNG — %s" % HouseholdWallet.format_money(prod.price)
+		buy_button.text = "MUA HÀNG — %s" % HouseholdWallet.format_money(effective_price)
 		_set_button_color(buy_button, Color("2e7d32"))
 		
 	# Produce Sell button
-	if (prod.category == "produce" or prod.id.begins_with("produce_")) and count > 0:
+	if is_produce:
 		sell_button.visible = true
-		sell_button.text = "BÁN 1 (+%s)" % HouseholdWallet.format_money(prod.price)
-		_set_button_color(sell_button, Color("e67e22"))
+		if count > 0:
+			sell_button.disabled = false
+			sell_button.text = "BÁN 1 (+%s)" % HouseholdWallet.format_money(effective_price)
+			_set_button_color(sell_button, Color("e67e22"))
+		else:
+			sell_button.disabled = true
+			sell_button.text = "HẾT NÔNG SẢN ĐỂ BÁN"
+			_set_button_color(sell_button, Color("455a64"))
 	else:
 		sell_button.visible = false
 
@@ -1172,7 +1188,8 @@ func _on_sell_button_pressed() -> void:
 	if not is_instance_valid(economy_mgr): return
 	var res := economy_mgr.sell_produce(prod.id, 1)
 	if res.get("success", false):
-		show_feedback("✅ %s" % res.get("message", "Đã bán nông sản!"), "success")
+		var remaining := economy_mgr.inventory.get_item_count(prod.id)
+		show_feedback("✅ %s (Còn trong kho: %d)" % [res.get("message", "Đã bán nông sản!"), remaining], "success")
 		update_ui()
 	else:
 		show_feedback("⚠️ %s" % res.get("message", "Không thể bán!"), "error")
@@ -1203,9 +1220,13 @@ func _execute_purchase(product: EconomyProduct) -> void:
 		elif product.category == "business_upgrade":
 			extra_note = " ⚡ Tiệm kinh doanh đã được nâng cấp!"
 			
-		show_feedback("✅ %s (-%s)%s" % [
+		var stock_note := ""
+		if not product.is_unique and economy_mgr.inventory:
+			stock_note = " · Trong kho: %d" % economy_mgr.inventory.get_item_count(product.id)
+		show_feedback("✅ %s (-%s%s)%s" % [
 			res["message"],
 			HouseholdWallet.format_money(res["total_cost"]),
+			stock_note,
 			extra_note
 		], "success")
 		

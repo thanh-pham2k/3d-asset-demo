@@ -20,16 +20,20 @@ signal pet_interacted(action: String, pet_node: Node)
 const DEFAULT_HOME_POSITION := Vector3(1.5, 0.0, -1.0)
 @export var home_position: Vector3 = DEFAULT_HOME_POSITION
 @export var current_activity_name: String = "IDLE"
+var last_pet_gift_day: int = -99
 
 var pet_instance: OrangeTabbyCat = null
 var room_node: Node3D = null
 var rename_dialog: ConfirmationDialog
 var rename_field: LineEdit
 var renaming_player: CharacterBody3D
+var pet_hud_layer: CanvasLayer = null
+var pet_status_label: Label = null
 
 func _ready() -> void:
 	add_to_group("pet_manager")
 	_build_rename_dialog()
+	_build_pet_hud()
 	
 	# Discover Room or House root
 	call_deferred("_discover_dependencies")
@@ -56,6 +60,7 @@ func _discover_dependencies() -> void:
 			
 	if is_adopted:
 		ensure_pet_spawned()
+	_refresh_pet_hud()
 
 func _build_rename_dialog() -> void:
 	var layer := CanvasLayer.new()
@@ -81,7 +86,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if not (event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_N):
 		return
-	var player := get_tree().get_first_node_in_group("players") as CharacterBody3D
+	var player := get_tree().get_first_node_in_group("active_player") as CharacterBody3D
+	if not is_instance_valid(player):
+		player = get_tree().get_first_node_in_group("players") as CharacterBody3D
 	if not is_instance_valid(player) or player.has_meta("shopping_open") or player.has_meta("daily_summary_open") or player.has_meta("map_open") or player.global_position.distance_to(pet_instance.global_position) > 2.0:
 		return
 	renaming_player = player
@@ -214,6 +221,76 @@ func _on_day_started(day_number: int) -> void:
 	
 	if is_instance_valid(pet_instance):
 		pet_instance.on_morning_wake_up()
+	try_grant_pet_gift(day_number)
+	_refresh_pet_hud()
+
+func get_pet_mood_text() -> String:
+	if happiness >= 75.0:
+		return "Rất vui vẻ 💖"
+	if hunger < 30.0:
+		return "Hơi đói 🐟"
+	if current_activity_name == "SLEEPING":
+		return "Đang ngủ 💤"
+	return "Thoải mái 😊"
+
+func get_pet_status_summary() -> String:
+	return "🐱 %s · Tình cảm: %d/100 · %s" % [pet_name, int(round(affection)), get_pet_mood_text()]
+
+func _build_pet_hud() -> void:
+	pet_hud_layer = CanvasLayer.new()
+	pet_hud_layer.name = "PetStatusHUD"
+	pet_hud_layer.layer = 5
+	pet_hud_layer.visible = false
+	add_child(pet_hud_layer)
+	var panel := PanelContainer.new()
+	panel.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	panel.offset_left = -290
+	panel.offset_right = -16
+	panel.offset_top = 128
+	panel.offset_bottom = 160
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color("141a21", 0.72)
+	sb.set_corner_radius_all(8)
+	sb.content_margin_left = 10
+	sb.content_margin_right = 10
+	sb.content_margin_top = 4
+	sb.content_margin_bottom = 4
+	panel.add_theme_stylebox_override("panel", sb)
+	pet_hud_layer.add_child(panel)
+	pet_status_label = Label.new()
+	pet_status_label.add_theme_font_size_override("font_size", 12)
+	pet_status_label.add_theme_color_override("font_color", Color("ffe082"))
+	panel.add_child(pet_status_label)
+
+func _refresh_pet_hud() -> void:
+	if not is_instance_valid(pet_hud_layer) or not is_instance_valid(pet_status_label):
+		return
+	pet_hud_layer.visible = is_adopted
+	if is_adopted:
+		pet_status_label.text = get_pet_status_summary()
+
+func try_grant_pet_gift(day_number: int) -> Dictionary:
+	if not is_adopted or affection < 50.0:
+		return {}
+	if day_number - last_pet_gift_day < 2:
+		return {} # Cooldown prevents economy exploitation
+	last_pet_gift_day = day_number
+	var econ := get_tree().get_first_node_in_group("economy_manager") as EconomyManager if is_inside_tree() else null
+	var gift_text := ""
+	var gift_type := "seed"
+	if is_instance_valid(econ):
+		if day_number % 2 == 0 and is_instance_valid(econ.inventory):
+			econ.inventory.add_item("seed_lettuce", 1)
+			gift_text = "🌱 %s tha về tặng bạn 1 Hạt giống Xà Lách!" % pet_name
+		elif is_instance_valid(econ.wallet):
+			gift_type = "money"
+			econ.wallet.deposit(3000, "pet_gift", "Quà nhỏ từ mèo %s" % pet_name, "pet_gift_day_%d" % day_number)
+			gift_text = "🪙 %s nhặt được 3,000 đ mang về tặng bạn!" % pet_name
+	var fx = get_tree().get_first_node_in_group("chaos_feedback") if is_inside_tree() else null
+	if gift_text != "" and is_instance_valid(fx) and fx.has_method("show_toast"):
+		fx.show_toast(gift_text)
+	return {"type": gift_type, "message": gift_text, "day": day_number}
 
 func record_care_action(action: String) -> void:
 	if is_adopted and is_instance_valid(pet_instance):
@@ -228,6 +305,7 @@ func _on_pet_interacted(action: String) -> void:
 		
 	pet_interacted.emit(action, pet_instance)
 	pet_stats_updated.emit(hunger, happiness, affection)
+	_refresh_pet_hud()
 	var econ := get_tree().get_first_node_in_group("economy_manager") as EconomyManager
 	if is_instance_valid(econ) and econ.auto_save_on_change:
 		econ.save_economy_state()
@@ -255,7 +333,8 @@ func get_save_data() -> Dictionary:
 		"affection": affection,
 		"has_collar": has_collar,
 		"home_position": [home_position.x, home_position.y, home_position.z],
-		"activity": current_activity_name
+		"activity": current_activity_name,
+		"last_pet_gift_day": last_pet_gift_day
 	}
 
 func apply_save_data(data: Dictionary) -> void:
@@ -272,6 +351,7 @@ func apply_save_data(data: Dictionary) -> void:
 	affection = clampf(float(data.get("affection", 25.0)), 0.0, 100.0)
 	has_collar = bool(data.get("has_collar", true))
 	current_activity_name = str(data.get("activity", "IDLE"))
+	last_pet_gift_day = int(data.get("last_pet_gift_day", -99))
 	home_position = DEFAULT_HOME_POSITION
 	
 	if data.has("home_position") and data["home_position"] is Array:
@@ -287,6 +367,7 @@ func apply_save_data(data: Dictionary) -> void:
 			pet_instance.remove_from_group("interactables")
 			pet_instance.queue_free()
 			pet_instance = null
+		_refresh_pet_hud()
 		return
 	if is_instance_valid(econ) and not owned_in_inventory:
 		econ.inventory.unlock_upgrade("pet_cat_adoption")
@@ -308,3 +389,4 @@ func apply_save_data(data: Dictionary) -> void:
 			pet_instance.target_player = null
 			pet_instance.target_nav_point = Vector3.ZERO
 			pet_instance.position = home_position
+	_refresh_pet_hud()

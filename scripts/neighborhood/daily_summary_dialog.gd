@@ -20,6 +20,9 @@ var expenses_label: Label
 var profit_label: Label
 var wallet_label: Label
 var objectives_label: Label
+var weekly_label: Label
+var milestone_label: Label
+var next_goal_label: Label
 var continue_button: Button
 
 var is_showing: bool = false
@@ -161,6 +164,24 @@ func _build_ui() -> void:
 	objectives_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	vbox.add_child(objectives_label)
 
+	weekly_label = Label.new()
+	weekly_label.add_theme_font_size_override("font_size", 13)
+	weekly_label.add_theme_color_override("font_color", Color("b9f6ca"))
+	weekly_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	vbox.add_child(weekly_label)
+
+	milestone_label = Label.new()
+	milestone_label.add_theme_font_size_override("font_size", 13)
+	milestone_label.add_theme_color_override("font_color", Color("ffe082"))
+	milestone_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	vbox.add_child(milestone_label)
+
+	next_goal_label = Label.new()
+	next_goal_label.add_theme_font_size_override("font_size", 13)
+	next_goal_label.add_theme_color_override("font_color", Color("80d8ff"))
+	next_goal_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	vbox.add_child(next_goal_label)
+
 	var spacer := Control.new()
 	spacer.custom_minimum_size = Vector2(0, 6)
 	vbox.add_child(spacer)
@@ -201,7 +222,49 @@ func show_summary(data: Dictionary) -> void:
 	for objective in objectives:
 		if objective is Dictionary and objective.get("is_completed", false):
 			completed += 1
-	objectives_label.text = "🎯 Mục tiêu hoàn thành: %d/%d" % [completed, objectives.size()]
+	objectives_label.text = "🎯 Mục tiêu ngày hoàn thành: %d/%d" % [completed, objectives.size()]
+	var wk_sum: Dictionary = data.get("weekly_summary", {})
+	if is_instance_valid(weekly_label):
+		if not wk_sum.is_empty():
+			weekly_label.visible = true
+			weekly_label.text = "📅 Tiến độ Tuần %d (Ngày %d/7): %d/%d mục tiêu tuần" % [
+				int(wk_sum.get("week", 1)),
+				int(wk_sum.get("day_in_week", 1)),
+				int(wk_sum.get("completed", 0)),
+				int(wk_sum.get("total", 0))
+			]
+		else:
+			weekly_label.visible = false
+	var ms_sum: Dictionary = data.get("milestone_summary", {})
+	if is_instance_valid(milestone_label):
+		if not ms_sum.is_empty():
+			milestone_label.visible = true
+			var next_ms: Dictionary = ms_sum.get("next_milestone", {})
+			var next_ms_str := " · Gần nhất: %s" % str(next_ms.get("title", "")) if not next_ms.is_empty() else " · Đã mở khóa tất cả!"
+			milestone_label.text = "🏆 Thành tựu dài hạn: %d/%d%s" % [
+				int(ms_sum.get("unlocked", 0)),
+				int(ms_sum.get("total", 0)),
+				next_ms_str
+			]
+		else:
+			milestone_label.visible = false
+	var next_goal: Dictionary = data.get("next_goal", {})
+	if is_instance_valid(next_goal_label):
+		if not next_goal.is_empty() and int(next_goal.get("target_cost", 0)) > 0:
+			var g_title: String = str(next_goal.get("title", ""))
+			var g_bal: int = int(next_goal.get("current_balance", wallet_bal))
+			var g_cost: int = int(next_goal.get("target_cost", 0))
+			var g_pct: int = int(next_goal.get("progress_pct", 0))
+			var ready_tag := " · ✅ Đủ tiền mở khóa!" if bool(next_goal.get("ready_to_buy", false)) else ""
+			next_goal_label.text = "🚀 Mục tiêu tiếp theo: %s\nTiến độ: %s / %s (%d%%)%s" % [
+				g_title,
+				HouseholdWallet.format_money(mini(g_bal, g_cost)),
+				HouseholdWallet.format_money(g_cost),
+				g_pct,
+				ready_tag
+			]
+		else:
+			next_goal_label.text = "🚀 Mục tiêu tiếp theo: %s" % str(next_goal.get("title", "Tự do phát triển gia đình"))
 	
 	visible = true
 	is_showing = true

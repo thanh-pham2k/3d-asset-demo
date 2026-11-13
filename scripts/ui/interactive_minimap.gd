@@ -23,7 +23,10 @@ var modal_window: PanelContainer
 var modal_drawer: Control
 var modal_objective_label: Label
 var modal_coords_label: Label
+var clear_waypoint_btn: Button
 var close_btn: Button
+var hovered_landmark_id: String = ""
+var landmark_buttons: Dictionary = {}
 
 # Town Landmark Data: [id, title, world_pos, color, icon]
 var landmarks := [
@@ -33,7 +36,15 @@ var landmarks := [
 		"pos": Vector3(-45, 0, 84),
 		"color": Color("ffb74d"), # Warm amber
 		"icon": "🏠",
-		"desc": "Nhà của Boy & Girl (Phòng khách, giường ngủ, bếp)"
+		"desc": "Nhà của Boy & Girl (Phòng khách, giường ngủ, nâng cấp nhà)"
+	},
+	{
+		"id": "garden",
+		"title": "Vườn Rau Gia Đình",
+		"pos": Vector3(-45, 0, 77.6),
+		"color": Color("aed581"), # Fresh garden green
+		"icon": "🌱",
+		"desc": "Khu trồng rau (Xà lách, Cà rốt, Cà chua) sau sân nhà"
 	},
 	{
 		"id": "garage",
@@ -60,28 +71,20 @@ var landmarks := [
 		"desc": "Quán ăn gia đình (Nồi trụng, nước lèo, bàn ghế)"
 	},
 	{
-		"id": "food_street",
-		"title": "Phố Ẩm Thực",
-		"pos": Vector3(-101, 0, 21),
-		"color": Color("ff8a65"), # Coral
-		"icon": "🍱",
-		"desc": "Quán cà phê, bánh mì, nước mía & tiệm tạp hóa"
-	},
-	{
 		"id": "market",
-		"title": "Chợ Dân Sinh",
-		"pos": Vector3(42, 0, -28),
+		"title": "Chợ Dân Sinh & Nông Sản",
+		"pos": Vector3(38, 0, -24),
 		"color": Color("ba68c8"), # Violet
 		"icon": "🥬",
-		"desc": "Khu sạp rau củ, trái cây, thịt cá tươi sống"
+		"desc": "Mua hạt giống, nguyên liệu & bán rau thu hoạch"
 	},
 	{
-		"id": "school",
-		"title": "Trường Học & Công Viên",
-		"pos": Vector3(40, 0, 50),
-		"color": Color("4dd0e1"), # Cyan
-		"icon": "🏫",
-		"desc": "Cổng trường, hoa viên & khu vui chơi ngoài trời"
+		"id": "food_street",
+		"title": "Phố Ẩm Thực & Tạp Hóa",
+		"pos": Vector3(-105, 0, 32),
+		"color": Color("ff8a65"), # Coral
+		"icon": "🍱",
+		"desc": "Khu ăn uống & tiệm tạp hóa đầu phố"
 	},
 	{
 		"id": "furniture",
@@ -90,6 +93,22 @@ var landmarks := [
 		"color": Color("dce775"), # Lime
 		"icon": "🛋️",
 		"desc": "Cửa hàng mua sắm đồ trang trí & nâng cấp nhà"
+	},
+	{
+		"id": "pet_shop",
+		"title": "Tiệm Thú Cưng Miu Miu",
+		"pos": Vector3(88, 0, -18),
+		"color": Color("f48fb1"), # Pink
+		"icon": "🐱",
+		"desc": "Nhận nuôi mèo Miu Miu & mua thức ăn thú cưng"
+	},
+	{
+		"id": "school",
+		"title": "Trường Học & Công Viên",
+		"pos": Vector3(40, 0, 50),
+		"color": Color("4dd0e1"), # Cyan
+		"icon": "🏫",
+		"desc": "Cổng trường, hoa viên & khu vui chơi ngoài trời"
 	}
 ]
 
@@ -145,7 +164,10 @@ func close_expanded_map() -> void:
 func _process(delta: float) -> void:
 	anim_pulse += delta * 4.0
 	
-	if not is_instance_valid(player):
+	var active_p := get_tree().get_first_node_in_group("active_player") as CharacterBody3D
+	if is_instance_valid(active_p):
+		player = active_p
+	elif not is_instance_valid(player):
 		player = get_tree().get_first_node_in_group("players") as CharacterBody3D
 	if not is_instance_valid(guidance):
 		guidance = get_tree().root.find_child("WorkplaceGuidance", true, false)
@@ -296,17 +318,20 @@ func _build_expanded_map() -> void:
 	modal_drawer = Control.new()
 	modal_drawer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	modal_drawer.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	modal_drawer.mouse_filter = Control.MOUSE_FILTER_STOP
+	modal_drawer.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	modal_drawer.draw.connect(_draw_expanded_map)
+	modal_drawer.gui_input.connect(_on_modal_drawer_gui_input)
 	map_frame.add_child(modal_drawer)
 	
 	# Right Sidebar: Objective status + Landmark Legend
 	var legend_vbox := VBoxContainer.new()
-	legend_vbox.custom_minimum_size = Vector2(250, 0)
+	legend_vbox.custom_minimum_size = Vector2(270, 0)
 	legend_vbox.add_theme_constant_override("separation", 8)
 	content_hbox.add_child(legend_vbox)
 	
 	var obj_hdr := Label.new()
-	obj_hdr.text = "🎯 MỤC TIÊU HIỆN TẠI"
+	obj_hdr.text = "🎯 ĐANG DẪN ĐƯỜNG"
 	obj_hdr.add_theme_font_size_override("font_size", 13)
 	obj_hdr.add_theme_color_override("font_color", Color("ffd54f"))
 	legend_vbox.add_child(obj_hdr)
@@ -318,11 +343,17 @@ func _build_expanded_map() -> void:
 	modal_objective_label.add_theme_color_override("font_color", Color("b9f6ca"))
 	legend_vbox.add_child(modal_objective_label)
 	
+	clear_waypoint_btn = Button.new()
+	clear_waypoint_btn.text = "✕ Xóa điểm đến tự chọn"
+	clear_waypoint_btn.visible = false
+	clear_waypoint_btn.pressed.connect(clear_waypoint)
+	legend_vbox.add_child(clear_waypoint_btn)
+	
 	var sep := HSeparator.new()
 	legend_vbox.add_child(sep)
 	
 	var leg_hdr := Label.new()
-	leg_hdr.text = "📍 ĐỊA ĐIỂM QUAN TRỌNG"
+	leg_hdr.text = "📍 CHỌN ĐỊA ĐIỂM ĐỂ ĐI"
 	leg_hdr.add_theme_font_size_override("font_size", 13)
 	leg_hdr.add_theme_color_override("font_color", Color("e0e0e0"))
 	legend_vbox.add_child(leg_hdr)
@@ -332,49 +363,118 @@ func _build_expanded_map() -> void:
 	legend_vbox.add_child(scroll)
 	
 	var list_box := VBoxContainer.new()
+	list_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	list_box.add_theme_constant_override("separation", 6)
 	scroll.add_child(list_box)
 	
+	landmark_buttons.clear()
 	for lm in landmarks:
-		var item_hbox := HBoxContainer.new()
-		item_hbox.add_theme_constant_override("separation", 8)
-		
-		var icon_lbl := Label.new()
-		icon_lbl.text = lm["icon"]
-		item_hbox.add_child(icon_lbl)
-		
-		var info_vbox := VBoxContainer.new()
-		info_vbox.add_theme_constant_override("separation", 1)
-		
-		var name_lbl := Label.new()
-		name_lbl.text = lm["title"]
-		name_lbl.add_theme_font_size_override("font_size", 12)
-		name_lbl.add_theme_color_override("font_color", lm["color"])
-		info_vbox.add_child(name_lbl)
-		
-		var desc_lbl := Label.new()
-		desc_lbl.text = lm["desc"]
-		desc_lbl.add_theme_font_size_override("font_size", 10)
-		desc_lbl.add_theme_color_override("font_color", Color("90a4ae"))
-		desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		info_vbox.add_child(desc_lbl)
-		
-		item_hbox.add_child(info_vbox)
-		list_box.add_child(item_hbox)
+		var lm_btn := Button.new()
+		lm_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		lm_btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		lm_btn.text = "%s %s" % [lm["icon"], lm["title"]]
+		lm_btn.tooltip_text = lm["desc"]
+		lm_btn.add_theme_font_size_override("font_size", 12)
+		lm_btn.add_theme_color_override("font_color", lm["color"])
+		var sb_lm := StyleBoxFlat.new()
+		sb_lm.bg_color = Color("232c38", 0.9)
+		sb_lm.set_corner_radius_all(8)
+		sb_lm.content_margin_left = 10
+		sb_lm.content_margin_right = 10
+		sb_lm.content_margin_top = 6
+		sb_lm.content_margin_bottom = 6
+		lm_btn.add_theme_stylebox_override("normal", sb_lm)
+		var sb_hover := sb_lm.duplicate()
+		sb_hover.bg_color = Color("314052", 0.98)
+		sb_hover.border_width_left = 2
+		sb_hover.border_color = lm["color"]
+		lm_btn.add_theme_stylebox_override("hover", sb_hover)
+		lm_btn.pressed.connect(_select_landmark_waypoint.bind(lm))
+		list_box.add_child(lm_btn)
+		landmark_buttons[lm["id"]] = lm_btn
+
+func _find_landmark_near_canvas_pos(canvas_pos: Vector2, max_px: float = 24.0) -> Dictionary:
+	if not is_instance_valid(modal_drawer):
+		return {}
+	var sz := modal_drawer.size
+	var best_lm: Dictionary = {}
+	var best_dist := max_px
+	for lm in landmarks:
+		var pt := _world_to_canvas(lm["pos"], sz)
+		var d := pt.distance_to(canvas_pos)
+		if d <= best_dist:
+			best_dist = d
+			best_lm = lm
+	return best_lm
+
+func _on_modal_drawer_gui_input(event: InputEvent) -> void:
+	if event is InputEventMouseMotion:
+		var hovered := _find_landmark_near_canvas_pos(event.position, 24.0)
+		var new_id := String(hovered.get("id", ""))
+		if new_id != hovered_landmark_id:
+			hovered_landmark_id = new_id
+			modal_drawer.queue_redraw()
+	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		var clicked := _find_landmark_near_canvas_pos(event.position, 26.0)
+		if not clicked.is_empty():
+			_select_landmark_waypoint(clicked)
+
+func _select_landmark_waypoint(lm: Dictionary) -> void:
+	if not is_instance_valid(guidance):
+		guidance = get_tree().root.find_child("WorkplaceGuidance", true, false)
+	if is_instance_valid(guidance) and guidance.has_method("set_custom_waypoint"):
+		guidance.set_custom_waypoint(String(lm["id"]), "%s %s" % [lm["icon"], lm["title"]], lm["pos"], String(lm["desc"]))
+	var fx := get_tree().get_first_node_in_group("chaos_feedback")
+	if is_instance_valid(fx) and fx.has_method("show_toast"):
+		fx.show_toast("📍 Đã đặt điểm đến: %s %s" % [lm["icon"], lm["title"]])
+	_update_expanded_labels()
+	if is_instance_valid(modal_drawer):
+		modal_drawer.queue_redraw()
+	if is_instance_valid(hud_drawer):
+		hud_drawer.queue_redraw()
+
+func clear_waypoint() -> void:
+	if not is_instance_valid(guidance):
+		guidance = get_tree().root.find_child("WorkplaceGuidance", true, false)
+	if is_instance_valid(guidance) and guidance.has_method("clear_custom_waypoint"):
+		guidance.clear_custom_waypoint(true)
+	_update_expanded_labels()
+	if is_instance_valid(modal_drawer):
+		modal_drawer.queue_redraw()
+	if is_instance_valid(hud_drawer):
+		hud_drawer.queue_redraw()
 
 func _update_expanded_labels() -> void:
 	if not is_instance_valid(player): return
 	var p_pos = player.global_position
 	modal_coords_label.text = "Tọa độ: (%.1f, %.1f)" % [p_pos.x, p_pos.z]
 	
+	var custom_active := false
+	var custom_id := ""
 	if is_instance_valid(guidance):
 		var target_title: String = guidance.get("current_title") if "current_title" in guidance else "Khám phá thành phố"
 		var target_hint: String = guidance.get("current_hint") if "current_hint" in guidance else ""
 		var target_dest: Vector3 = guidance.get("current_destination") if "current_destination" in guidance else Vector3.ZERO
+		custom_active = bool(guidance.get("has_custom_waypoint")) if "has_custom_waypoint" in guidance else false
+		custom_id = String(guidance.get("custom_waypoint_id")) if "custom_waypoint_id" in guidance else ""
+		var walkable := bool(guidance.get("is_walkable_route")) if "is_walkable_route" in guidance else false
 		var dist := int(p_pos.distance_to(target_dest))
-		modal_objective_label.text = "⭐ %s\nKhoảng cách: %dm\n%s" % [target_title, dist, target_hint]
+		var mode_tag := "📍 Điểm tự chọn" if custom_active else "🎯 Mục tiêu hàng ngày"
+		var route_tag := "🛤️ Lối đi hợp lệ" if walkable else "🧭 Hướng chim bay"
+		modal_objective_label.text = "%s: %s\nKhoảng cách: %dm · %s\n%s" % [mode_tag, target_title, dist, route_tag, target_hint]
 	else:
 		modal_objective_label.text = "Tự do khám phá khu phố"
+	
+	if is_instance_valid(clear_waypoint_btn):
+		clear_waypoint_btn.visible = custom_active
+	for lm in landmarks:
+		var lm_id: String = String(lm["id"])
+		if landmark_buttons.has(lm_id) and is_instance_valid(landmark_buttons[lm_id]):
+			var btn := landmark_buttons[lm_id] as Button
+			if custom_active and lm_id == custom_id:
+				btn.text = "📍 %s (Đang đi)" % lm["title"]
+			else:
+				btn.text = "%s %s" % [lm["icon"], lm["title"]]
 
 # ==============================================================================
 # DRAWING LOGIC (COORDINATE TRANSFORMATION)
@@ -445,20 +545,34 @@ func _draw_hud_minimap() -> void:
 	if is_instance_valid(guidance):
 		var has_target: bool = guidance.get("has_navigation_target") if "has_navigation_target" in guidance else true
 		var is_arrived: bool = guidance.get("arrived") if "arrived" in guidance else false
+		var is_custom: bool = guidance.get("has_custom_waypoint") if "has_custom_waypoint" in guidance else false
+		var marker_col := Color("40c4ff") if is_custom else Color("ffd54f")
 		if has_target and not is_arrived:
 			var target_dest: Vector3 = guidance.get("current_destination") if "current_destination" in guidance else Vector3.ZERO
 			var target_pt: Vector2 = to_hud_point.call(target_dest)
 			var to_target := target_pt - center
 			var t_dist := to_target.length()
 			
+			var walkable: bool = guidance.get("is_walkable_route") if "is_walkable_route" in guidance else false
+			var route_pts: PackedVector3Array = guidance.get("current_route_points") if "current_route_points" in guidance else PackedVector3Array()
 			var pulse := 1.0 + 0.25 * sin(anim_pulse)
 			var clamped_pt := target_pt if t_dist <= radius - 10.0 else (center + to_target.normalized() * (radius - 8.0))
-			hud_drawer.draw_line(center, clamped_pt, Color("ffd54f", 0.45), 1.5)
-			if t_dist <= radius - 10.0:
-				hud_drawer.draw_circle(target_pt, 7.0 * pulse, Color("ffd54f", 0.5))
-				hud_drawer.draw_circle(target_pt, 4.0, Color("ffd54f"))
+			if walkable and route_pts.size() >= 2:
+				var prev_pt: Vector2 = center
+				for i in range(1, route_pts.size()):
+					var seg_pt: Vector2 = to_hud_point.call(route_pts[i])
+					var d_seg := seg_pt - center
+					if d_seg.length() > radius - 8.0:
+						seg_pt = center + d_seg.normalized() * (radius - 8.0)
+					hud_drawer.draw_line(prev_pt, seg_pt, Color(marker_col.r, marker_col.g, marker_col.b, 0.8), 2.0)
+					prev_pt = seg_pt
 			else:
-				hud_drawer.draw_circle(clamped_pt, 5.0 * pulse, Color("ffd54f"))
+				_draw_dashed_line(hud_drawer, center, clamped_pt, Color(marker_col.r, marker_col.g, marker_col.b, 0.6), 1.5, 6.0, 4.0)
+			if t_dist <= radius - 10.0:
+				hud_drawer.draw_circle(target_pt, 7.0 * pulse, Color(marker_col.r, marker_col.g, marker_col.b, 0.5))
+				hud_drawer.draw_circle(target_pt, 4.0, marker_col)
+			else:
+				hud_drawer.draw_circle(clamped_pt, 5.0 * pulse, marker_col)
 	
 	# Draw Player Arrow in Center
 	# Map X is world +X, Map Y is world +Z. Use player.facing directly so arrow matches actual movement/scooter heading.
@@ -532,6 +646,10 @@ func _draw_expanded_map() -> void:
 	# 3. Draw All Landmark Icons & Badges
 	for lm in landmarks:
 		var pt := _world_to_canvas(lm["pos"], sz)
+		var is_hovered := (String(lm["id"]) == hovered_landmark_id)
+		
+		if is_hovered:
+			modal_drawer.draw_arc(pt, 14.0, 0, TAU, 24, Color.WHITE, 2.0)
 		
 		# Pill badge
 		modal_drawer.draw_circle(pt, 9.0, lm["color"])
@@ -544,18 +662,36 @@ func _draw_expanded_map() -> void:
 		modal_drawer.draw_string(ThemeDB.fallback_font, text_pos + Vector2(1, 1), label_text, HORIZONTAL_ALIGNMENT_CENTER, -1, 11, Color("000000", 0.9))
 		modal_drawer.draw_string(ThemeDB.fallback_font, text_pos, label_text, HORIZONTAL_ALIGNMENT_CENTER, -1, 11, Color("ffffff"))
 	
-	# 4. Highlight Active Objective Target
+	# 4. Highlight Active Objective / Waypoint Target & Route
 	if is_instance_valid(guidance):
-		var target_dest: Vector3 = guidance.get("current_destination") if "current_destination" in guidance else Vector3.ZERO
-		var target_title: String = guidance.get("current_title") if "current_title" in guidance else "Mục tiêu"
-		var t_pt := _world_to_canvas(target_dest, sz)
-		
-		var pulse := 1.0 + 0.3 * sin(anim_pulse)
-		modal_drawer.draw_arc(t_pt, 18.0 * pulse, 0, TAU, 32, Color("ffd54f", 0.85), 3.0)
-		modal_drawer.draw_circle(t_pt, 6.0, Color("ffd54f"))
-		
-		var obj_text := "★ " + target_title
-		modal_drawer.draw_string(ThemeDB.fallback_font, t_pt + Vector2(-40, 24), obj_text, HORIZONTAL_ALIGNMENT_CENTER, -1, 12, Color("ffd54f"))
+		var has_target: bool = guidance.get("has_navigation_target") if "has_navigation_target" in guidance else true
+		if has_target:
+			var target_dest: Vector3 = guidance.get("current_destination") if "current_destination" in guidance else Vector3.ZERO
+			var target_title: String = guidance.get("current_title") if "current_title" in guidance else "Mục tiêu"
+			var is_custom: bool = guidance.get("has_custom_waypoint") if "has_custom_waypoint" in guidance else false
+			var walkable: bool = guidance.get("is_walkable_route") if "is_walkable_route" in guidance else false
+			var route_pts: PackedVector3Array = guidance.get("current_route_points") if "current_route_points" in guidance else PackedVector3Array()
+			var marker_col := Color("40c4ff") if is_custom else Color("ffd54f")
+			var t_pt := _world_to_canvas(target_dest, sz)
+			
+			if is_instance_valid(player):
+				var p_pt := _world_to_canvas(player.global_position, sz)
+				if walkable and route_pts.size() >= 2:
+					var prev := p_pt
+					for i in range(1, route_pts.size()):
+						var nxt := _world_to_canvas(route_pts[i], sz)
+						modal_drawer.draw_line(prev, nxt, Color(marker_col.r, marker_col.g, marker_col.b, 0.85), 3.0)
+						prev = nxt
+				else:
+					_draw_dashed_line(modal_drawer, p_pt, t_pt, Color(marker_col.r, marker_col.g, marker_col.b, 0.7), 2.0, 8.0, 6.0)
+			
+			var pulse := 1.0 + 0.3 * sin(anim_pulse)
+			modal_drawer.draw_arc(t_pt, 18.0 * pulse, 0, TAU, 32, Color(marker_col.r, marker_col.g, marker_col.b, 0.9), 3.0)
+			modal_drawer.draw_circle(t_pt, 6.0, marker_col)
+			
+			var prefix := "📍 " if is_custom else "★ "
+			var obj_text := prefix + target_title
+			modal_drawer.draw_string(ThemeDB.fallback_font, t_pt + Vector2(-40, 24), obj_text, HORIZONTAL_ALIGNMENT_CENTER, -1, 12, marker_col)
 	
 	# 5. Draw Player Marker
 	if is_instance_valid(player):
@@ -583,3 +719,15 @@ func _draw_expanded_map() -> void:
 		modal_drawer.draw_colored_polygon(PackedVector2Array([p_tip, p_left, p_pt, p_right]), Color("00e5ff"))
 		modal_drawer.draw_circle(p_pt, 3.0, Color.WHITE)
 		modal_drawer.draw_string(ThemeDB.fallback_font, p_pt + Vector2(-20, 20), "Bạn ở đây", HORIZONTAL_ALIGNMENT_CENTER, -1, 11, Color("00e5ff"))
+
+func _draw_dashed_line(canvas: Control, from_pt: Vector2, to_pt: Vector2, color: Color, width: float = 2.0, dash_len: float = 8.0, gap_len: float = 6.0) -> void:
+	var diff := to_pt - from_pt
+	var total_len := diff.length()
+	if total_len < 1.0:
+		return
+	var dir := diff / total_len
+	var dist := 0.0
+	while dist < total_len:
+		var seg_end := minf(dist + dash_len, total_len)
+		canvas.draw_line(from_pt + dir * dist, from_pt + dir * seg_end, color, width)
+		dist += dash_len + gap_len

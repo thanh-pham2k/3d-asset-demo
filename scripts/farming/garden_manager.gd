@@ -50,9 +50,9 @@ func setup_garden_plots(parent: Node3D) -> void:
 		Vector3(0.6, 0.0, -6.4),
 		Vector3(1.8, 0.0, -6.4)
 	]
-	# The garden upgrade adds two plots without occupying the doorway.
+	# Level 2+ (Cozy Home) or Flower Garden upgrade adds two plots without occupying the doorway.
 	var room := parent as Room
-	if is_instance_valid(room) and is_instance_valid(room.progression_manager) and room.progression_manager.has_flower_garden:
+	if is_instance_valid(room) and is_instance_valid(room.progression_manager) and (room.progression_manager.house_level >= 2 or room.progression_manager.has_flower_garden):
 		plot_positions.append(Vector3(-1.9, 0.0, -4.95))
 		plot_positions.append(Vector3(1.9, 0.0, -4.95))
 	

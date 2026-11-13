@@ -38,6 +38,7 @@ var daily_customers_lost: int = 0
 var is_transitioning_day: bool = false
 var is_closing_workplace: bool = false
 var summary_shown_today: bool = false
+var last_advanced_day: int = 1
 
 var garage_business: GarageBusiness:
 	set(v):
@@ -159,6 +160,7 @@ func set_phase(new_phase: Phase) -> void:
 
 func set_day(day: int) -> void:
 	current_day = maxi(1, day)
+	last_advanced_day = current_day
 	if is_instance_valid(time_manager):
 		time_manager.current_day = current_day
 
@@ -188,7 +190,9 @@ func _reset_daily_counters() -> void:
 func get_active_business(player_node: Node3D = null) -> BusinessShop:
 	var p := player_node
 	if not is_instance_valid(p):
-		p = get_tree().get_first_node_in_group("players") as CharacterBody3D
+		p = get_tree().get_first_node_in_group("active_player") as CharacterBody3D
+		if not is_instance_valid(p):
+			p = get_tree().get_first_node_in_group("players") as CharacterBody3D
 	
 	var char_name := "boy"
 	if is_instance_valid(p):
@@ -233,31 +237,36 @@ func close_workplace(shop: BusinessShop = null) -> Dictionary:
 
 func get_daily_summary() -> Dictionary:
 	var shop := get_active_business()
-	var shop_title := shop.shop_name if is_instance_valid(shop) else "Cửa hàng"
+	var shop_title := shop.shop_name if is_instance_valid(shop) else "Tự do khám phá"
 	var wallet_bal := 0
-	if is_instance_valid(economy_manager) and is_instance_valid(economy_manager.wallet):
-		wallet_bal = economy_manager.wallet.balance
+	var next_goal := {}
+	if is_instance_valid(economy_manager):
+		if is_instance_valid(economy_manager.wallet):
+			wallet_bal = economy_manager.wallet.balance
+		if economy_manager.has_method("get_next_meaningful_goal"):
+			next_goal = economy_manager.get_next_meaningful_goal()
 	
 	var served := daily_customers_served
 	var rev := daily_revenue
-	if is_instance_valid(shop):
-		served = maxi(served, shop.daily_customers_served)
-		rev = maxi(rev, shop.daily_revenue)
-	
 	var exp_val := daily_expenses
 	var prof := rev - exp_val
 	var objective_mgr := get_tree().get_first_node_in_group("daily_objective_manager") as DailyObjectiveManager
 	var objective_list: Array = objective_mgr.get_summary_list() if is_instance_valid(objective_mgr) else []
+	var weekly_summary: Dictionary = objective_mgr.get_weekly_summary() if is_instance_valid(objective_mgr) else {}
+	var milestone_summary: Dictionary = objective_mgr.get_milestone_summary() if is_instance_valid(objective_mgr) else {}
 
 	return {
 		"objectives": objective_list,
+		"weekly_summary": weekly_summary,
+		"milestone_summary": milestone_summary,
 		"day": current_day,
 		"customers_served": served,
 		"revenue": rev,
 		"expenses": exp_val,
 		"profit": prof,
 		"wallet_balance": wallet_bal,
-		"shop_name": shop_title
+		"shop_name": shop_title,
+		"next_goal": next_goal
 	}
 
 func show_summary_dialog(data: Dictionary = {}) -> void:
@@ -283,7 +292,11 @@ func has_worked_today() -> bool:
 	return daily_customers_served > 0 or daily_revenue > 0 or (current_phase >= Phase.WORK_CLOSE)
 
 func is_ready_to_sleep() -> bool:
-	return has_worked_today() or (is_instance_valid(time_manager) and (time_manager.current_hour >= 20.0 or time_manager.current_hour < 6.0))
+	if is_transitioning_day:
+		return false
+	if is_instance_valid(guidance) and bool(guidance.get("has_mandatory_objective")):
+		return false
+	return true
 
 func on_player_sleep(player_node: CharacterBody3D) -> bool:
 	if is_transitioning_day:
@@ -292,6 +305,7 @@ func on_player_sleep(player_node: CharacterBody3D) -> bool:
 		return false
 	
 	is_transitioning_day = true
+	var target_next_day := current_day + 1
 	
 	# 1. Close any open shops safely
 	if is_instance_valid(garage_business) and garage_business.is_open:
@@ -299,15 +313,16 @@ func on_player_sleep(player_node: CharacterBody3D) -> bool:
 	if is_instance_valid(hutieu_business) and hutieu_business.is_open:
 		hutieu_business.close_shop()
 	
-	# 2. Advance day counter and time
+	# 2. Advance day counter and time (guarded against double-advance)
 	if is_instance_valid(time_manager):
 		time_manager.advance_to_next_day(7.0)
 		current_day = time_manager.current_day
 	else:
-		current_day += 1
+		current_day = target_next_day
 		day_advanced.emit(current_day)
+	last_advanced_day = current_day
 	
-	# 3. Reset daily business state cleanly
+	# 3. Reset daily business state cleanly (permanent progress & inventory preserved)
 	if is_instance_valid(garage_business):
 		garage_business.reset_daily_state()
 	if is_instance_valid(hutieu_business):
@@ -336,6 +351,9 @@ func _reset_scooters_to_home() -> void:
 			sc.global_position = sc.home_parking_pos
 
 func _on_time_manager_day_advanced(new_day: int) -> void:
+	if new_day <= last_advanced_day and current_day == new_day:
+		return
+	last_advanced_day = new_day
 	if current_day != new_day:
 		current_day = new_day
 		if not is_transitioning_day:
@@ -382,9 +400,18 @@ func _build_morning_toast() -> void:
 	toast_label.add_theme_color_override("font_color", Color("ffd54f"))
 	panel.add_child(toast_label)
 
+func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.is_echo() and event.keycode == KEY_TAB:
+		var shop := get_tree().get_first_node_in_group("shopping_ui") as ShoppingUI
+		if is_instance_valid(shop) and shop.is_open:
+			return
+		if is_instance_valid(summary_dialog) and not summary_dialog.is_showing:
+			show_summary_dialog()
+			get_viewport().set_input_as_handled()
+
 func show_morning_announcement() -> void:
 	if not is_instance_valid(morning_toast) or not is_instance_valid(toast_label): return
-	toast_label.text = "☀️ CHÀO NGÀY MỚI — NGÀY %d!\nThức dậy, chuẩn bị đồ đạc và lên xe máy đến chỗ làm!" % current_day
+	toast_label.text = "☀️ CHÀO NGÀY MỚI — NGÀY %d!\nTự do chọn việc hôm nay: Mở tiệm, trồng rau, mua sắm, chăm mèo · [M] Bản đồ · [Tab] Tổng kết" % current_day
 	morning_toast.visible = true
 	
 	var tween := create_tween()

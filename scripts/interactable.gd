@@ -112,6 +112,8 @@ func prompt(player: Node3D) -> String:
    return "Đọc sách thư giãn"
   "kitchen_counter":
    return "Nấu món ăn gia đình"
+  "pet_playground":
+   return "Chơi cùng mèo tại Khu vui chơi thú cưng"
   "plant":
    return "Ngắm cây xanh tươi 🌿" if is_watered else "Tưới nước cho cây 💧"
   _:
@@ -242,21 +244,41 @@ func interact(player: Node3D) -> void:
    if is_instance_valid(fx) and fx.has_method("play_event"):
     fx.play_event("pickup", global_position + Vector3(0, 1.2, 0))
   "kitchen_counter":
-   var cooked_dish := "⚠️ Cần bánh hủ tiếu và rau cải, sườn hoặc tôm trong kho để nấu ăn."
+   var cooked_dish := "⚠️ Cần rau vườn nhà (Xà lách/Cà rốt/Cà chua), sườn hoặc tôm trong kho để nấu bữa tối."
    if is_instance_valid(econ) and is_instance_valid(econ.inventory):
     var ingredient := ""
-    for candidate in ["produce_lettuce", "ing_pork_ribs", "ing_fresh_shrimp"]:
+    for candidate in ["produce_lettuce", "produce_carrot", "produce_tomato", "ing_pork_ribs", "ing_fresh_shrimp"]:
      if econ.inventory.has_item(candidate):
       ingredient = candidate
       break
-    if ingredient != "" and econ.inventory.has_item("ing_rice_noodle"):
-     econ.inventory.remove_item("ing_rice_noodle", 1)
+    var house_mgr := get_tree().get_first_node_in_group("house_progression_manager") as HouseProgressionManager
+    var cur_day := 1
+    var loop_mgr := get_tree().get_first_node_in_group("daily_loop_manager")
+    if is_instance_valid(loop_mgr) and "current_day" in loop_mgr:
+     cur_day = int(loop_mgr.current_day)
+    if ingredient != "":
      econ.inventory.remove_item(ingredient, 1)
-     cooked_dish = "🍲 Đã nấu bữa hủ tiếu ấm cúng từ nguyên liệu trong kho!"
+     if is_instance_valid(house_mgr) and house_mgr.house_level >= 2:
+      house_mgr.grant_dinner_buff_for_next_day(cur_day)
+      cooked_dish = "🍲 Đã nấu bữa tối ấm cúng! Ngày mai nhận +5% tốc độ di chuyển!"
+     else:
+      cooked_dish = "🍲 Đã nấu bữa ăn gia đình ấm cúng từ nguyên liệu trong kho!"
    if is_instance_valid(fx) and fx.has_method("show_toast"):
     fx.show_toast(cooked_dish)
    if is_instance_valid(fx) and fx.has_method("play_event"):
     fx.play_event("pickup", global_position + Vector3(0, 1.0, 0))
+  "pet_playground":
+   var pet_mgr := get_tree().get_first_node_in_group("pet_manager") as PetManager
+   if is_instance_valid(pet_mgr) and pet_mgr.is_adopted:
+    pet_mgr.happiness = minf(100.0, pet_mgr.happiness + 18.0)
+    pet_mgr.affection = minf(100.0, pet_mgr.affection + 8.0)
+    pet_mgr.pet_stats_updated.emit(pet_mgr.hunger, pet_mgr.happiness, pet_mgr.affection)
+    pet_mgr.pet_interacted.emit("playground", pet_mgr.pet_instance)
+    if is_instance_valid(fx) and fx.has_method("show_toast"):
+     fx.show_toast("🐾 %s vui đùa thỏa thích ở khu vui chơi thú cưng! (+Hạnh phúc)" % pet_mgr.pet_name)
+   else:
+    if is_instance_valid(fx) and fx.has_method("show_toast"):
+     fx.show_toast("🐾 Khu vui chơi thú cưng sẵn sàng! Hãy nhận nuôi mèo để cùng chơi nhé.")
   "plant":
    if not is_watered:
     is_watered = true

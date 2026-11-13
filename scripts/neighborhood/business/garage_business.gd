@@ -16,7 +16,7 @@ class RepairStation extends Interactable:
 		interaction_radius = 2.6
 	
 	func available(player_node: Node3D) -> bool:
-		if station_type == "shop_sign":
+		if station_type in ["shop_sign", "upgrade_board"]:
 			return enabled and is_instance_valid(garage)
 		if station_type in ["air_pump", "workbench", "tire_rack"]:
 			return false
@@ -62,14 +62,67 @@ var repair_kit_label: Label = null
 var hud_message_timer: float = 0.0
 var hud_override_mode: String = "" # "", "success", "error"
 
-# Business Upgrades State
+# Business Upgrades & 5-Level Progression State
+const GARAGE_LEVEL_CONFIG: Dictionary = {
+	1: {
+		"title": "Cấp 1 — Tiệm Nhỏ Khởi Nghiệp",
+		"cost": 0,
+		"min_customers": 0,
+		"benefit": "1 khoang sửa xe, khách tiêu chuẩn, sửa 3.0 giây (1 Bộ dụng cụ/lần)"
+	},
+	2: {
+		"title": "Cấp 2 — Tiệm Mở Rộng 2 Khoang",
+		"cost": 65000,
+		"min_customers": 3,
+		"benefit": "Mở Khoang sửa xe số 2, thêm khách mới & đơn Cao Cấp (4.5s · thưởng 2x)"
+	},
+	3: {
+		"title": "Cấp 3 — Trang Bị Máy Nén Khí",
+		"cost": 110000,
+		"min_customers": 8,
+		"benefit": "Sửa thường giảm còn 2.0s, thêm máy nén khí & tăng 15% kiên nhẫn khách"
+	},
+	4: {
+		"title": "Cấp 4 — Thuê Thợ Phụ Tiệm Xe",
+		"cost": 160000,
+		"min_customers": 14,
+		"benefit": "Thợ phụ tự sửa ở Khoang 2 khi mở cửa (chậm hơn người chơi, tốn 15,000 đ/ngày)"
+	},
+	5: {
+		"title": "Cấp 5 — Gara Uy Tín Khu Phố",
+		"cost": 240000,
+		"min_customers": 22,
+		"benefit": "Nâng cấp diện mạo gara, tăng tỉ lệ đơn Cao Cấp & VIP, cộng uy tín dịch vụ"
+	}
+}
+
 var is_second_bay_unlocked: bool = false
 var is_better_tools_unlocked: bool = false
 var is_faster_service_unlocked: bool = false
+var assistant_hired: bool = false
+var assistant_daily_cost: int = 15000
+var assistant_paid_day: int = 0
+var assistant_repairing: bool = false
+var assistant_order: BusinessOrder = null
+var assistant_elapsed: float = 0.0
+var assistant_duration: float = 5.5
 
 var second_bay_visual_node: Node3D = null
 var tools_visual_node: Node3D = null
 var compressor_visual_node: Node3D = null
+var assistant_visual_node: Node3D = null
+var assistant_arm_node: Node3D = null
+var assistant_status_label: Label3D = null
+var established_visual_node: Node3D = null
+var established_sign_light: MeshInstance3D = null
+
+var upgrade_ui_layer: CanvasLayer = null
+var upgrade_current_label: Label = null
+var upgrade_next_label: Label = null
+var upgrade_cost_label: Label = null
+var upgrade_benefit_label: Label = null
+var upgrade_confirm_btn: Button = null
+var upgrade_feedback_label: Label = null
 
 # Legacy compatibility properties
 var player_holding_tool: String = ""
@@ -110,8 +163,31 @@ var service_catalog: Array[Dictionary] = [
 	}
 ]
 
+var premium_service_catalog: Array[Dictionary] = [
+	{
+		"type": "premium_engine",
+		"title": "Đại tu động cơ & phanh ABS",
+		"reward": 70000,
+		"patience": 75.0,
+		"duration": 4.5,
+		"steps": ["repair"]
+	},
+	{
+		"type": "premium_overhaul",
+		"title": "Bảo dưỡng toàn diện xe ga",
+		"reward": 80000,
+		"patience": 80.0,
+		"duration": 4.5,
+		"steps": ["repair"]
+	}
+]
+
 var customer_names: Array[String] = [
 	"Anh Tuấn", "Bác Năm", "Chú Tư", "Chị Lan", "Cô Mai", "Em Linh", "Anh Dũng"
+]
+
+var extra_customer_names: Array[String] = [
+	"Anh Khang", "Chị Thảo", "Bác Hùng", "Anh Minh", "Cô Hương"
 ]
 
 func _ready() -> void:
@@ -121,10 +197,12 @@ func _ready() -> void:
 	open_hour = 6.0
 	close_hour = 21.0
 	spawn_interval = 12.0
+	auto_level_up_enabled = false
 	super._ready()
 	
 	_create_work_stations()
 	_build_repair_hud()
+	_build_upgrade_ui()
 
 func _get_peak_hour_ranges() -> Array[Vector2]:
 	return [
@@ -201,6 +279,15 @@ func _create_work_stations() -> void:
 	sign_station.position = Vector3(-100.5, 0, -14.5)
 	sign_station.interaction_radius = 2.2
 	add_child(sign_station)
+
+	# 4. Garage Upgrade Board station
+	var upgrade_station := RepairStation.new()
+	upgrade_station.name = "UpgradeBoardStation"
+	upgrade_station.garage = self
+	upgrade_station.station_type = "upgrade_board"
+	upgrade_station.position = Vector3(-99.0, 0, -14.5)
+	upgrade_station.interaction_radius = 2.2
+	add_child(upgrade_station)
 
 func _build_repair_hud() -> void:
 	repair_hud_layer = CanvasLayer.new()
@@ -294,6 +381,7 @@ func reset_daily_state() -> void:
 
 func _safe_clear_remaining_customers() -> void:
 	_cancel_active_repair()
+	_cancel_assistant_repair()
 	for bay in bay_customers.keys():
 		var cust = bay_customers[bay]
 		if is_instance_valid(cust) and cust.current_state != MotorcycleCustomer.State.DEPARTING and cust.current_state != MotorcycleCustomer.State.DESPAWNED:
@@ -307,12 +395,24 @@ func _safe_clear_remaining_customers() -> void:
 
 func get_patience_multiplier() -> float:
 	var base_mult := super.get_patience_multiplier()
-	if is_faster_service_unlocked:
-		base_mult *= 1.40 # 40% more patient customers
+	if business_level >= 3 or is_faster_service_unlocked:
+		base_mult *= 1.15 # +15% patience bonus from Level 3 equipment
 	return base_mult
+
+func get_order_repair_duration(order: BusinessOrder) -> float:
+	if is_instance_valid(order) and order.repair_duration_override > 0.0:
+		# Level 3+ slightly smooths premium prep without stacking to instantaneous
+		var prem_dur := order.repair_duration_override
+		if business_level >= 3:
+			prem_dur = maxf(3.5, prem_dur - 0.5)
+		return maxf(1.8, prem_dur)
+	if business_level >= 3 or is_faster_service_unlocked:
+		return 2.0
+	return maxf(1.8, repair_duration)
 
 func apply_second_bay_upgrade() -> void:
 	is_second_bay_unlocked = true
+	business_level = maxi(business_level, 2)
 	_build_second_bay_visual()
 
 func apply_better_tools_upgrade() -> void:
@@ -321,8 +421,23 @@ func apply_better_tools_upgrade() -> void:
 
 func apply_compressor_upgrade() -> void:
 	is_faster_service_unlocked = true
-	spawn_interval = 8.0
+	business_level = maxi(business_level, 3)
+	spawn_interval = 9.0
+	_build_better_tools_visual()
 	_build_compressor_visual()
+
+func apply_garage_level_unlocks(lvl: int) -> void:
+	business_level = clampi(lvl, 1, 5)
+	if business_level >= 2:
+		apply_second_bay_upgrade()
+	if business_level >= 3:
+		apply_compressor_upgrade()
+	if business_level >= 4:
+		assistant_hired = true
+		_build_assistant_visual()
+	if business_level >= 5:
+		_build_established_garage_visual()
+	_update_status_display()
 
 func _build_second_bay_visual() -> void:
 	if is_instance_valid(second_bay_visual_node): return
@@ -459,6 +574,266 @@ func _build_compressor_visual() -> void:
 	
 	add_child(compressor_visual_node)
 
+func _build_assistant_visual() -> void:
+	if is_instance_valid(assistant_visual_node):
+		return
+	assistant_visual_node = Node3D.new()
+	assistant_visual_node.name = "AssistantMechanicVisual"
+	assistant_visual_node.position = bay_positions[1] + Vector3(1.15, 0, -0.3)
+
+	var body := MeshInstance3D.new()
+	var b_mesh := CapsuleMesh.new()
+	b_mesh.radius = 0.24
+	b_mesh.height = 0.72
+	body.mesh = b_mesh
+	var b_mat := StandardMaterial3D.new()
+	b_mat.albedo_color = Color("1e88e5")
+	body.material_override = b_mat
+	body.position = Vector3(0, 0.58, 0)
+	assistant_visual_node.add_child(body)
+
+	var head := MeshInstance3D.new()
+	var h_mesh := SphereMesh.new()
+	h_mesh.radius = 0.20
+	head.mesh = h_mesh
+	var h_mat := StandardMaterial3D.new()
+	h_mat.albedo_color = Color("f4c9ab")
+	head.material_override = h_mat
+	head.position = Vector3(0, 1.12, 0)
+	assistant_visual_node.add_child(head)
+
+	assistant_arm_node = Node3D.new()
+	assistant_arm_node.position = Vector3(-0.24, 0.75, 0)
+	var arm_mesh := MeshInstance3D.new()
+	var a_box := BoxMesh.new()
+	a_box.size = Vector3(0.10, 0.36, 0.10)
+	arm_mesh.mesh = a_box
+	arm_mesh.material_override = b_mat
+	arm_mesh.position = Vector3(0, -0.14, 0.10)
+	assistant_arm_node.add_child(arm_mesh)
+	assistant_visual_node.add_child(assistant_arm_node)
+
+	assistant_status_label = Label3D.new()
+	assistant_status_label.position = Vector3(0, 1.65, 0)
+	assistant_status_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	assistant_status_label.font_size = 18
+	assistant_status_label.pixel_size = 0.004
+	assistant_status_label.outline_size = 6
+	assistant_status_label.modulate = Color("80d8ff")
+	assistant_status_label.text = "🔧 Tí Thợ Phụ (Sẵn sàng)"
+	assistant_visual_node.add_child(assistant_status_label)
+
+	add_child(assistant_visual_node)
+
+func _build_established_garage_visual() -> void:
+	if is_instance_valid(established_visual_node):
+		return
+	established_visual_node = Node3D.new()
+	established_visual_node.name = "EstablishedGarageVisual"
+
+	established_sign_light = MeshInstance3D.new()
+	var s_mesh := BoxMesh.new()
+	s_mesh.size = Vector3(3.6, 0.55, 0.16)
+	established_sign_light.mesh = s_mesh
+	var s_mat := StandardMaterial3D.new()
+	s_mat.albedo_color = Color("ffb300")
+	s_mat.emission_enabled = true
+	s_mat.emission = Color("ffd54f")
+	s_mat.emission_energy_multiplier = 1.4
+	established_sign_light.material_override = s_mat
+	established_sign_light.position = Vector3(-105.5, 3.3, -15.5)
+	established_visual_node.add_child(established_sign_light)
+
+	var sign_lbl := Label3D.new()
+	sign_lbl.position = Vector3(-105.5, 3.3, -15.35)
+	sign_lbl.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	sign_lbl.font_size = 24
+	sign_lbl.pixel_size = 0.005
+	sign_lbl.outline_size = 8
+	sign_lbl.modulate = Color("fff8e1")
+	sign_lbl.text = "⭐ GARA UY TÍN CẤP 5 ⭐"
+	established_visual_node.add_child(sign_lbl)
+
+	add_child(established_visual_node)
+
+func _build_upgrade_ui() -> void:
+	upgrade_ui_layer = CanvasLayer.new()
+	upgrade_ui_layer.name = "GarageUpgradeUILayer"
+	upgrade_ui_layer.layer = 96
+	upgrade_ui_layer.visible = false
+	add_child(upgrade_ui_layer)
+
+	var shade := ColorRect.new()
+	shade.color = Color(0.06, 0.08, 0.11, 0.72)
+	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	upgrade_ui_layer.add_child(shade)
+
+	var center := CenterContainer.new()
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	upgrade_ui_layer.add_child(center)
+
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size = Vector2(480, 320)
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color("1f2933")
+	style.border_color = Color("ffd54f")
+	style.set_border_width_all(2)
+	style.set_corner_radius_all(12)
+	style.content_margin_left = 22
+	style.content_margin_right = 22
+	style.content_margin_top = 18
+	style.content_margin_bottom = 18
+	panel.add_theme_stylebox_override("panel", style)
+	center.add_child(panel)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 10)
+	panel.add_child(vbox)
+
+	var title := Label.new()
+	title.text = "🔧 NÂNG CẤP TIỆM SỬA XE"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 20)
+	title.add_theme_color_override("font_color", Color("ffd54f"))
+	vbox.add_child(title)
+
+	upgrade_current_label = Label.new()
+	upgrade_current_label.add_theme_font_size_override("font_size", 15)
+	upgrade_current_label.add_theme_color_override("font_color", Color("ffffff"))
+	vbox.add_child(upgrade_current_label)
+
+	upgrade_next_label = Label.new()
+	upgrade_next_label.add_theme_font_size_override("font_size", 15)
+	upgrade_next_label.add_theme_color_override("font_color", Color("80d8ff"))
+	vbox.add_child(upgrade_next_label)
+
+	upgrade_cost_label = Label.new()
+	upgrade_cost_label.add_theme_font_size_override("font_size", 14)
+	upgrade_cost_label.add_theme_color_override("font_color", Color("ffe082"))
+	vbox.add_child(upgrade_cost_label)
+
+	upgrade_benefit_label = Label.new()
+	upgrade_benefit_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	upgrade_benefit_label.add_theme_font_size_override("font_size", 13)
+	upgrade_benefit_label.add_theme_color_override("font_color", Color("cfd8dc"))
+	vbox.add_child(upgrade_benefit_label)
+
+	upgrade_feedback_label = Label.new()
+	upgrade_feedback_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	upgrade_feedback_label.add_theme_font_size_override("font_size", 13)
+	upgrade_feedback_label.add_theme_color_override("font_color", Color("ffab40"))
+	vbox.add_child(upgrade_feedback_label)
+
+	var btn_row := HBoxContainer.new()
+	btn_row.add_theme_constant_override("separation", 10)
+	vbox.add_child(btn_row)
+
+	upgrade_confirm_btn = Button.new()
+	upgrade_confirm_btn.text = "✅ Xác Nhận Nâng Cấp"
+	upgrade_confirm_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	upgrade_confirm_btn.pressed.connect(func():
+		var res := upgrade_garage_level()
+		if res.get("success", false):
+			_refresh_upgrade_ui()
+		elif is_instance_valid(upgrade_feedback_label):
+			upgrade_feedback_label.text = str(res.get("message", ""))
+	)
+	btn_row.add_child(upgrade_confirm_btn)
+
+	var close_btn := Button.new()
+	close_btn.text = "Đóng (ESC)"
+	close_btn.pressed.connect(close_upgrade_ui)
+	btn_row.add_child(close_btn)
+
+func open_upgrade_ui() -> void:
+	if not is_instance_valid(upgrade_ui_layer):
+		return
+	_refresh_upgrade_ui()
+	upgrade_ui_layer.visible = true
+
+func close_upgrade_ui() -> void:
+	if is_instance_valid(upgrade_ui_layer):
+		upgrade_ui_layer.visible = false
+
+func _unhandled_input(event: InputEvent) -> void:
+	if is_instance_valid(upgrade_ui_layer) and upgrade_ui_layer.visible:
+		if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_ESCAPE:
+			get_viewport().set_input_as_handled()
+			close_upgrade_ui()
+
+func _refresh_upgrade_ui() -> void:
+	if not is_instance_valid(upgrade_current_label):
+		return
+	var cur_cfg: Dictionary = GARAGE_LEVEL_CONFIG.get(business_level, {})
+	upgrade_current_label.text = "Hiện tại: %s (Đã sửa: %d xe)" % [str(cur_cfg.get("title", "Cấp %d" % business_level)), customers_served]
+	var check := can_upgrade_garage()
+	if business_level >= 5:
+		upgrade_next_label.text = "Mở khóa tiếp theo: Đã đạt Cấp Tối Đa (5/5)"
+		upgrade_cost_label.text = "Chi phí: —"
+		upgrade_benefit_label.text = "Lợi ích: %s" % str(cur_cfg.get("benefit", ""))
+		upgrade_feedback_label.text = "🎉 Gara đã phát triển tối đa!"
+		upgrade_confirm_btn.disabled = true
+	else:
+		var next_lvl: int = int(check["next_level"])
+		var next_cfg: Dictionary = GARAGE_LEVEL_CONFIG.get(next_lvl, {})
+		upgrade_next_label.text = "Tiếp theo: %s" % str(next_cfg.get("title", ""))
+		upgrade_cost_label.text = "Chi phí: %s đ | Yêu cầu: %d/%d xe đã sửa" % [
+			format_money(int(next_cfg.get("cost", 0))),
+			customers_served,
+			int(next_cfg.get("min_customers", 0))
+		]
+		upgrade_benefit_label.text = "Lợi ích: %s" % str(next_cfg.get("benefit", ""))
+		upgrade_feedback_label.text = str(check.get("message", ""))
+		upgrade_confirm_btn.disabled = not bool(check.get("can_upgrade", false))
+
+func can_upgrade_garage() -> Dictionary:
+	if business_level >= 5:
+		return {"can_upgrade": false, "next_level": 5, "cost": 0, "message": "Đã đạt cấp tối đa!"}
+	var next_lvl := business_level + 1
+	var cfg: Dictionary = GARAGE_LEVEL_CONFIG.get(next_lvl, {})
+	var cost: int = int(cfg.get("cost", 0))
+	var min_cust: int = int(cfg.get("min_customers", 0))
+	if customers_served < min_cust:
+		return {
+			"can_upgrade": false, "next_level": next_lvl, "cost": cost,
+			"message": "Cần phục vụ thêm %d xe nữa để mở khóa cấp %d." % [min_cust - customers_served, next_lvl]
+		}
+	var econ := get_tree().get_first_node_in_group("economy_manager") as EconomyManager if is_inside_tree() else null
+	if not is_instance_valid(econ) or not is_instance_valid(econ.wallet):
+		return {"can_upgrade": false, "next_level": next_lvl, "cost": cost, "message": "Không tìm thấy ví gia đình."}
+	if not econ.wallet.can_afford(cost):
+		return {
+			"can_upgrade": false, "next_level": next_lvl, "cost": cost,
+			"message": "Chưa đủ tiền! Cần thêm %s đ." % format_money(cost - econ.wallet.balance)
+		}
+	return {"can_upgrade": true, "next_level": next_lvl, "cost": cost, "message": "Sẵn sàng nâng cấp!"}
+
+func upgrade_garage_level() -> Dictionary:
+	var check := can_upgrade_garage()
+	if not bool(check.get("can_upgrade", false)):
+		return {"success": false, "message": check.get("message", "")}
+	var next_lvl: int = int(check["next_level"])
+	var cost: int = int(check["cost"])
+	var econ := get_tree().get_first_node_in_group("economy_manager") as EconomyManager if is_inside_tree() else null
+	var tx_id := "garage_upgrade_lvl_%d" % next_lvl
+	if not econ.wallet.withdraw(cost, "business_upgrade", "Nâng cấp Gara Cấp %d" % next_lvl, tx_id):
+		return {"success": false, "message": "Giao dịch đã tồn tại hoặc không đủ tiền."}
+	daily_expenses += cost
+	apply_garage_level_unlocks(next_lvl)
+	if next_lvl >= 5:
+		reputation_score = minf(100.0, reputation_score + 5.0)
+	level_up.emit(business_level)
+	_show_feedback(global_position + Vector3(0, 3.0, 0), "🎉 Gara lên CẤP %d! ⭐" % business_level, Color("ffd54f"))
+	if econ.auto_save_on_change:
+		econ.save_economy_state()
+	return {"success": true, "new_level": business_level, "message": "Nâng cấp thành công!"}
+
+func roll_customer_type() -> BusinessOrder.CustomerType:
+	var rolled := super.roll_customer_type()
+	if rolled == BusinessOrder.CustomerType.NORMAL and business_level >= 5 and randf() < 0.08:
+		return BusinessOrder.CustomerType.VIP
+	return rolled
+
 func _try_spawn_customer() -> void:
 	var free_bay := -1
 	var allowed_bays: int = bay_positions.size() if is_second_bay_unlocked else 1
@@ -470,8 +845,18 @@ func _try_spawn_customer() -> void:
 	
 	bay_reserved[free_bay] = true
 	
+	var is_premium_order := false
 	var service: Dictionary = service_catalog[randi() % service_catalog.size()]
-	var cust_name: String = customer_names[randi() % customer_names.size()]
+	if business_level >= 2 and not premium_service_catalog.is_empty():
+		var prem_chance := 0.40 if business_level >= 5 else 0.25
+		if randf() < prem_chance:
+			service = premium_service_catalog[randi() % premium_service_catalog.size()]
+			is_premium_order = true
+
+	var name_pool := customer_names.duplicate()
+	if business_level >= 2:
+		name_pool.append_array(extra_customer_names)
+	var cust_name: String = name_pool[randi() % name_pool.size()]
 	var order_id := "garage_%d_%d_%d_%d" % [free_bay, int(Time.get_unix_time_from_system()), Time.get_ticks_usec(), randi()]
 	var configured_reward: int = int(service.get("reward", base_repair_reward))
 	
@@ -484,8 +869,16 @@ func _try_spawn_customer() -> void:
 		service["steps"].duplicate(),
 		adjusted_patience
 	)
+	order.is_premium = is_premium_order
+	if service.has("duration"):
+		order.repair_duration_override = float(service["duration"])
 	order.is_peak_hour = is_peak_hour
 	order.customer_name = cust_name
+	order.customer_type = roll_customer_type()
+	apply_customer_type_to_order(order, configured_reward, adjusted_patience)
+	if is_premium_order and not order.service_title.begins_with("💎"):
+		order.service_title = "💎 " + order.service_title
+	cust_name = order.customer_name
 	order.table_index = free_bay
 	order.target_spot = to_global(bay_positions[free_bay])
 	
@@ -502,6 +895,7 @@ func _try_spawn_customer() -> void:
 	
 	var customer := MotorcycleCustomer.new()
 	customer.name = "MotorcycleCustomer_%d" % free_bay
+	customer.customer_type = order.customer_type
 	add_child(customer)
 	customer.setup(free_bay, cust_name, bay_positions[free_bay], approach_path, departure_path)
 	customer.order = order
@@ -536,8 +930,10 @@ func complete_order(order: BusinessOrder) -> bool:
 	
 	var bay := order.table_index
 	if is_better_tools_unlocked:
-		var bonus_tip := int(order.reward_money * 0.30)
+		var bonus_tip := int(order.reward_money * 0.20)
 		order.tip_money += bonus_tip
+	if business_level >= 5:
+		reputation_score = minf(100.0, reputation_score + 0.5)
 		
 	var success := super.complete_order(order)
 	if success:
@@ -585,8 +981,14 @@ func _process(delta: float) -> void:
 			active_repair_order.patience_max,
 			active_repair_order.patience_remaining + delta
 		)
+	if assistant_repairing and is_instance_valid(assistant_order):
+		assistant_order.patience_remaining = minf(
+			assistant_order.patience_max,
+			assistant_order.patience_remaining + delta
+		)
 	super._process(delta)
 	_update_active_repair(delta)
+	_update_assistant_repair(delta)
 	_update_repair_hud(delta)
 	for bay in bay_orders:
 		_update_bay_display(bay)
@@ -609,11 +1011,117 @@ func _update_active_repair(delta: float) -> void:
 			_cancel_active_repair()
 			return
 	
-	var safe_duration := maxf(0.1, repair_duration)
+	var safe_duration := get_order_repair_duration(active_repair_order)
 	repair_elapsed = minf(safe_duration, repair_elapsed + delta)
 	
 	if repair_elapsed >= safe_duration:
 		_finish_active_repair()
+
+func _cancel_assistant_repair() -> void:
+	if is_instance_valid(assistant_order) and assistant_order.status == BusinessOrder.Status.IN_PROGRESS:
+		assistant_order.status = BusinessOrder.Status.PENDING
+	assistant_repairing = false
+	assistant_order = null
+	assistant_elapsed = 0.0
+	if is_instance_valid(assistant_arm_node):
+		assistant_arm_node.rotation.x = 0.0
+	if is_instance_valid(assistant_status_label):
+		assistant_status_label.text = "🔧 Tí Thợ Phụ (Nghỉ)" if not is_open else "🔧 Tí Thợ Phụ (Sẵn sàng)"
+
+func _try_pay_assistant_daily_wage() -> bool:
+	var cur_day := 1
+	if is_inside_tree():
+		var loop_mgr := get_tree().get_first_node_in_group("daily_loop_manager")
+		if is_instance_valid(loop_mgr) and "current_day" in loop_mgr:
+			cur_day = int(loop_mgr.current_day)
+	if assistant_paid_day == cur_day:
+		return true
+	var econ := get_tree().get_first_node_in_group("economy_manager") as EconomyManager if is_inside_tree() else null
+	if not is_instance_valid(econ) or not is_instance_valid(econ.wallet):
+		return false
+	if not econ.wallet.can_afford(assistant_daily_cost):
+		return false
+	var tx_id := "garage_assistant_wage_day_%d" % cur_day
+	if econ.wallet.withdraw(assistant_daily_cost, "operating_cost", "Tiền công Thợ Phụ Gara (Ngày %d)" % cur_day, tx_id):
+		assistant_paid_day = cur_day
+		daily_expenses += assistant_daily_cost
+		return true
+	return assistant_paid_day == cur_day
+
+func _update_assistant_repair(delta: float) -> void:
+	if not assistant_hired or business_level < 4:
+		return
+	if not is_open:
+		if assistant_repairing:
+			_cancel_assistant_repair()
+		elif is_instance_valid(assistant_status_label):
+			assistant_status_label.text = "🔧 Tí Thợ Phụ (Đã đóng cửa)"
+		return
+
+	if not assistant_repairing:
+		# Look for a waiting customer on Bay 2 (bay_index == 1) not being repaired by player
+		if not bay_orders.has(1) or not bay_customers.has(1):
+			return
+		var cust = bay_customers[1]
+		if not is_instance_valid(cust) or cust.current_state == MotorcycleCustomer.State.DEPARTING or cust.current_state == MotorcycleCustomer.State.DESPAWNED:
+			return
+		var ord: BusinessOrder = bay_orders[1]
+		if not is_instance_valid(ord) or not active_orders.has(ord):
+			return
+		if ord.status != BusinessOrder.Status.PENDING or completed_order_ids.has(ord.order_id):
+			return
+		if is_repairing and active_repair_order == ord:
+			return
+		if get_repair_kit_count() < 1:
+			if is_instance_valid(assistant_status_label):
+				assistant_status_label.text = "🔧 Tí Thợ Phụ (Thiếu Dụng Cụ)"
+			return
+		if not _try_pay_assistant_daily_wage():
+			if is_instance_valid(assistant_status_label):
+				assistant_status_label.text = "🔧 Tí Thợ Phụ (Chờ trả công %s đ)" % format_money(assistant_daily_cost)
+			return
+
+		assistant_repairing = true
+		assistant_order = ord
+		assistant_elapsed = 0.0
+		assistant_duration = 7.0 if ord.is_premium else 5.5 # Slower than player
+		ord.status = BusinessOrder.Status.IN_PROGRESS
+		return
+
+	# Validate active assistant repair
+	if not is_instance_valid(assistant_order) or not active_orders.has(assistant_order) or not bay_customers.has(1):
+		_cancel_assistant_repair()
+		return
+	var cust_check = bay_customers[1]
+	if not is_instance_valid(cust_check) or cust_check.current_state == MotorcycleCustomer.State.DEPARTING or cust_check.current_state == MotorcycleCustomer.State.DESPAWNED:
+		_cancel_assistant_repair()
+		return
+	if assistant_order.status in [BusinessOrder.Status.FAILED, BusinessOrder.Status.CANCELLED, BusinessOrder.Status.PAID]:
+		_cancel_assistant_repair()
+		return
+
+	assistant_elapsed = minf(assistant_duration, assistant_elapsed + delta)
+	if is_instance_valid(assistant_arm_node):
+		assistant_arm_node.rotation.x = sin(assistant_elapsed * 10.0) * 0.65
+	if is_instance_valid(assistant_status_label):
+		var pct := clampi(int(round((assistant_elapsed / assistant_duration) * 100.0)), 0, 100)
+		assistant_status_label.text = "🔧 Tí đang sửa Khoang 2 (%d%%)" % pct
+
+	if assistant_elapsed >= assistant_duration:
+		var finished_ord := assistant_order
+		_cancel_assistant_repair()
+		if not is_instance_valid(finished_ord) or not active_orders.has(finished_ord) or completed_order_ids.has(finished_ord.order_id):
+			return
+		if get_repair_kit_count() <= 0 or not consume_repair_kit():
+			finished_ord.status = BusinessOrder.Status.PENDING
+			return
+		while not finished_ord.get_current_required_step().is_empty():
+			var step_name := finished_ord.get_current_required_step()
+			finished_ord.advance_step(step_name)
+			order_step_done.emit(finished_ord, step_name)
+		finished_ord.status = BusinessOrder.Status.COMPLETED
+		if complete_order(finished_ord):
+			_show_feedback(to_global(bay_positions[1]), "🔧 Thợ phụ sửa xong! +%s đ (-1 Dụng cụ)" % format_money(finished_ord.get_total_payout()), Color("80d8ff"))
 
 func _cancel_active_repair() -> void:
 	if is_instance_valid(active_repair_order) and active_repair_order.status == BusinessOrder.Status.IN_PROGRESS:
@@ -669,7 +1177,7 @@ func _finish_active_repair() -> void:
 		var actual_payout := order.get_total_payout()
 		var reward_str := format_money(actual_payout if actual_payout > 0 else preview_reward)
 		_show_repair_completed_hud(reward_str)
-		_show_feedback(to_global(bay_positions[bay]), "✓ Sửa xe thành công! +%s đ" % reward_str, Color("69f0ae"))
+		_show_feedback(to_global(bay_positions[bay]), "✓ Sửa xe thành công! +%s đ · -1 Bộ dụng cụ (Còn: %d)" % [reward_str, get_repair_kit_count()], Color("69f0ae"))
 
 func _show_out_of_kits_message(world_pos: Vector3) -> void:
 	var msg := "Hết dụng cụ sửa xe! Hãy đến cửa hàng mua thêm."
@@ -713,7 +1221,8 @@ func _update_repair_hud(delta: float) -> void:
 		repair_kit_label.add_theme_color_override("font_color", Color("ff8a80"))
 	
 	if is_repairing and is_instance_valid(active_repair_order):
-		var ratio := clampf(repair_elapsed / maxf(0.1, repair_duration), 0.0, 1.0)
+		var dur := get_order_repair_duration(active_repair_order)
+		var ratio := clampf(repair_elapsed / dur, 0.0, 1.0)
 		var pct := clampi(int(round(ratio * 100.0)), 0, 100)
 		repair_hud_panel.visible = true
 		repair_status_label.text = "Đang sửa xe... %d%%" % pct
@@ -733,7 +1242,9 @@ func _update_repair_hud(delta: float) -> void:
 			return
 	
 	# Show HUD when player is inside or near the repair shop
-	var player := get_tree().get_first_node_in_group("players") as Node3D
+	var player := get_tree().get_first_node_in_group("active_player") as Node3D
+	if not is_instance_valid(player):
+		player = get_tree().get_first_node_in_group("players") as Node3D
 	if not is_instance_valid(player):
 		repair_hud_panel.visible = false
 		return
@@ -781,18 +1292,31 @@ func _update_bay_display(bay_index: int) -> void:
 	
 	lbl.visible = true
 	if is_repairing and active_repair_bay == bay_index and active_repair_order == order:
-		var ratio := clampf(repair_elapsed / maxf(0.1, repair_duration), 0.0, 1.0)
+		var dur := get_order_repair_duration(order)
+		var ratio := clampf(repair_elapsed / dur, 0.0, 1.0)
 		var pct := clampi(int(round(ratio * 100.0)), 0, 100)
 		lbl.text = "Đang sửa xe... %d%%\n%s" % [pct, _format_unicode_progress_bar(ratio, 10)]
 		lbl.modulate = Color("80d8ff")
 		return
+	if assistant_repairing and bay_index == 1 and assistant_order == order:
+		var ratio_a := clampf(assistant_elapsed / maxf(0.1, assistant_duration), 0.0, 1.0)
+		var pct_a := clampi(int(round(ratio_a * 100.0)), 0, 100)
+		lbl.text = "🔧 Thợ phụ đang sửa... %d%%\n%s" % [pct_a, _format_unicode_progress_bar(ratio_a, 10)]
+		lbl.modulate = Color("ffd54f")
+		return
 	
 	var patience_pct := int(order.get_patience_ratio() * 100.0)
 	var kit_count := get_repair_kit_count()
-	lbl.text = "🏍️ %s: %s (+%s đ)\n⏳ Kiên nhẫn: %d%% | 🧰 Dụng cụ: %d\n👉 Nhấn E để sửa xe" % [
+	var express_tag := ""
+	if order.customer_type == BusinessOrder.CustomerType.EXPRESS and order.express_deadline > 0.0:
+		var left := maxf(0.0, order.express_deadline - order.time_spent)
+		if left > 0.0:
+			express_tag = " | ⚡ Nhanh < %ds (+10k)" % int(ceil(left))
+	lbl.text = "🏍️ %s: %s (+%s đ%s)\n⏳ Kiên nhẫn: %d%% | 🧰 Dụng cụ: %d\n👉 Nhấn E để sửa xe" % [
 		order.customer_name,
 		order.service_title,
 		format_money(order.reward_money),
+		express_tag,
 		patience_pct,
 		kit_count
 	]
@@ -809,7 +1333,7 @@ func get_station_prompt(station: RepairStation, _player_node: Node3D = null) -> 
 		"bike_bay":
 			var bay := station.bay_index
 			if is_repairing and active_repair_bay == bay:
-				var ratio := clampf(repair_elapsed / maxf(0.1, repair_duration), 0.0, 1.0)
+				var ratio := clampf(repair_elapsed / get_order_repair_duration(active_repair_order), 0.0, 1.0)
 				return "Đang sửa xe... %d%%" % clampi(int(round(ratio * 100.0)), 0, 100)
 			if not bay_orders.has(bay):
 				return "Khoang sửa xe trống"
@@ -823,6 +1347,8 @@ func get_station_prompt(station: RepairStation, _player_node: Node3D = null) -> 
 				return "Đóng cửa tiệm sửa xe (kết thúc ngày)"
 			else:
 				return "Mở cửa tiệm sửa xe"
+		"upgrade_board":
+			return "Nâng cấp Tiệm Sửa Xe (Cấp %d/5)" % business_level
 	
 	return "Tương tác"
 
@@ -835,6 +1361,8 @@ func on_station_interacted(station: RepairStation, player_node: Node3D) -> void:
 			else:
 				open_shop()
 				_show_feedback(station.global_position, "🎉 Tiệm sửa xe chính thức MỞ CỬA đón khách!", Color("69f0ae"))
+		"upgrade_board":
+			open_upgrade_ui()
 		
 		"bike_bay":
 			if is_repairing:
@@ -870,3 +1398,23 @@ func on_station_interacted(station: RepairStation, player_node: Node3D) -> void:
 			order.status = BusinessOrder.Status.IN_PROGRESS
 			_update_bay_display(bay)
 			_update_repair_hud(0.0)
+
+func get_persistent_stats() -> Dictionary:
+	var stats := super.get_persistent_stats()
+	stats["is_second_bay_unlocked"] = is_second_bay_unlocked
+	stats["is_better_tools_unlocked"] = is_better_tools_unlocked
+	stats["is_faster_service_unlocked"] = is_faster_service_unlocked
+	stats["assistant_hired"] = assistant_hired
+	stats["assistant_paid_day"] = assistant_paid_day
+	return stats
+
+func apply_persistent_stats(data: Dictionary) -> void:
+	super.apply_persistent_stats(data)
+	if data.is_empty():
+		return
+	is_second_bay_unlocked = bool(data.get("is_second_bay_unlocked", is_second_bay_unlocked))
+	is_better_tools_unlocked = bool(data.get("is_better_tools_unlocked", is_better_tools_unlocked))
+	is_faster_service_unlocked = bool(data.get("is_faster_service_unlocked", is_faster_service_unlocked))
+	assistant_hired = bool(data.get("assistant_hired", assistant_hired))
+	assistant_paid_day = int(data.get("assistant_paid_day", assistant_paid_day))
+	apply_garage_level_unlocks(business_level)

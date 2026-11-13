@@ -47,6 +47,7 @@ func _ready() -> void:
 	progression_manager = HouseProgressionManager.new()
 	progression_manager.name = "HouseProgressionManager"
 	add_child(progression_manager)
+	progression_manager.house_upgraded.connect(_on_house_upgraded_feedback)
 	
 	placement_manager = FurniturePlacementManager.new()
 	placement_manager.name = "FurniturePlacementManager"
@@ -554,6 +555,18 @@ func _build_level_3() -> void:
 	default_furniture_root.add_child(plant_fb2)
 	# Decorative garden rail
 	box(default_furniture_root, Vector3(11.9, 0.4, -8.2), Vector3(6.5, 0.8, 0.08), Color("8c5432"), true)
+	_build_pet_playground()
+
+func _build_pet_playground() -> void:
+	var pg_pos := Vector3(10.4, 0.0, 1.8)
+	# Cozy low-poly cat tower & scratching post
+	box(default_furniture_root, pg_pos + Vector3(0, 0.06, 0), Vector3(1.1, 0.12, 1.1), Color("d7ccc8"), true)
+	box(default_furniture_root, pg_pos + Vector3(-0.25, 0.45, 0), Vector3(0.16, 0.8, 0.16), Color("a1887f"), true)
+	box(default_furniture_root, pg_pos + Vector3(-0.25, 0.88, 0), Vector3(0.55, 0.08, 0.55), Color("ffcc80"), true)
+	Art.ball(default_furniture_root, pg_pos + Vector3(0.28, 0.18, 0.2), 0.12, Color("ff7043"))
+	var pg_interact := make_interaction("pet_playground", pg_pos + Vector3(0, 0.5, 0), pg_pos + Vector3(0, 0, 0.9), Vector3.ZERO)
+	pg_interact.display_name = "Khu vui chơi thú cưng"
+	default_furniture_root.add_child(pg_interact)
 
 # -----------------------------------------------------------------
 # Standalone House Upgrades: Tiled Yard, Flower Garden, Modern Kitchen
@@ -758,7 +771,7 @@ func _process(_delta: float) -> void:
 		var space_state := get_world_3d().direct_space_state
 		var bounds := progression_manager.get_room_bounds()
 		bounds.position += global_position
-		placement_manager.update_placement(target_pos, space_state, bounds, player)
+		placement_manager.update_placement(target_pos, space_state, bounds, player, _get_blocked_placement_zones())
 		
 		# Update banner text status
 		if placement_manager.current_valid:
@@ -783,7 +796,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			var space_state := get_world_3d().direct_space_state
 			var bounds := progression_manager.get_room_bounds()
 			bounds.position += global_position
-			var placed := placement_manager.confirm_placement(target_pos, space_state, bounds, player)
+			var placed := placement_manager.confirm_placement(target_pos, space_state, bounds, player, _get_blocked_placement_zones())
 			if placed:
 				get_viewport().set_input_as_handled()
 		elif event.keycode == KEY_X or event.keycode == KEY_DELETE or event.keycode == KEY_BACKSPACE:
@@ -937,6 +950,26 @@ func make_interaction(type: String, pos: Vector3, stand: Vector3, seat: Vector3)
 			item.display_name = "Kệ sách gia đình"
 		"kitchen_counter":
 			item.display_name = "Bếp nấu ăn gia đình"
+		"pet_playground":
+			item.display_name = "Khu vui chơi thú cưng"
 		"plant":
 			item.display_name = "Chậu cây cảnh"
 	return item
+
+func _get_blocked_placement_zones() -> Array[AABB]:
+	var zones: Array[AABB] = []
+	# Front door doorway & back garden doorway
+	zones.append(AABB(global_position + Vector3(-1.2, 0.0, 3.0), Vector3(2.4, 2.5, 1.8)))
+	zones.append(AABB(global_position + Vector3(-1.2, 0.0, -4.6), Vector3(2.4, 2.5, 1.6)))
+	# Upgrade board & delivery box area
+	zones.append(AABB(global_position + Vector3(-8.5, 0.0, 2.5), Vector3(2.0, 2.0, 2.0)))
+	return zones
+
+func _on_house_upgraded_feedback(new_level: int, unlocked_areas: Array) -> void:
+	var fx = get_tree().get_first_node_in_group("chaos_feedback")
+	if is_instance_valid(fx) and fx.has_method("show_toast"):
+		var bonus_pct := int(round(progression_manager.get_cozy_objective_bonus_pct() * 100.0))
+		var new_feat := "Mở bếp nấu bữa tối & +2 ô vườn!" if new_level == 2 else "Mở Phòng đọc sách, Vườn hoa & Khu vui chơi thú cưng!"
+		fx.show_toast("🏠 Nhà lên Cấp %d! Khu vực: %s\n✨ Điểm Ấm Cúng: %d/100 (+%d%% thưởng mục tiêu) · %s" % [
+			new_level, ", ".join(unlocked_areas), progression_manager.cozy_score, bonus_pct, new_feat
+		])

@@ -2,11 +2,12 @@ class_name WorkplaceGuidance
 extends CanvasLayer
 
 ## Advanced Camera-Relative Directional Arrow and Navigation Guidance System.
-## Dynamically resolves objectives based on player gender and business state.
-## Renders smooth camera-relative directional arrows, off-screen edge clamping,
-## distance badges, 3D pulsing ground beacons, and interaction highlights.
+## Dynamically resolves objectives based on player gender, inventory, and business state.
+## Renders smooth camera-relative directional arrows, 3D player directional arrow,
+## off-screen edge clamping, distance badges, and 3D pulsing ground beacons.
 
 const GARAGE_DEFAULT := Vector3(-63, 0, -11)
+const TOOL_SHOP_POS := Vector3(-56.0, 0, -14.0)
 const NOODLE_DEFAULT := Vector3(-50, 0, -17)
 const HOUSE_EXIT := Vector3(-45, 0, 68)
 
@@ -22,23 +23,28 @@ var direction: Label:
 var hint_label: Label
 
 var edge_pointer: PanelContainer
+var arrow_icon: Control
 var arrow_label: Label
 var pointer_text: Label
 
 var ground_beacon: Node3D
 var beacon_ring: MeshInstance3D
+var player_arrow: Node3D
 
 var current_destination: Vector3 = Vector3.ZERO
 var current_title: String = ""
 var current_hint: String = ""
+var has_navigation_target: bool = true
 var arrived: bool = false
 var smoothed_angle: float = 0.0
+var smoothed_world_yaw: float = 0.0
 
 func _ready() -> void:
 	layer = 90
 	add_to_group("workplace_guidance")
 	_build_ui()
 	_build_ground_beacon()
+	_build_player_arrow()
 
 func _build_ui() -> void:
 	# 1. Top-Right Guidance Card (Clean, compact, no overlap with clock/wallet on left)
@@ -78,7 +84,7 @@ func _build_ui() -> void:
 	edge_pointer = PanelContainer.new()
 	edge_pointer.name = "EdgePointer"
 	edge_pointer.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	edge_pointer.custom_minimum_size = Vector2(170, 36)
+	edge_pointer.custom_minimum_size = Vector2(180, 36)
 	add_child(edge_pointer)
 	
 	var ptr_row := HBoxContainer.new()
@@ -86,13 +92,17 @@ func _build_ui() -> void:
 	ptr_row.add_theme_constant_override("separation", 6)
 	edge_pointer.add_child(ptr_row)
 	
+	arrow_icon = Control.new()
+	arrow_icon.name = "ArrowIcon"
+	arrow_icon.custom_minimum_size = Vector2(22, 22)
+	arrow_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	arrow_icon.draw.connect(_draw_arrow_icon)
+	ptr_row.add_child(arrow_icon)
+	
+	# Keep arrow_label for compatibility with any external inspection
 	arrow_label = Label.new()
 	arrow_label.text = "▲"
-	arrow_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	arrow_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	arrow_label.add_theme_font_size_override("font_size", 18)
-	arrow_label.add_theme_color_override("font_color", Color("69f0ae"))
-	arrow_label.pivot_offset = Vector2(9, 12)
+	arrow_label.visible = false
 	ptr_row.add_child(arrow_label)
 	
 	pointer_text = Label.new()
@@ -101,11 +111,27 @@ func _build_ui() -> void:
 	pointer_text.add_theme_color_override("font_color", Color("ffffff"))
 	ptr_row.add_child(pointer_text)
 
+func _draw_arrow_icon() -> void:
+	if not is_instance_valid(arrow_icon):
+		return
+	var center := arrow_icon.size * 0.5
+	var dir := Vector2(cos(smoothed_angle), sin(smoothed_angle))
+	if arrow_label.text == "▼" and arrow_label.rotation == 0.0:
+		dir = Vector2(0, 1)
+	var perp := Vector2(-dir.y, dir.x)
+	var tip := center + dir * 9.0
+	var tail_l := center - dir * 6.5 + perp * 6.0
+	var tail_m := center - dir * 3.5
+	var tail_r := center - dir * 6.5 - perp * 6.0
+	arrow_icon.draw_colored_polygon(
+		PackedVector2Array([tip, tail_l, tail_m, tail_r]),
+		Color("69f0ae")
+	)
+
 func _build_ground_beacon() -> void:
 	ground_beacon = Node3D.new()
 	ground_beacon.name = "NavGroundBeacon"
 	
-	# Subtle glowing flat ring mesh
 	beacon_ring = MeshInstance3D.new()
 	var torus := TorusMesh.new()
 	torus.inner_radius = 0.9
@@ -123,7 +149,6 @@ func _build_ground_beacon() -> void:
 	beacon_ring.position.y = 0.12
 	ground_beacon.add_child(beacon_ring)
 	
-	# Overhead 3D pin label
 	var pin := Label3D.new()
 	pin.name = "BeaconPin"
 	pin.text = "▼"
@@ -136,6 +161,42 @@ func _build_ground_beacon() -> void:
 	ground_beacon.add_child(pin)
 	
 	get_parent().add_child.call_deferred(ground_beacon)
+
+func _build_player_arrow() -> void:
+	player_arrow = Node3D.new()
+	player_arrow.name = "PlayerNavArrow3D"
+	
+	var arrow_mat := StandardMaterial3D.new()
+	arrow_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	arrow_mat.albedo_color = Color(0.41, 0.94, 0.68, 0.92)
+	arrow_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	
+	# Arrow shaft & chevron pointing toward local +Z (so atan2(dx, dz) aligns +Z with target)
+	var shaft := MeshInstance3D.new()
+	var shaft_mesh := BoxMesh.new()
+	shaft_mesh.size = Vector3(0.18, 0.04, 0.42)
+	shaft.mesh = shaft_mesh
+	shaft.material_override = arrow_mat
+	shaft.position = Vector3(0, 0.14, 1.15)
+	player_arrow.add_child(shaft)
+	
+	var wing_l := MeshInstance3D.new()
+	var wing_mesh := BoxMesh.new()
+	wing_mesh.size = Vector3(0.14, 0.04, 0.36)
+	wing_l.mesh = wing_mesh
+	wing_l.material_override = arrow_mat
+	wing_l.position = Vector3(0.11, 0.14, 1.38)
+	wing_l.rotation.y = -0.65
+	player_arrow.add_child(wing_l)
+	
+	var wing_r := MeshInstance3D.new()
+	wing_r.mesh = wing_mesh
+	wing_r.material_override = arrow_mat
+	wing_r.position = Vector3(-0.11, 0.14, 1.38)
+	wing_r.rotation.y = 0.65
+	player_arrow.add_child(wing_r)
+	
+	get_parent().add_child.call_deferred(player_arrow)
 
 func _process(delta: float) -> void:
 	if not is_instance_valid(player):
@@ -154,6 +215,7 @@ func _process(delta: float) -> void:
 	_update_navigation_arrow(delta)
 
 func _resolve_current_destination() -> void:
+	has_navigation_target = true
 	var char_val = player.get("selected_character")
 	if char_val == null and player.has_meta("selected_character"):
 		char_val = player.get_meta("selected_character")
@@ -193,7 +255,7 @@ func _resolve_current_destination() -> void:
 	
 	if not girl:
 		# -------------------------------------------------------------
-		# Boy Flow: Home -> Scooter -> Garage Parking -> Repair Bay -> Return
+		# Boy Flow: Home -> Scooter -> Garage / Tool Shop / Repair Station -> Return
 		# -------------------------------------------------------------
 		if is_riding:
 			if heading_home:
@@ -236,6 +298,13 @@ func _resolve_current_destination() -> void:
 			current_hint = "Tiệm đã đóng cửa, lên xe máy [E] để về nhà nghỉ ngơi"
 			return
 		
+		# Check if player needs Repair Kits from the Tool Shop
+		if is_instance_valid(garage) and (garage.get_repair_kit_count() <= 0 or garage.needs_tool_shop_guidance):
+			current_destination = TOOL_SHOP_POS
+			current_title = "🧰 Cửa Hàng Dụng Cụ Sửa Xe"
+			current_hint = "Mua thêm Bộ dụng cụ sửa xe [E]"
+			return
+		
 		if not is_instance_valid(garage) or p_pos.distance_to(GARAGE_DEFAULT) > 16.0:
 			current_destination = GARAGE_DEFAULT
 			current_title = "🛵 Tiệm Sửa Xe Chú Ba"
@@ -253,30 +322,31 @@ func _resolve_current_destination() -> void:
 				break
 		
 		if active_bay != -1 and active_order != null:
-			# Guide to bay or tool station
-			var step := active_order.get_current_required_step()
-			var holding := garage.get_holding_tool(player)
-			
-			if step == "patch_kit" and holding != "patch_kit":
-				current_destination = garage.global_position + Vector3(-101, 0, -20)
-				current_title = "Bàn Thợ (Lấy Miếng Vá)"
-				current_hint = "Lấy miếng vá lốp tại bàn làm việc"
-			elif step == "mount_tire" and holding != "new_tire":
-				current_destination = garage.global_position + Vector3(-112, 0, -12)
-				current_title = "Kệ Lốp Mới (Lấy Lốp)"
-				current_hint = "Lấy lốp xe mới từ kệ để thay"
-			elif step == "pump_air":
-				current_destination = garage.global_position + garage.bay_positions[active_bay]
-				current_title = "Khoang %d: Bơm Căng Lốp Xe" % (active_bay + 1)
-				current_hint = "Nhấn [E] để bơm lốp hoàn thành đơn"
+			current_destination = garage.to_global(garage.bay_positions[active_bay])
+			if garage.is_repairing and garage.active_repair_bay == active_bay:
+				var pct := clampi(int(round((garage.repair_elapsed / maxf(0.1, garage.repair_duration)) * 100.0)), 0, 100)
+				current_title = "🔧 Đang sửa xe... %d%%" % pct
+				current_hint = "Giữ vị trí cạnh xe để hoàn tất sửa chữa"
 			else:
-				current_destination = garage.global_position + garage.bay_positions[active_bay]
-				current_title = "Khoang %d: %s" % [active_bay + 1, active_order.service_title]
-				current_hint = "Khách %s đang chờ sửa xe" % active_order.customer_name
+				current_title = "🏍️ Khoang %d: %s" % [active_bay + 1, active_order.service_title]
+				current_hint = "Nhấn E để sửa xe cho %s" % active_order.customer_name
 		else:
+			var obj_mgr := get_tree().get_first_node_in_group("daily_objective_manager") as DailyObjectiveManager
+			var work_done := false
+			if is_instance_valid(obj_mgr):
+				for obj in obj_mgr.objectives:
+					if obj.get("id", "") == "obj_serve_customers" and bool(obj.get("is_completed", false)):
+						work_done = true
+						break
 			current_destination = GARAGE_DEFAULT
-			current_title = "🛵 Tiệm Sửa Xe Chú Ba"
-			current_hint = "Sẵn sàng đón khách vào tiệm sửa xe"
+			if work_done:
+				current_title = "✓ Hoàn Thành Mục Tiêu Sửa Xe"
+				current_hint = "Có thể tiếp tục sửa xe hoặc đóng cửa tiệm về nhà"
+				has_navigation_target = false
+			else:
+				current_title = "🛵 Tiệm Sửa Xe Chú Ba"
+				current_hint = "Đang chờ khách mang xe vào khoang sửa"
+				has_navigation_target = false
 	else:
 		# -------------------------------------------------------------
 		# Girl Flow: Home -> Scooter -> Hu Tieu Parking -> Prep -> Tables -> Return
@@ -321,7 +391,6 @@ func _resolve_current_destination() -> void:
 			current_hint = "Đến quán hủ tiếu đầu ngõ"
 			return
 		
-		# Check prep state
 		if hutieu.prep_state == HuTieuBusiness.PrepState.CLOSED:
 			var dl_girl = get_tree().get_first_node_in_group("daily_loop_manager")
 			if is_instance_valid(dl_girl) and dl_girl.has_worked_today():
@@ -341,7 +410,6 @@ func _resolve_current_destination() -> void:
 			current_title = "Bếp: Sẵn Sàng Bán!"
 			current_hint = "Nhấn [E] để chính thức mở cửa đón khách"
 		else:
-			# Shop is OPEN: check orders
 			var waiting_table := -1
 			var waiting_order: BusinessOrder = null
 			for tbl_idx in hutieu.table_orders:
@@ -376,48 +444,75 @@ func _resolve_current_destination() -> void:
 				current_destination = NOODLE_DEFAULT
 				current_title = "🍜 Quán Hủ Tiếu Cô Bảy"
 				current_hint = "Quán đang mở, chờ khách vào bàn"
+				has_navigation_target = false
 
-func _update_beacon(delta: float) -> void:
+func _update_beacon(_delta: float) -> void:
 	if not is_instance_valid(ground_beacon) or not ground_beacon.is_inside_tree(): return
 	ground_beacon.global_position = current_destination
 	
-	# Gentle floating pulse
 	var t := Time.get_ticks_msec() / 1000.0
 	beacon_ring.scale = Vector3.ONE * (1.0 + 0.12 * sin(t * 4.0))
-	ground_beacon.visible = not arrived
+	ground_beacon.visible = has_navigation_target and not arrived
 
 func _update_navigation_arrow(delta: float) -> void:
-	var dist: float = player.global_position.distance_to(current_destination)
-	arrived = dist < 2.5
+	var delta_3d := current_destination - player.global_position
+	delta_3d.y = 0.0
+	var dist: float = delta_3d.length()
+	arrived = (not has_navigation_target) or (dist < 2.4)
 	
 	# -------------------------------------------------------------
-	# 1. Exact Camera-Relative Ground Projection
+	# 1. 3D Ground Directional Arrow around Player
+	# -------------------------------------------------------------
+	if is_instance_valid(player_arrow) and player_arrow.is_inside_tree():
+		if has_navigation_target and not arrived and dist > 0.1:
+			player_arrow.visible = true
+			player_arrow.global_position = Vector3(player.global_position.x, 0.05, player.global_position.z)
+			var target_yaw := atan2(delta_3d.x, delta_3d.z)
+			smoothed_world_yaw = lerp_angle(smoothed_world_yaw, target_yaw, 1.0 - exp(-16.0 * delta))
+			player_arrow.global_rotation = Vector3(0.0, smoothed_world_yaw, 0.0)
+		else:
+			player_arrow.visible = false
+	
+	# -------------------------------------------------------------
+	# 2. Exact Camera-Relative Screen-Space Direction Calculation
 	# -------------------------------------------------------------
 	var cam_fwd := -camera.global_basis.z
 	cam_fwd.y = 0.0
-	cam_fwd = cam_fwd.normalized()
+	if cam_fwd.length_squared() < 0.0001:
+		cam_fwd = Vector3.FORWARD
+	else:
+		cam_fwd = cam_fwd.normalized()
 	
 	var cam_right := camera.global_basis.x
 	cam_right.y = 0.0
-	cam_right = cam_right.normalized()
+	if cam_right.length_squared() < 0.0001:
+		cam_right = Vector3.RIGHT
+	else:
+		cam_right = cam_right.normalized()
 	
-	var delta_pos := current_destination - player.global_position
-	delta_pos.y = 0.0
+	var right_dot := delta_3d.dot(cam_right)
+	var fwd_dot := delta_3d.dot(cam_fwd)
 	
-	var right_dot := delta_pos.dot(cam_right)
-	var fwd_dot := delta_pos.dot(cam_fwd)
+	# Screen direction vector: +X is screen right, +Y is screen down (so forward is -Y)
+	var screen_dir := Vector2(right_dot, -fwd_dot)
+	if screen_dir.length_squared() > 0.0001:
+		screen_dir = screen_dir.normalized()
+	else:
+		screen_dir = Vector2.UP
 	
-	# Screen direction vector: X is screen right, Y is screen up (negative Y in 2D UI)
-	var screen_dir := Vector2(right_dot, -fwd_dot).normalized()
 	var target_angle := screen_dir.angle()
-	smoothed_angle = lerp_angle(smoothed_angle, target_angle, 1.0 - exp(-12.0 * delta))
+	smoothed_angle = lerp_angle(smoothed_angle, target_angle, 1.0 - exp(-15.0 * delta))
 	
 	# Direction glyph for Top-Right HUD Card
 	var glyphs := ["→", "↘", "↓", "↙", "←", "↖", "↑", "↗"]
 	var glyph_idx := posmod(int(round(smoothed_angle / (PI / 4.0))), 8)
 	var arrow_char: String = glyphs[glyph_idx]
 	
-	if arrived:
+	if not has_navigation_target:
+		direction_label.text = current_title
+		direction_label.add_theme_color_override("font_color", Color("69f0ae"))
+		hint_label.text = current_hint
+	elif arrived:
 		direction_label.text = "✅ ĐÃ ĐẾN NƠI"
 		direction_label.add_theme_color_override("font_color", Color("69f0ae"))
 		hint_label.text = current_title + " · Tương tác [E]"
@@ -427,8 +522,12 @@ func _update_navigation_arrow(delta: float) -> void:
 		hint_label.text = current_hint
 	
 	# -------------------------------------------------------------
-	# 2. Dynamic Floating Screen-Edge Pointer
+	# 3. Dynamic Floating Screen-Edge Pointer
 	# -------------------------------------------------------------
+	if not has_navigation_target or arrived:
+		edge_pointer.visible = false
+		return
+	
 	var vp_size := get_viewport().get_visible_rect().size
 	var screen_center := vp_size * 0.5
 	var target_screen_pos := camera.unproject_position(current_destination + Vector3(0, 1.2, 0))
@@ -436,27 +535,30 @@ func _update_navigation_arrow(delta: float) -> void:
 	
 	var margin := 70.0
 	var bounds_min := Vector2(margin, margin)
-	var bounds_max := vp_size - Vector2(margin + 120, margin + 40)
+	var bounds_max := vp_size - Vector2(margin + 180, margin + 40)
 	
-	var is_on_screen := not is_behind and target_screen_pos.x >= bounds_min.x and target_screen_pos.x <= bounds_max.x and target_screen_pos.y >= bounds_min.y and target_screen_pos.y <= bounds_max.y
+	var is_on_screen := (
+		not is_behind
+		and target_screen_pos.x >= bounds_min.x
+		and target_screen_pos.x <= bounds_max.x
+		and target_screen_pos.y >= bounds_min.y
+		and target_screen_pos.y <= bounds_max.y
+	)
 	
-	if arrived:
-		edge_pointer.visible = false
+	edge_pointer.visible = true
+	pointer_text.text = "%s (%dm)" % [current_title, int(round(dist))]
+	
+	if is_on_screen:
+		edge_pointer.position = edge_pointer.position.lerp(target_screen_pos - Vector2(90, 48), 1.0 - exp(-15.0 * delta))
+		arrow_label.text = "▼"
+		arrow_label.rotation = 0.0
 	else:
-		edge_pointer.visible = true
-		pointer_text.text = "%s (%dm)" % [current_title, int(round(dist))]
-		
-		if is_on_screen:
-			# Anchor smoothly above the on-screen 3D object
-			edge_pointer.position = edge_pointer.position.lerp(target_screen_pos - Vector2(85, 45), 1.0 - exp(-15.0 * delta))
-			arrow_label.text = "▼"
-			arrow_label.rotation = 0.0
-		else:
-			# Clamp to screen border pointing towards the off-screen destination
-			var pointer_pos := screen_center + screen_dir * (minf(vp_size.x, vp_size.y) * 0.42)
-			pointer_pos.x = clampf(pointer_pos.x, bounds_min.x, bounds_max.x)
-			pointer_pos.y = clampf(pointer_pos.y, bounds_min.y, bounds_max.y)
-			
-			edge_pointer.position = edge_pointer.position.lerp(pointer_pos, 1.0 - exp(-15.0 * delta))
-			arrow_label.text = "▲"
-			arrow_label.rotation = smoothed_angle + PI / 2.0
+		var pointer_pos := screen_center + screen_dir * (minf(vp_size.x, vp_size.y) * 0.40)
+		pointer_pos.x = clampf(pointer_pos.x, bounds_min.x, bounds_max.x)
+		pointer_pos.y = clampf(pointer_pos.y, bounds_min.y, bounds_max.y)
+		edge_pointer.position = edge_pointer.position.lerp(pointer_pos, 1.0 - exp(-15.0 * delta))
+		arrow_label.text = "▲"
+		arrow_label.rotation = smoothed_angle + PI / 2.0
+	
+	if is_instance_valid(arrow_icon):
+		arrow_icon.queue_redraw()

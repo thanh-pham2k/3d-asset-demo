@@ -62,12 +62,13 @@ func setup(
 	_build_visuals()
 
 func _build_visuals() -> void:
-	# 1. Motorcycle / Scooter
+	# 1. Motorcycle / Scooter (scooter mesh faces -Z locally; rotate PI so +Z is forward along customer path)
 	var scooter_scene: PackedScene = load("res://scenes/neighborhood/scooter.tscn")
 	if scooter_scene:
 		scooter = scooter_scene.instantiate()
 	else:
 		scooter = Node3D.new()
+	scooter.rotation.y = PI
 	add_child(scooter)
 	
 	# Cache wheels for rolling animation
@@ -118,23 +119,27 @@ func _build_visuals() -> void:
 
 func _seat_driver_on_scooter() -> void:
 	if not is_instance_valid(driver): return
-	driver.position = Vector3(0, 0.46, 0.18)
-	driver.rotation = Vector3.ZERO
+	driver.position = Vector3(0, 0.46, 0.22)
+	driver.rotation = Vector3(0.0, PI, 0.0)
 	driver.visible = true
 	
 	# Natural motorcycle riding pose with hands on handlebars and feet on footboard
 	if driver.has_method("_pose_joint"):
-		driver._pose_joint("left_leg", Vector3(-1.15, 0.15, 0.10))
-		driver._pose_joint("right_leg", Vector3(-1.15, -0.15, -0.10))
-		driver._pose_joint("left_arm", Vector3(-0.95, 0.16, -0.20))
-		driver._pose_joint("right_arm", Vector3(-0.95, -0.16, 0.20))
+		driver._pose_joint("root", Vector3(0.14, 0.0, 0.0))
+		driver._pose_joint("head", Vector3(-0.10, 0.0, 0.0))
+		driver._pose_joint("left_leg", Vector3(-0.98, 0.18, 0.12))
+		driver._pose_joint("right_leg", Vector3(-0.98, -0.18, -0.12))
+		driver._pose_joint("left_arm", Vector3(-1.22, 0.12, -0.10))
+		driver._pose_joint("right_arm", Vector3(-1.22, -0.12, 0.10))
 
 func _stand_driver_beside_scooter() -> void:
 	if not is_instance_valid(driver): return
-	# Move driver to stand beside motorcycle
-	driver.position = Vector3(-0.75, 0, 0.1)
-	driver.rotation.y = PI / 4.0
+	# Move driver to stand cleanly beside motorcycle without overlapping walls or furniture
+	driver.position = Vector3(-0.95, 0, -0.25)
+	driver.rotation = Vector3(0.0, PI * 0.75, 0.0)
 	if driver.has_method("_pose_joint"):
+		driver._pose_joint("root", Vector3.ZERO)
+		driver._pose_joint("head", Vector3.ZERO)
 		driver._pose_joint("left_leg", Vector3.ZERO)
 		driver._pose_joint("right_leg", Vector3.ZERO)
 		driver._pose_joint("left_arm", Vector3.ZERO)

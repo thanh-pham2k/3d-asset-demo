@@ -53,16 +53,8 @@ static func create_default_catalog() -> Dictionary:
 		
 		# --- 2. Repair Tools & Supplies (Dụng cụ sửa xe) ---
 		EconomyProduct.new(
-			"tool_patch_strip", "Miếng vá săm cao cấp", "repair_tool",
-			10000, "Một miếng vá cao su chịu nhiệt độ bền cao", false, "garage"
-		),
-		EconomyProduct.new(
-			"tool_spare_tire", "Lốp xe máy không ruột", "repair_tool",
-			45000, "Lốp xe chính hãng bám đường chống trơn trượt", false, "garage"
-		),
-		EconomyProduct.new(
-			"tool_air_wrench", "Súng xiết bu-lông khí nén", "repair_tool",
-			80000, "Dụng cụ tháo lắp bánh xe chuyên nghiệp nhanh chóng", true, "garage"
+			"tool_repair_kit", "Bộ dụng cụ sửa xe", "repair_tool",
+			10000, "Bộ dụng cụ sửa xe đa năng (Repair Kit) — mỗi lần sửa xe tiêu hao 1 bộ", false, "garage"
 		),
 		
 		# --- 3. Furniture (Nội thất & Gia dụng) ---

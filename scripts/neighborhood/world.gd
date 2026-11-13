@@ -224,14 +224,16 @@ func _ready() -> void:
  add_piece(house,"clothesline",Vector3(-56,0,100),Color.WHITE,PI/2)
  for p in [Vector3(-59,0,68),Vector3(-26,0,69),Vector3(-27,0,100)]: add_piece(house,"flower_bed",p)
  var garage := zone("02_MotorcycleRepair")
+ var garage_paving := add_piece(garage, "paved_court", Vector3(-105, 0, -14))
+ garage_paving.scale = Vector3(2.2, 1.0, 1.8)
  add_piece(garage,"garage",Vector3(-105,0,-18),Color("a3bbab"),PI)
- add_piece(garage,"scooter_parking",Vector3(-104,0,-10))
- add_piece(garage,"tire",Vector3(-112,0,-12))
- add_piece(garage,"air_pump",Vector3(-111,0,-16))
- add_piece(garage,"workbench",Vector3(-101,0,-20))
- # Scooters remain separate scene instances from the garage and terrain.
- add_piece(garage,"scooter",Vector3(-109,0,-11),Color("9ac0b8"),PI/2)
- add_piece(garage,"scooter",Vector3(-106,0,-11),Color("e0a180"),PI/2)
+ add_piece(garage,"scooter_parking",Vector3(-104,0,-11))
+ add_piece(garage,"scooter_parking",Vector3(-108,0,-11))
+ add_piece(garage,"tire",Vector3(-111.5,0,-16.5))
+ add_piece(garage,"air_pump",Vector3(-110.5,0,-18.5))
+ add_piece(garage,"workbench",Vector3(-100.5,0,-18.5))
+ # Dedicated Tool Shop stall east of the repair bays (World X = -56, Z = -16)
+ add_piece(garage,"market_stall",Vector3(-98,0,-16.5),Color("ffd54f"))
  garage.position.x = 42.0
  var noodle := zone("03_HuTieu")
  var noodle_paving := add_piece(noodle,"paved_court",Vector3(-50,0,-20.5))
@@ -497,9 +499,9 @@ func _ready() -> void:
  add_child(market_kiosk)
  var tool_kiosk := ShopKiosk.new()
  tool_kiosk.name = "Kiosk_Tools"
- tool_kiosk.kiosk_title = "Phụ Tùng Sửa Xe"
+ tool_kiosk.kiosk_title = "Cửa Hàng Dụng Cụ Sửa Xe"
  tool_kiosk.product_category = "repair_tool"
- tool_kiosk.position = Vector3(-59, 0, -18)
+ tool_kiosk.position = Vector3(-56, 0, -14)
  add_child(tool_kiosk)
  var house_kiosk := ShopKiosk.new()
  house_kiosk.name = "Kiosk_House"

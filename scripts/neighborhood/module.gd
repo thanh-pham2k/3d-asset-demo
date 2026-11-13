@@ -161,15 +161,23 @@ func build() -> void:
    var gw := 6.2
    var gd := 4.2
    var gh := 3.0
+   interior_half_size = Vector2(gw * 0.5 + 2.2, gd * 0.5 + 5.8)
+   visual_occlusion_bounds = AABB(Vector3(-gw * 0.5 - 1.5, 0.9, -gd * 0.5 - 3.5), Vector3(gw + 3.0, gh + 0.8, gd + 5.5))
    box(Vector3(0, 0.05, 0), Vector3(gw, 0.1, gd), Color("90a4ae"), true)
    for x in [-gw/2 + 0.15, gw/2 - 0.15]:
     for z in [-gd/2 + 0.15, gd/2 - 0.15]:
-     box(Vector3(x, gh/2, z), Vector3(0.16, gh, 0.16), wood)
-   box(Vector3(0, 1.4, gd/2 - 0.08), Vector3(gw - 0.2, 2.7, 0.14), wood, true)
-   box(Vector3(0, 1.7, gd/2 - 0.18), Vector3(4.0, 1.2, 0.06), Color("37474f"))
+     var post := box(Vector3(x, gh/2, z), Vector3(0.16, gh, 0.16), wood)
+     if z < 0.0:
+      cutaway_meshes.append(post)
+   # Low waist wall stays visible for grounding; upper wall + tool board cut away when inside
+   box(Vector3(0, 0.55, gd/2 - 0.08), Vector3(gw - 0.2, 1.0, 0.14), wood, true)
+   var upper_back_wall := box(Vector3(0, 1.9, gd/2 - 0.08), Vector3(gw - 0.2, 1.7, 0.14), wood)
+   cutaway_meshes.append(upper_back_wall)
+   var tool_board := box(Vector3(0, 1.7, gd/2 - 0.18), Vector3(4.0, 1.2, 0.06), Color("37474f"))
+   cutaway_meshes.append(tool_board)
    for tx in [-1.5, -0.9, -0.3, 0.3, 0.9, 1.5]:
-    box(Vector3(tx, 1.8, gd/2 - 0.23), Vector3(0.18, 0.35, 0.05), Color("cfd8dc"))
-    box(Vector3(tx, 1.45, gd/2 - 0.23), Vector3(0.14, 0.22, 0.05), Color("d32f2f"))
+    cutaway_meshes.append(box(Vector3(tx, 1.8, gd/2 - 0.23), Vector3(0.18, 0.35, 0.05), Color("cfd8dc")))
+    cutaway_meshes.append(box(Vector3(tx, 1.45, gd/2 - 0.23), Vector3(0.14, 0.22, 0.05), Color("d32f2f")))
    var roof := box(Vector3(0, gh + 0.1, -0.1), Vector3(gw + 0.6, 0.14, gd + 0.8), tint)
    roof.rotation.x = -0.06
    cutaway_meshes.append(roof)
@@ -188,12 +196,14 @@ func build() -> void:
    round_shape(Vector3(-gw/2 + 0.9, 0.22, -0.6), 0.46, 0.32, dark)
    round_shape(Vector3(0.3, 0.38, 0.8), 0.26, 0.7, Color("e53935"))
   "noodle", "market_stall", "fruit_stall", "meat_stall", "ingredient_stall", "cafe", "banh_mi", "juice":
+   interior_half_size = Vector2(2.4, 2.2)
+   visual_occlusion_bounds = AABB(Vector3(-2.0, 1.2, -1.2), Vector3(4.0, 2.0, 2.4))
    box(Vector3(0,0.55,0),Vector3(3.2,1.1,1.3),wood,true)
    for x in [-1.4,1.4]:
     for z in [-0.55,0.55]: box(Vector3(x,1.4,z),Vector3(0.12,2.8,0.12),wood)
-   box(Vector3(0,2.8,0),Vector3(3.8,0.18,1.9),tint)
+   cutaway_meshes.append(box(Vector3(0,2.8,0),Vector3(3.8,0.18,1.9),tint))
    for x in [-1.4,-0.6,0.2,1.0]:
-    box(Vector3(x,2.9,0),Vector3(0.36,0.03,1.85),Color("fff1dc"))
+    cutaway_meshes.append(box(Vector3(x,2.9,0),Vector3(0.36,0.03,1.85),Color("fff1dc")))
    match kind:
     "noodle":
      box(Vector3(0,1.16,0),Vector3(1.1,0.15,0.8),dark)
@@ -306,23 +316,30 @@ func build() -> void:
    box(Vector3(-0.5,1.05,0),Vector3(0.35,0.12,0.22),red)
    box(Vector3(0.35,1.03,0),Vector3(0.6,0.06,0.09),Color("b9c3bf"))
   "scooter":
-   # Visual-only entity; keep separate from scenery so a controller can replace it.
-   for z in [-0.62,0.62]:
+   # Visual-only entity; proportioned so low-poly characters sit naturally on seat with hands on grips and feet on footboard.
+   for z in [-0.58,0.58]:
     var wheel := CylinderMesh.new()
-    wheel.top_radius = 0.28
-    wheel.bottom_radius = 0.28
-    wheel.height = 0.18
+    wheel.top_radius = 0.26
+    wheel.bottom_radius = 0.26
+    wheel.height = 0.16
     wheel.radial_segments = 12
     var wheel_node := MeshInstance3D.new()
     wheel_node.mesh = wheel
     wheel_node.material_override = mat(dark)
-    wheel_node.position = Vector3(0,0.3,z)
+    wheel_node.position = Vector3(0,0.28,z)
     wheel_node.rotation.z = PI / 2
     add_child(wheel_node)
-   box(Vector3(0,0.62,0.15),Vector3(0.5,0.42,1.15),tint)
-   box(Vector3(0,0.94,0.32),Vector3(0.42,0.15,0.65),dark)
-   box(Vector3(0,1.0,-0.6),Vector3(0.28,1.05,0.25),tint)
-   box(Vector3(0,1.55,-0.6),Vector3(0.75,0.1,0.12),dark)
+   # Low step-through footboard & footrests
+   box(Vector3(0,0.44,-0.08),Vector3(0.44,0.12,0.58),dark)
+   # Rear under-seat fairing
+   box(Vector3(0,0.66,0.26),Vector3(0.40,0.36,0.60),tint)
+   # Seat cushion aligned with rider pelvis (top at y = 0.94, z = 0.22)
+   box(Vector3(0,0.88,0.22),Vector3(0.36,0.12,0.54),dark)
+   # Steering stem & front shield angled toward rider
+   var stem := box(Vector3(0,0.82,-0.42),Vector3(0.24,0.76,0.20),tint)
+   stem.rotation.x = 0.22
+   # Handlebar & grips aligned with rider hands (y = 1.20, z = -0.24)
+   box(Vector3(0,1.20,-0.24),Vector3(0.66,0.07,0.08),dark)
   "produce_crate":
    box(Vector3(0,0.2,0),Vector3(1,0.4,0.7),wood)
    for x in [-0.3,0.0,0.3]:

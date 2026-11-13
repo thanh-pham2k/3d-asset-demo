@@ -913,9 +913,11 @@ func _create_preview_model(product: EconomyProduct) -> Node3D:
 			m.material_override = Art.material(Color("1976d2"))
 			root.add_child(m)
 			return root
-		"tool_patch_strip":
-			Art.box(root, Vector3(0, 0.15, 0), Vector3(0.6, 0.25, 0.4), Color("fbc02d"))
-			Art.box(root, Vector3(0, 0.16, 0), Vector3(0.4, 0.02, 0.25), Color("212121"))
+		"tool_repair_kit", "tool_patch_strip":
+			Art.box(root, Vector3(0, 0.22, 0), Vector3(0.68, 0.36, 0.42), Color("d32f2f"))
+			Art.box(root, Vector3(0, 0.41, 0), Vector3(0.70, 0.04, 0.44), Color("b71c1c"))
+			Art.box(root, Vector3(0, 0.46, 0), Vector3(0.28, 0.06, 0.06), Color("cfd8dc"))
+			Art.box(root, Vector3(0, 0.24, 0.22), Vector3(0.16, 0.08, 0.03), Color("ffd54f"))
 			return root
 		"tool_spare_tire":
 			var tire := TorusMesh.new()

@@ -88,7 +88,8 @@ func _save_completed_order() -> void:
 		save_economy_state()
 
 func get_product(product_id: String) -> EconomyProduct:
-	return catalog.get(product_id, null)
+	var normalized := InventoryManager.normalize_item_id(product_id)
+	return catalog.get(normalized, catalog.get(product_id, null))
 
 func get_house_level() -> int:
 	_ensure_house_manager()

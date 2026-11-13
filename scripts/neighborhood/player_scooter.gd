@@ -78,60 +78,79 @@ func _build_scooter_mesh() -> void:
 	metal_mat.metallic = 0.8
 	
 	# 1. Wheels (front and rear)
-	for z_pos in [-0.62, 0.62]:
+	for z_pos in [-0.58, 0.58]:
 		var wheel_mesh := MeshInstance3D.new()
 		var cyl := CylinderMesh.new()
-		cyl.top_radius = 0.28
-		cyl.bottom_radius = 0.28
-		cyl.height = 0.18
+		cyl.top_radius = 0.26
+		cyl.bottom_radius = 0.26
+		cyl.height = 0.16
 		cyl.radial_segments = 14
 		wheel_mesh.mesh = cyl
 		wheel_mesh.material_override = dark_mat
-		wheel_mesh.position = Vector3(0, 0.3, z_pos)
+		wheel_mesh.position = Vector3(0, 0.28, z_pos)
 		wheel_mesh.rotation.z = PI / 2.0
 		scooter_root.add_child(wheel_mesh)
 		wheels.append(wheel_mesh)
 	
-	# 2. Main body and footboard
+	# 2. Step-through footboard and footrests (prevents leg clipping)
+	var footboard := MeshInstance3D.new()
+	var fb_box := BoxMesh.new()
+	fb_box.size = Vector3(0.46, 0.12, 0.58)
+	footboard.mesh = fb_box
+	footboard.material_override = dark_mat
+	footboard.position = Vector3(0, 0.44, -0.08)
+	scooter_root.add_child(footboard)
+	
+	# Rear body fairing under seat
 	var body := MeshInstance3D.new()
 	var b_box := BoxMesh.new()
-	b_box.size = Vector3(0.48, 0.42, 1.15)
+	b_box.size = Vector3(0.38, 0.36, 0.60)
 	body.mesh = b_box
 	body.material_override = paint_mat
-	body.position = Vector3(0, 0.62, 0.15)
+	body.position = Vector3(0, 0.66, 0.26)
 	scooter_root.add_child(body)
 	
-	# 3. Comfortable seat
+	# 3. Comfortable seat aligned with rider pelvis (top at y = 0.94, z = 0.22)
 	var seat := MeshInstance3D.new()
 	var s_box := BoxMesh.new()
-	s_box.size = Vector3(0.42, 0.15, 0.65)
+	s_box.size = Vector3(0.36, 0.12, 0.54)
 	seat.mesh = s_box
 	seat.material_override = dark_mat
-	seat.position = Vector3(0, 0.94, 0.32)
+	seat.position = Vector3(0, 0.88, 0.22)
 	scooter_root.add_child(seat)
 	
-	# 4. Front steering column and handlebars
+	# 4. Front steering column and ergonomic handlebars
 	var column := MeshInstance3D.new()
 	var c_box := BoxMesh.new()
-	c_box.size = Vector3(0.28, 1.05, 0.25)
+	c_box.size = Vector3(0.24, 0.78, 0.20)
 	column.mesh = c_box
 	column.material_override = paint_mat
-	column.position = Vector3(0, 1.0, -0.6)
+	column.position = Vector3(0, 0.82, -0.42)
+	column.rotation.x = 0.24
 	scooter_root.add_child(column)
 	
 	var bar := MeshInstance3D.new()
 	var bar_box := BoxMesh.new()
-	bar_box.size = Vector3(0.75, 0.09, 0.12)
+	bar_box.size = Vector3(0.66, 0.07, 0.08)
 	bar.mesh = bar_box
-	bar.material_override = dark_mat
-	bar.position = Vector3(0, 1.55, -0.6)
+	bar.material_override = metal_mat
+	bar.position = Vector3(0, 1.20, -0.24)
 	scooter_root.add_child(bar)
+	
+	for grip_x in [-0.30, 0.30]:
+		var grip := MeshInstance3D.new()
+		var g_box := BoxMesh.new()
+		g_box.size = Vector3(0.14, 0.085, 0.095)
+		grip.mesh = g_box
+		grip.material_override = dark_mat
+		grip.position = Vector3(grip_x, 1.20, -0.24)
+		scooter_root.add_child(grip)
 	
 	# 5. Headlight
 	var light_mesh := MeshInstance3D.new()
 	var l_cyl := CylinderMesh.new()
-	l_cyl.top_radius = 0.12
-	l_cyl.bottom_radius = 0.12
+	l_cyl.top_radius = 0.11
+	l_cyl.bottom_radius = 0.11
 	l_cyl.height = 0.08
 	light_mesh.mesh = l_cyl
 	var glow_mat := StandardMaterial3D.new()
@@ -140,7 +159,7 @@ func _build_scooter_mesh() -> void:
 	glow_mat.emission = Color("fff9c4")
 	glow_mat.emission_energy_multiplier = 1.5
 	light_mesh.material_override = glow_mat
-	light_mesh.position = Vector3(0, 1.35, -0.74)
+	light_mesh.position = Vector3(0, 1.08, -0.52)
 	light_mesh.rotation.x = PI / 2.0
 	scooter_root.add_child(light_mesh)
 	
@@ -207,12 +226,15 @@ func mount(player_node: CharacterBody3D) -> void:
 	if is_instance_valid(exhaust_particles):
 		exhaust_particles.emitting = true
 	
-	# Attach scooter to player node
+	# Attach scooter to player node and align player heading with scooter
+	var scooter_world_rot_y := global_rotation.y
 	reparent(rider)
-	position = Vector3(0, 0, 0)
+	position = Vector3.ZERO
 	rotation = Vector3.ZERO
+	rider.rotation.y = scooter_world_rot_y
+	rider.facing = Vector3(sin(scooter_world_rot_y + PI), 0.0, cos(scooter_world_rot_y + PI)).normalized()
 	
-	# Seat rider onto scooter
+	# Seat rider onto scooter with smooth mount transition
 	_apply_seated_pose(true)
 	_update_label()
 	
@@ -269,13 +291,23 @@ func _apply_seated_pose(seated: bool) -> void:
 	
 	if is_instance_valid(visual_root):
 		if seated:
-			# Align rider hips onto scooter seat (seat at y=0.94, z=0.32)
-			# Hips pivot at y=0.48, so visual root at y=0.46, z=0.18 puts hips firmly on cushion
-			# and feet resting naturally on the footboard (y=0.62)
-			visual_root.position = Vector3(0, 0.46, 0.18)
+			# Align rider pelvis onto scooter seat (seat top at y=0.94, z=0.22)
+			# Hips pivot at y=0.48 in VisualRoot, so y=0.46, z=0.22 places pelvis flush on seat,
+			# hands directly on handlebar grips (y=1.20, z=-0.24), and feet on footboard (y=0.50).
+			visual_root.position = Vector3(0, 0.46, 0.22)
+			visual_root.rotation = Vector3(0.0, PI, 0.0)
+			if rider.is_inside_tree():
+				var tween := rider.create_tween()
+				visual_root.scale = Vector3(1.06, 0.92, 1.06)
+				tween.tween_property(visual_root, "scale", Vector3.ONE, 0.16).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 		else:
-			visual_root.position = rider.config.visual_offset if "config" in rider and rider.config else Vector3.ZERO
+			var base_offset: Vector3 = rider.config.visual_offset if "config" in rider and rider.config else Vector3.ZERO
+			visual_root.position = base_offset
+			visual_root.rotation.x = 0.0
 			visual_root.rotation.z = 0.0
+			if "facing" in rider:
+				visual_root.rotation.y = atan2(rider.facing.x, rider.facing.z)
+			rider.rotation.y = 0.0
 
 func update_riding(delta: float, direction: Vector3, current_speed: float, is_running: bool) -> void:
 	if not is_mounted or not is_instance_valid(rider): return

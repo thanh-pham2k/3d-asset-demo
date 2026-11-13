@@ -156,7 +156,11 @@ func _physics_process(delta: float) -> void:
  impulse = impulse.move_toward(Vector3.ZERO, 9.0 * delta)
  if not is_on_floor(): velocity.y -= 18.0 * delta
  else: velocity.y = -0.1
- if direction.length() > 0.08 and slip_timer <= 0.0:
+ if riding_scooter != null and is_instance_valid(riding_scooter):
+  if direction.length() > 0.08:
+   facing = direction.normalized()
+  visual.rotation.y = PI
+ elif direction.length() > 0.08 and slip_timer <= 0.0:
   facing = direction.normalized()
   visual.rotation.y = lerp_angle(visual.rotation.y, atan2(facing.x,facing.z), 1.0-exp(-12.0*delta))
  visual.rotation.x = lerp_angle(visual.rotation.x, 0.0, 1.0 - exp(-8.0 * delta))
@@ -345,7 +349,11 @@ func find_target() -> void:
     nearest_dist = distance
     target = item
   if target:
-   prompt_label.text = key + " — " + target.prompt(self)
+   var p_text: String = str(target.prompt(self))
+   if p_text.begins_with("Nhấn ") or p_text.begins_with("Đang sửa xe") or p_text.begins_with("✓") or p_text.begins_with("Hết dụng cụ"):
+    prompt_label.text = p_text
+   else:
+    prompt_label.text = key + " — " + p_text
    prompt_label.visible = true
   else:
    prompt_label.text = ""

@@ -278,7 +278,10 @@ static func load_economy(
 		inventory.items.clear()
 		var loaded_items: Dictionary = inv.get("items", {})
 		for k in loaded_items:
-			inventory.items[str(k)] = maxi(0, int(loaded_items[k]))
+			var norm_key := InventoryManager.normalize_item_id(str(k))
+			var count_val := maxi(0, int(loaded_items[k]))
+			if count_val > 0:
+				inventory.items[norm_key] = inventory.items.get(norm_key, 0) + count_val
 		
 		inventory.owned_upgrades.clear()
 		var loaded_upgrades: Dictionary = inv.get("owned_upgrades", {})

@@ -34,15 +34,15 @@ func apply_state(move: float, running: bool, holding: bool, throwing: bool, rest
 func update_placeholder(move: float, running: bool, holding: bool, throwing: bool, resting: bool, lying: bool, reacting: bool, time: float, riding: bool = false) -> void:
  if riding:
   state = "ride"
-  # Both hands on handlebars, both legs bent onto footboard
-  var left_arm_rot := Vector3(-0.98, 0.16, -0.20)
-  var right_arm_rot := Vector3(-0.98, -0.16, 0.20)
-  var left_leg_rot := Vector3(-1.15, 0.15, 0.10)
-  var right_leg_rot := Vector3(-1.15, -0.15, -0.10)
-  var engine_vibe := sin(time * 24.0) * 0.006
+  # Pelvis on seat, slight forward torso lean, hands on handlebar grips, feet on footrests
+  var left_arm_rot := Vector3(-1.22, 0.12, -0.10)
+  var right_arm_rot := Vector3(-1.22, -0.12, 0.10)
+  var left_leg_rot := Vector3(-0.98, 0.18, 0.12)
+  var right_leg_rot := Vector3(-0.98, -0.18, -0.12)
+  var engine_vibe := sin(time * 24.0) * 0.005
   if model.has_method("pose_joint"):
-   model.pose_joint("root", Vector3(-0.08, 0, engine_vibe))
-   model.pose_joint("head", Vector3(0.04, 0, 0))
+   model.pose_joint("root", Vector3(0.14, 0, engine_vibe))
+   model.pose_joint("head", Vector3(-0.10, 0, 0))
    model.pose_joint("left_leg", left_leg_rot)
    model.pose_joint("right_leg", right_leg_rot)
    model.pose_joint("left_arm", left_arm_rot)

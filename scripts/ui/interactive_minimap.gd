@@ -41,7 +41,15 @@ var landmarks := [
 		"pos": Vector3(-63, 0, -15),
 		"color": Color("4fc3f7"), # Sky blue
 		"icon": "🛵",
-		"desc": "Chòi sửa xe máy chú Ba (Khoang sửa, bơm hơi, bàn thợ)"
+		"desc": "Chòi sửa xe máy chú Ba (Khoang sửa xe 3 giây)"
+	},
+	{
+		"id": "tool_shop",
+		"title": "Tiệm Dụng Cụ Sửa Xe",
+		"pos": Vector3(-56, 0, -14),
+		"color": Color("ffd54f"), # Golden yellow
+		"icon": "🧰",
+		"desc": "Cửa hàng bán Bộ dụng cụ sửa xe (Repair Kit)"
 	},
 	{
 		"id": "hutieu",
@@ -435,23 +443,33 @@ func _draw_hud_minimap() -> void:
 	
 	# Draw Workplace Guidance Objective (if available)
 	if is_instance_valid(guidance):
-		var target_dest: Vector3 = guidance.get("current_destination") if "current_destination" in guidance else Vector3.ZERO
-		var target_pt: Vector2 = to_hud_point.call(target_dest)
-		var to_target := target_pt - center
-		var t_dist := to_target.length()
-		
-		var pulse := 1.0 + 0.25 * sin(anim_pulse)
-		if t_dist <= radius - 10.0:
-			hud_drawer.draw_circle(target_pt, 7.0 * pulse, Color("ffd54f", 0.5))
-			hud_drawer.draw_circle(target_pt, 4.0, Color("ffd54f"))
-		else:
-			var rim_target := center + to_target.normalized() * (radius - 8.0)
-			hud_drawer.draw_circle(rim_target, 5.0 * pulse, Color("ffd54f"))
+		var has_target: bool = guidance.get("has_navigation_target") if "has_navigation_target" in guidance else true
+		var is_arrived: bool = guidance.get("arrived") if "arrived" in guidance else false
+		if has_target and not is_arrived:
+			var target_dest: Vector3 = guidance.get("current_destination") if "current_destination" in guidance else Vector3.ZERO
+			var target_pt: Vector2 = to_hud_point.call(target_dest)
+			var to_target := target_pt - center
+			var t_dist := to_target.length()
+			
+			var pulse := 1.0 + 0.25 * sin(anim_pulse)
+			var clamped_pt := target_pt if t_dist <= radius - 10.0 else (center + to_target.normalized() * (radius - 8.0))
+			hud_drawer.draw_line(center, clamped_pt, Color("ffd54f", 0.45), 1.5)
+			if t_dist <= radius - 10.0:
+				hud_drawer.draw_circle(target_pt, 7.0 * pulse, Color("ffd54f", 0.5))
+				hud_drawer.draw_circle(target_pt, 4.0, Color("ffd54f"))
+			else:
+				hud_drawer.draw_circle(clamped_pt, 5.0 * pulse, Color("ffd54f"))
 	
 	# Draw Player Arrow in Center
-	# Note: in Godot 3D, facing -Z is forward. Screen Y is downwards.
-	var heading_angle := p_rot_y + PI / 2.0
-	var fwd := Vector2(cos(heading_angle), sin(heading_angle))
+	# Map X is world +X, Map Y is world +Z. Use player.facing directly so arrow matches actual movement/scooter heading.
+	var fwd := Vector2(0, 1)
+	if is_instance_valid(player) and "facing" in player:
+		var f3: Vector3 = player.facing
+		var f2 := Vector2(f3.x, f3.z)
+		if f2.length_squared() > 0.001:
+			fwd = f2.normalized()
+	else:
+		fwd = Vector2(sin(p_rot_y), cos(p_rot_y))
 	var right := Vector2(-fwd.y, fwd.x)
 	
 	var p_tip := center + fwd * 8.0
@@ -548,8 +566,14 @@ func _draw_expanded_map() -> void:
 		# Pulsing glow
 		modal_drawer.draw_circle(p_pt, 10.0, Color("00e5ff", 0.35))
 		
-		var heading_angle := p_rot_y + PI / 2.0
-		var fwd := Vector2(cos(heading_angle), sin(heading_angle))
+		var fwd := Vector2(0, 1)
+		if "facing" in player:
+			var f3: Vector3 = player.facing
+			var f2 := Vector2(f3.x, f3.z)
+			if f2.length_squared() > 0.001:
+				fwd = f2.normalized()
+		else:
+			fwd = Vector2(sin(p_rot_y), cos(p_rot_y))
 		var right := Vector2(-fwd.y, fwd.x)
 		
 		var p_tip := p_pt + fwd * 12.0

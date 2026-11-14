@@ -40,21 +40,37 @@ func setup_garden_plots(parent: Node3D) -> void:
 		garden_root = Node3D.new()
 		garden_root.name = "GardenPlotsRoot"
 		parent.add_child(garden_root)
-		
+
+	# Anchor the garden in the backyard (behind the house, away from the front gate).
+	var anchor := parent.get_node_or_null("GardenAnchor") as Node3D
+	if not is_instance_valid(anchor) and is_inside_tree():
+		anchor = get_tree().get_first_node_in_group("garden_anchor") as Node3D
+	if is_instance_valid(anchor):
+		garden_root.position = parent.to_local(anchor.global_position)
+	else:
+		garden_root.position = Vector3(0.0, 0.0, 9.5)
+
 	plots.clear()
-	
-	# Default layout: 4 garden plots outside back doorway in the home garden area
+
+	# 4 initial crop plots arranged cleanly in the backyard
 	var plot_positions := [
-		Vector3(-1.8, 0.0, -6.4),
-		Vector3(-0.6, 0.0, -6.4),
-		Vector3(0.6, 0.0, -6.4),
-		Vector3(1.8, 0.0, -6.4)
+		Vector3(-2.1, 0.0, 0.4),
+		Vector3(-0.7, 0.0, 0.4),
+		Vector3(0.7, 0.0, 0.4),
+		Vector3(2.1, 0.0, 0.4)
 	]
-	# Level 2+ (Cozy Home) or Flower Garden upgrade adds two plots without occupying the doorway.
+	# Level 2+ (Cozy Home) or Flower Garden upgrade adds two extra backyard plots.
+	var has_extra_plots := false
 	var room := parent as Room
-	if is_instance_valid(room) and is_instance_valid(room.progression_manager) and (room.progression_manager.house_level >= 2 or room.progression_manager.has_flower_garden):
-		plot_positions.append(Vector3(-1.9, 0.0, -4.95))
-		plot_positions.append(Vector3(1.9, 0.0, -4.95))
+	if is_instance_valid(room) and is_instance_valid(room.progression_manager):
+		has_extra_plots = (room.progression_manager.house_level >= 2 or room.progression_manager.has_flower_garden)
+	elif is_inside_tree():
+		var hp := get_tree().get_first_node_in_group("house_progression_manager") as HouseProgressionManager
+		if is_instance_valid(hp):
+			has_extra_plots = (hp.house_level >= 2 or hp.has_flower_garden)
+	if has_extra_plots:
+		plot_positions.append(Vector3(-2.1, 0.0, -1.2))
+		plot_positions.append(Vector3(2.1, 0.0, -1.2))
 	
 	for i in range(plot_positions.size()):
 		var p_id := "plot_%d" % (i + 1)
@@ -71,50 +87,51 @@ func setup_garden_plots(parent: Node3D) -> void:
 				pending_plot_data.erase(p_id)
 			plot_added.emit(plot)
 		else:
+			existing.position = plot_positions[i]
 			plots.append(existing)
 			if pending_plot_data.has(p_id):
 				existing.apply_save_data(pending_plot_data[p_id])
 				pending_plot_data.erase(p_id)
 			
-	# Spawn decorative garden accessories around the plots
+	# Spawn decorative garden accessories around the backyard plots
 	_spawn_garden_decorations(garden_root)
 
 func _spawn_garden_decorations(parent: Node3D) -> void:
 	if parent.get_node_or_null("GardenCompost"):
 		return
 		
-	# 1. Garden fence along the rear of the garden
+	# 1. Decorative garden fence along the rear of the backyard garden
 	var fence_sc: PackedScene = load("res://scenes/farming/garden_fence.tscn")
 	if fence_sc:
-		for x_pos in [-1.5, 1.5]:
+		for x_pos in [-1.8, 0.0, 1.8]:
 			var fence = fence_sc.instantiate()
 			fence.name = "GardenFence_%s" % str(x_pos)
-			fence.position = Vector3(x_pos, 0, -7.4)
+			fence.position = Vector3(x_pos, 0, 1.5)
 			parent.add_child(fence)
 			
-	# 2. Compost bag near the right plot
+	# 2. Compost bag near the right side of the backyard garden
 	var compost_sc: PackedScene = load("res://scenes/farming/compost_bag.tscn")
 	if compost_sc:
 		var compost = compost_sc.instantiate()
 		compost.name = "GardenCompost"
-		compost.position = Vector3(2.8, 0, -6.0)
+		compost.position = Vector3(3.1, 0, 0.2)
 		parent.add_child(compost)
 		
-	# 3. Watering can tool prop near left plot
+	# 3. Watering can tool prop near left side of the backyard garden
 	var can_sc: PackedScene = load("res://scenes/farming/tool_watering_can.tscn")
 	if can_sc:
 		var can = can_sc.instantiate()
 		can.name = "GardenWateringCan"
-		can.position = Vector3(-2.8, 0, -6.0)
+		can.position = Vector3(-3.1, 0, 0.2)
 		parent.add_child(can)
 		
-	# 4. Garden stepping stone pathway in front of the plots
+	# 4. Garden stepping stone pathway in front of the backyard plots
 	var path_sc: PackedScene = load("res://scenes/farming/garden_pathway.tscn")
 	if path_sc:
-		for x_pos in [-1.2, 0.0, 1.2]:
+		for x_pos in [-1.0, 0.0, 1.0]:
 			var pathway = path_sc.instantiate()
 			pathway.name = "Pathway_%s" % str(x_pos)
-			pathway.position = Vector3(x_pos, 0, -5.3)
+			pathway.position = Vector3(x_pos, 0, -1.1)
 			parent.add_child(pathway)
 
 # -----------------------------------------------------------------

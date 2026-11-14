@@ -211,7 +211,13 @@ func rebuild_house(preserve_furniture_state: bool = true) -> void:
 	if is_instance_valid(pet_manager) and pet_manager.is_adopted:
 		pet_manager.ensure_pet_spawned(self)
 
-	# Setup Garden Plots (Requirement 2 & 4)
+	# Setup Backyard Garden Anchor & Plots (Requirement 2 & 4)
+	if not get_node_or_null("GardenAnchor"):
+		var anchor := Marker3D.new()
+		anchor.name = "GardenAnchor"
+		anchor.position = Vector3(0.0, 0.0, 9.5)
+		anchor.add_to_group("garden_anchor")
+		add_child(anchor)
 	if is_instance_valid(garden_manager):
 		garden_manager.setup_garden_plots(self)
 

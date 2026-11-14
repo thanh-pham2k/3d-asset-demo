@@ -824,7 +824,7 @@ func _build_hud() -> void:
 	layer.layer = 5
 	add_child(layer)
 	var panel := PanelContainer.new()
-	panel.position = Vector2(16, 128)
+	panel.position = Vector2(16, 152)
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = Color("141a21", 0.72)
 	sb.set_corner_radius_all(10)

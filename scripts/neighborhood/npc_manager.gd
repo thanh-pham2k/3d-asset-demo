@@ -88,6 +88,7 @@ func _ready() -> void:
 
 	_build_neighbor_ui()
 	call_deferred("spawn_all_default_npcs")
+	call_deferred("_spawn_ambient_pedestrians")
 	call_deferred("_discover_economy_and_businesses")
 
 func _discover_economy_and_businesses() -> void:
@@ -470,7 +471,129 @@ func _on_time_updated(hour: float) -> void:
 func _schedule_key(entry: Dictionary) -> String:
 	return "%s|%s|%s|%s" % [entry.get("start_hour", 0.0), entry.get("end_hour", 24.0), entry.get("activity", ""), entry.get("position", Vector3.ZERO)]
 
+var ambient_walkers: Array[Dictionary] = []
+var _ambient_root: Node3D = null
+
+func _spawn_ambient_pedestrians() -> void:
+	if not is_inside_tree() or _ambient_root != null:
+		return
+	# Only spawn ambient neighborhood walkers when inside the neighborhood world
+	var world_node := get_tree().get_first_node_in_group("couple_world")
+	if not is_instance_valid(world_node):
+		return
+	_ambient_root = Node3D.new()
+	_ambient_root.name = "AmbientPedestrians"
+	add_child(_ambient_root)
+
+	var routes := [
+		[Vector3(-74, 0, -8), Vector3(74, 0, -8)],       # Boulevard North
+		[Vector3(-74, 0, 8), Vector3(74, 0, 8)],         # Boulevard South
+		[Vector3(-74, 0, -65), Vector3(-74, 0, 60)],     # West Sidewalk
+		[Vector3(6, 0, -70), Vector3(6, 0, 70)],         # Centre Sidewalk
+		[Vector3(42, 0, 12), Vector3(42, 0, 70)],        # Park Promenade
+		[Vector3(26, 0, -16), Vector3(52, 0, -16)],      # Market Stall Row
+		[Vector3(-100, 0, 12), Vector3(-80, 0, 12)],     # Food Street
+		[Vector3(-60, 0, -84), Vector3(60, 0, -84)],     # Residential Alley
+		[Vector3(-68, 0, 46), Vector3(0, 0, 46)],        # South Residential Street
+	]
+	var shirt_colors := [
+		Color("ef9a9a"), Color("90caf9"), Color("a5d6a7"),
+		Color("ffe082"), Color("ce93d8"), Color("80cbc4")
+	]
+	for i in range(18):
+		var seg: Array = routes[i % routes.size()]
+		var a: Vector3 = seg[0]
+		var b: Vector3 = seg[1]
+		var t: float = float((i * 37) % 100) / 100.0
+		var start_pos: Vector3 = a.lerp(b, t)
+		var walker := _create_lightweight_pedestrian(shirt_colors[i % shirt_colors.size()], i)
+		walker.position = start_pos
+		_ambient_root.add_child(walker)
+		ambient_walkers.append({
+			"node": walker,
+			"a": a,
+			"b": b,
+			"forward": (i % 2 == 0),
+			"speed": 1.35 + float(i % 4) * 0.2,
+			"pause": float(i % 3) * 0.6,
+			"phase": float(i) * 0.9,
+			"tier": 0 if i < 3 else (1 if i < 9 else 2) # 0=night, 1=evening, 2=daytime
+		})
+	var cur_h := time_manager.current_hour if is_instance_valid(time_manager) else 8.0
+	_refresh_ambient_density(cur_h)
+
+func _create_lightweight_pedestrian(shirt_col: Color, idx: int) -> Node3D:
+	var root := Node3D.new()
+	root.name = "AmbientNPC_%d" % idx
+	var body := MeshInstance3D.new()
+	var cap := CapsuleMesh.new()
+	cap.radius = 0.22
+	cap.height = 0.75
+	cap.radial_segments = 8
+	cap.rings = 2
+	body.mesh = cap
+	var b_mat := StandardMaterial3D.new()
+	b_mat.albedo_color = shirt_col
+	b_mat.roughness = 0.85
+	body.material_override = b_mat
+	body.position = Vector3(0, 0.72, 0)
+	root.add_child(body)
+
+	var head := MeshInstance3D.new()
+	var sph := SphereMesh.new()
+	sph.radius = 0.19
+	sph.height = 0.38
+	sph.radial_segments = 8
+	sph.rings = 4
+	head.mesh = sph
+	var h_mat := StandardMaterial3D.new()
+	h_mat.albedo_color = Color("f3cbb0")
+	h_mat.roughness = 0.85
+	head.material_override = h_mat
+	head.position = Vector3(0, 1.35, 0)
+	root.add_child(head)
+	return root
+
+func _refresh_ambient_density(hour: float) -> void:
+	var max_tier := 2 # Daytime (6..18): all 18
+	if hour >= 22.0 or hour < 6.0:
+		max_tier = 0 # Night: 3
+	elif hour >= 18.0:
+		max_tier = 1 # Evening: 9
+	for w in ambient_walkers:
+		var n: Node3D = w["node"]
+		if is_instance_valid(n):
+			n.visible = int(w["tier"]) <= max_tier
+
+func _process(delta: float) -> void:
+	if ambient_walkers.is_empty():
+		return
+	var active_p := get_tree().get_first_node_in_group("active_player") as Node3D
+	for w in ambient_walkers:
+		var n: Node3D = w["node"]
+		if not is_instance_valid(n) or not n.visible:
+			continue
+		if is_instance_valid(active_p) and n.global_position.distance_squared_to(active_p.global_position) > 6400.0:
+			continue # Distance-based update culling (> 80m)
+		if float(w["pause"]) > 0.0:
+			w["pause"] = float(w["pause"]) - delta
+			continue
+		var target: Vector3 = w["b"] if bool(w["forward"]) else w["a"]
+		var diff: Vector3 = target - n.position
+		diff.y = 0.0
+		var dist := diff.length()
+		if dist < 0.4:
+			w["forward"] = not bool(w["forward"])
+			w["pause"] = 1.5 + float(randi() % 3)
+			continue
+		var dir := diff / dist
+		n.position += dir * float(w["speed"]) * delta
+		w["phase"] = float(w["phase"]) + delta * 8.0
+		n.position.y = absf(sin(float(w["phase"]))) * 0.04
+		n.rotation.y = atan2(dir.x, dir.z)
+
 func _update_all_schedules(hour: float) -> void:
+	_refresh_ambient_density(hour)
 	for id in npcs:
 		var npc: NPCController = npcs[id]
 		if not is_instance_valid(npc) or not npc.data: continue

@@ -234,6 +234,19 @@ func _ready() -> void:
   add_piece(house,"yard_fence",Vector3(-20,0,z),Color.WHITE,PI/2)
  add_piece(house,"clothesline",Vector3(-56,0,100),Color.WHITE,PI/2)
  for p in [Vector3(-59,0,68),Vector3(-26,0,69),Vector3(-27,0,100)]: add_piece(house,"flower_bed",p)
+ if not integrated:
+  # Backyard pathway connecting the front yard around the east side of the house to the backyard garden
+  slab(house,Vector3(-37.8,0.06,87.5),Vector3(2.2,0.1,21.0),Color("d7b999"))
+  slab(house,Vector3(-41.5,0.06,97.5),Vector3(7.5,0.1,2.2),Color("d7b999"))
+  var garden_anchor := Marker3D.new()
+  garden_anchor.name = "GardenAnchor"
+  garden_anchor.position = Vector3(-45.0, 0.0, 97.5)
+  garden_anchor.add_to_group("garden_anchor")
+  add_child(garden_anchor)
+  var garden_mgr := GardenManager.new()
+  garden_mgr.name = "GardenManager"
+  add_child(garden_mgr)
+  garden_mgr.setup_garden_plots(self)
  var garage := zone("02_MotorcycleRepair")
  var garage_paving := add_piece(garage, "paved_court", Vector3(-105, 0, -14))
  garage_paving.scale = Vector3(2.2, 1.0, 1.8)
@@ -383,6 +396,40 @@ func _ready() -> void:
  for p in [Vector3(-70,0,-10),Vector3(10,0,10),Vector3(70,0,-10),Vector3(35,0,28)]: add_piece(street,"trash_bin",p)
  for p in [Vector3(-20,0,-15),Vector3(20,0,-15),Vector3(70,0,-15),Vector3(-70,0,15),Vector3(70,0,15)]:
   add_piece(street,"utility_pole",p)
+ var ambiance := zone("NeighborhoodDensity")
+ # Cozy South-East and East residential houses/townhouses (clear of roads and landmarks)
+ var extra_buildings := [
+  ["townhouse", Vector3(22,0,94), Color("f1d5a0"), PI],
+  ["house", Vector3(41,0,94), Color("bad4c2"), PI],
+  ["townhouse", Vector3(60,0,94), Color("b8d5dc"), PI],
+  ["house", Vector3(110,0,50), Color("f2d6a1"), -PI/2],
+  ["townhouse", Vector3(110,0,72), Color("c4dacf"), -PI/2],
+ ]
+ for b in extra_buildings:
+  add_piece(ambiance, b[0], b[1], b[2], b[3])
+ # Sidewalk, park, and market trees with natural scale/rotation variation (never on roads/driveways)
+ var extra_trees := [
+  ["tree", Vector3(-34,0,11), Color("81a974"), 1.12],
+  ["tree", Vector3(-12,0,-11), Color("7da36f"), 0.95],
+  ["tree", Vector3(26,0,-11), Color("8cb37f"), 1.08],
+  ["tree", Vector3(54,0,11), Color("84ab76"), 1.15],
+  ["tree", Vector3(25,0,28), Color("7aa16c"), 1.2],
+  ["tree", Vector3(58,0,34), Color("8ab17d"), 0.92],
+  ["tree", Vector3(24,0,56), Color("82aa75"), 1.05],
+  ["tree", Vector3(60,0,62), Color("7fa570"), 1.18],
+  ["banana_tree", Vector3(-24,0,104), Color("86ad72"), 1.05],
+  ["banana_tree", Vector3(14,0,92), Color("7da66b"), 0.94],
+  ["banana_tree", Vector3(66,0,86), Color("8cb57a"), 1.1],
+  ["banana_tree", Vector3(-92,0,14), Color("83aa6e"), 1.0],
+ ]
+ for i in extra_trees.size():
+  var t = extra_trees[i]
+  var node := add_piece(ambiance, t[0], t[1], t[2], float(i) * 0.85)
+  node.scale = Vector3.ONE * float(t[3])
+ for p in [Vector3(28,0,14), Vector3(56,0,14), Vector3(28,0,-22), Vector3(52,0,-22), Vector3(-14,0,14)]:
+  add_piece(ambiance, "flower_bed", p)
+ for p in [Vector3(24,0,11), Vector3(60,0,11), Vector3(-32,0,-11), Vector3(92,0,-11)]:
+  add_piece(ambiance, "bench", p, Color.WHITE, 0.0 if p.z > 0 else PI)
  var routes := zone("NPCWalkingRoutes")
  # Named guide paths follow sidewalk centres, crossing the roads at intersections.
  # Their shared coordinates are connection points for a future route graph.
@@ -713,7 +760,9 @@ func add_help() -> void:
  box.add_child(character_badge_label)
  _refresh_character_badge()
  var text := Label.new()
- text.text = "WASD: di chuyển · Shift: chạy · Space: lướt\nE: tương tác · F: ném · C: đổi Boy/Girl · Esc: menu"
+ text.text = "WASD · Shift · E: tương tác · C: đổi · M: bản đồ · Esc"
+ text.add_theme_font_size_override("font_size", 12)
+ text.modulate = Color("cfd8dc")
  box.add_child(text)
 
 func _refresh_character_badge() -> void:

@@ -539,7 +539,11 @@ func _is_point_blocked_or_out_of_bounds(p: Vector3) -> bool:
 	return not get_world_3d().direct_space_state.intersect_ray(query).is_empty()
 
 func _pick_random_garden_point() -> Vector3:
-	var pt := Vector3(randf_range(-2.2, 2.2), 0.0, randf_range(-6.6, -4.8))
+	var garden_mgr := get_tree().get_first_node_in_group("garden_manager") if is_inside_tree() else null
+	if is_instance_valid(garden_mgr) and "garden_root" in garden_mgr and is_instance_valid(garden_mgr.garden_root):
+		var origin: Vector3 = (garden_mgr.garden_root as Node3D).global_position
+		return origin + Vector3(randf_range(-2.4, 2.4), 0.0, randf_range(-1.4, 1.0))
+	var pt := Vector3(randf_range(-2.2, 2.2), 0.0, randf_range(8.4, 10.6))
 	return _room_to_global(pt)
 
 func _is_in_doorway(p: Vector3) -> bool:

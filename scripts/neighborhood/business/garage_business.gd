@@ -196,9 +196,12 @@ func _ready() -> void:
 	shop_name = "Tiệm Sửa Xe Máy Chú Ba"
 	open_hour = 6.0
 	close_hour = 21.0
+	auto_open_by_schedule = true
 	spawn_interval = 12.0
 	auto_level_up_enabled = false
 	super._ready()
+	var tm := get_tree().get_first_node_in_group("time_manager") as NeighborhoodTimeManager
+	_check_operating_hours(tm.current_hour if is_instance_valid(tm) else 8.0)
 	
 	_create_work_stations()
 	_build_repair_hud()
@@ -1200,10 +1203,8 @@ func _show_repair_completed_hud(reward_str: String) -> void:
 	repair_hud_panel.visible = true
 	repair_status_label.text = "✓ Sửa xe thành công! +%s đ" % reward_str
 	repair_status_label.add_theme_color_override("font_color", Color("69f0ae"))
-	repair_bar_text_label.visible = true
-	repair_bar_text_label.text = "██████████"
-	repair_progress_bar.visible = true
-	repair_progress_bar.value = 100.0
+	repair_bar_text_label.visible = false
+	repair_progress_bar.visible = false
 	repair_kit_label.text = "🧰 Bộ dụng cụ sửa xe: %d" % get_repair_kit_count()
 
 func _update_repair_hud(delta: float) -> void:
@@ -1344,9 +1345,8 @@ func get_station_prompt(station: RepairStation, _player_node: Node3D = null) -> 
 		
 		"shop_sign":
 			if is_open:
-				return "Đóng cửa tiệm sửa xe (kết thúc ngày)"
-			else:
-				return "Mở cửa tiệm sửa xe"
+				return "🔧 Tiệm Sửa Xe: Đang mở cửa (06:00–21:00)"
+			return "🌙 Tiệm Sửa Xe: Đã đóng cửa (Mở lại 06:00)"
 		"upgrade_board":
 			return "Nâng cấp Tiệm Sửa Xe (Cấp %d/5)" % business_level
 	
@@ -1356,16 +1356,15 @@ func on_station_interacted(station: RepairStation, player_node: Node3D) -> void:
 	match station.station_type:
 		"shop_sign":
 			if is_open:
-				close_shop()
-				_show_feedback(station.global_position, "Tiệm sửa xe đã ĐÓNG CỬA nghỉ ngơi!", Color("ffd54f"))
+				_show_feedback(station.global_position, "🔧 Tiệm sửa xe tự động mở cửa (06:00–21:00) — khách tự ghé!", Color("69f0ae"))
 			else:
-				open_shop()
-				_show_feedback(station.global_position, "🎉 Tiệm sửa xe chính thức MỞ CỬA đón khách!", Color("69f0ae"))
+				_show_feedback(station.global_position, "🌙 Tiệm nghỉ ngơi ngoài giờ (Mở lại lúc 06:00)", Color("ffd54f"))
 		"upgrade_board":
 			open_upgrade_ui()
 		
 		"bike_bay":
-			if is_repairing:
+			if not is_open:
+				_show_feedback(station.global_position, "🌙 Tiệm đang đóng cửa (06:00–21:00)", Color("ffd54f"))
 				return
 			
 			var bay := station.bay_index
@@ -1387,12 +1386,16 @@ func on_station_interacted(station: RepairStation, player_node: Node3D) -> void:
 				_show_out_of_kits_message(station.global_position)
 				return
 			
-			# Start 3-second repair progress
-			is_repairing = true
+			# Instant player repair: complete immediately on E press
 			active_repair_bay = bay
 			active_repair_order = order
 			active_repair_player = player_node
 			repair_elapsed = 0.0
+			_finish_active_repair()
+			if is_instance_valid(player_node) and player_node.has_method("play_couple_celebration"):
+				var fx = get_tree().get_first_node_in_group("chaos_feedback")
+				if is_instance_valid(fx) and fx.has_method("play_event"):
+					fx.play_event("bonk", station.global_position + Vector3.UP * 0.8)
 			hud_override_mode = ""
 			hud_message_timer = 0.0
 			order.status = BusinessOrder.Status.IN_PROGRESS

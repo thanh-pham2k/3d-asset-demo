@@ -79,7 +79,7 @@ func update_placeholder(move: float, running: bool, holding: bool, throwing: boo
   state = "hit" if elapsed < 0.12 else ("knockback" if elapsed < 0.3 else "fall")
  elif time < recovery_until: state = "get_up"
  if resting: state = "lie" if lying else "sit"
- var swing := sin(time * (13.0 if running else 8.0)) * move
+ var swing := sin(time * (16.5 if running else 11.5)) * move
  var left_leg_angle := swing * 0.62
  var right_leg_angle := -swing * 0.62
  var left_arm_angle := -swing * 0.55

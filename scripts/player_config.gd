@@ -1,9 +1,9 @@
 class_name PlayerConfig
 extends Resource
 
-@export var walk_speed := 2.15
-@export var run_speed := 3.4
-@export var acceleration := 14.0
+@export var walk_speed := 4.3
+@export var run_speed := 6.8
+@export var acceleration := 24.0
 @export var dash_speed := 7.5
 @export var dash_duration := 0.20
 @export var dash_cooldown := 0.65

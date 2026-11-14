@@ -17,6 +17,7 @@ signal level_up(new_level: int)
 @export var open_hour: float = 6.0
 @export var close_hour: float = 21.0
 @export var auto_spawn_customers: bool = true
+@export var auto_open_by_schedule: bool = false
 @export var spawn_interval: float = 16.0
 
 var is_open: bool = true
@@ -312,7 +313,10 @@ func _check_operating_hours(hour: float) -> void:
 	else:
 		hours_open = (hour >= open_hour or hour < close_hour)
 	
-	if not hours_open:
+	if auto_open_by_schedule:
+		manual_closed = false
+		is_open = hours_open
+	elif not hours_open:
 		manual_closed = false # Re-arm for tomorrow morning
 		is_open = false
 	elif not manual_closed:

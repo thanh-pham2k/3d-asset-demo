@@ -1,0 +1,7 @@
+{
+  "id": "order_carrot_4",
+  "title": "Đơn hàng Cà rốt tươi",
+  "item_id": "carrot",
+  "required_count": 4,
+  "reward_coins": 60
+}

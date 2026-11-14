@@ -1,0 +1,6 @@
+{
+  "starting_coins": 100,
+  "initial_unlocked_plots": 4,
+  "total_plots": 6,
+  "unlock_plot_cost": 120
+}

@@ -4,6 +4,9 @@ extends RefCounted
 
 signal queue_changed()
 
+const BATCH_UNLOCK_COST := 140
+const BATCH_UNLOCK_LEVEL := 2
+
 var recipes_by_id: Dictionary = {}
 var recipe_ids_sorted: Array[String] = []
 var initial_slots: int = 2
@@ -12,6 +15,8 @@ var slot_upgrade_base_cost: int = 80
 var slot_upgrade_cost_step: int = 80
 
 var max_slots: int = 2
+var batch_unlocked: bool = false
+var batch_mode: bool = false
 var queue: Array[Dictionary] = []
 var _next_job_seq: int = 0
 
@@ -40,9 +45,33 @@ func apply_config(cfg: Dictionary) -> void:
 
 func reset() -> void:
 	max_slots = initial_slots
+	batch_unlocked = false
+	batch_mode = false
 	queue.clear()
 	_next_job_seq = 0
 	queue_changed.emit()
+
+func get_active_batch_mult() -> int:
+	return 2 if (batch_unlocked and batch_mode) else 1
+
+func unlock_batch_mode(wallet: Wallet, player_level: int) -> Dictionary:
+	if batch_unlocked:
+		return {"ok": false, "reason": "Đã mở khóa Chế biến đôi (x2)."}
+	if player_level < BATCH_UNLOCK_LEVEL:
+		return {"ok": false, "reason": "Cần Level %d để mở Chế biến đôi." % BATCH_UNLOCK_LEVEL}
+	if not wallet.can_afford(BATCH_UNLOCK_COST) or not wallet.spend(BATCH_UNLOCK_COST):
+		return {"ok": false, "reason": "Cần %d xu để mở Chế biến đôi." % BATCH_UNLOCK_COST}
+	batch_unlocked = true
+	batch_mode = true
+	queue_changed.emit()
+	return {"ok": true, "cost": BATCH_UNLOCK_COST}
+
+func toggle_batch_mode() -> bool:
+	if not batch_unlocked:
+		return false
+	batch_mode = not batch_mode
+	queue_changed.emit()
+	return batch_mode
 
 func get_recipe(recipe_id: String) -> Dictionary:
 	return recipes_by_id.get(recipe_id, {}) as Dictionary
@@ -59,8 +88,9 @@ func can_start_recipe(recipe_id: String, inventory: Inventory, player_level: int
 	var inputs: Dictionary = r.get("inputs", {}) as Dictionary
 	if inputs.is_empty():
 		return {"ok": false, "reason": "Công thức không hợp lệ."}
+	var mult := get_active_batch_mult()
 	for item_id in inputs.keys():
-		var need := maxi(1, int(inputs[item_id]))
+		var need := maxi(1, int(inputs[item_id])) * mult
 		if not inventory.has_item(String(item_id), need):
 			return {"ok": false, "reason": "Thiếu nguyên liệu: %s (cần %d)." % [String(item_id), need]}
 	return {"ok": true}
@@ -72,9 +102,10 @@ func start_recipe(recipe_id: String, inventory: Inventory, clock: GameClock, pla
 
 	var r := recipes_by_id[recipe_id] as Dictionary
 	var inputs: Dictionary = r.get("inputs", {}) as Dictionary
+	var mult := get_active_batch_mult()
 	# All inputs validated above — deduct atomically.
 	for item_id in inputs.keys():
-		var need := maxi(1, int(inputs[item_id]))
+		var need := maxi(1, int(inputs[item_id])) * mult
 		if not inventory.remove_item(String(item_id), need):
 			return {"ok": false, "reason": "Lỗi trừ nguyên liệu."}
 
@@ -85,16 +116,17 @@ func start_recipe(recipe_id: String, inventory: Inventory, clock: GameClock, pla
 			has_active = true
 			break
 
-	var duration := maxi(1, int(r.get("duration_sec", 10)))
+	var base_dur := maxi(1, int(r.get("duration_sec", 10)))
+	var duration := base_dur if mult == 1 else maxi(base_dur + 1, int(ceil(float(base_dur) * 1.6)))
 	var status := "QUEUED" if has_active else "PROCESSING"
 	var started := 0 if has_active else clock.now()
 
 	var job := {
 		"job_id": "job_%d" % _next_job_seq,
 		"recipe_id": recipe_id,
-		"display_name": String(r.get("display_name", recipe_id)),
+		"display_name": String(r.get("display_name", recipe_id)) + (" (x2)" if mult == 2 else ""),
 		"output_id": String(r.get("output_id", recipe_id)),
-		"output_yield": maxi(1, int(r.get("output_yield", 1))),
+		"output_yield": maxi(1, int(r.get("output_yield", 1))) * mult,
 		"duration_sec": duration,
 		"started_at_unix": started,
 		"status": status
@@ -213,12 +245,16 @@ func upgrade_slot(wallet: Wallet) -> Dictionary:
 func to_dict() -> Dictionary:
 	return {
 		"max_slots": max_slots,
+		"batch_unlocked": batch_unlocked,
+		"batch_mode": batch_mode,
 		"queue": queue.duplicate(true),
 		"next_job_seq": _next_job_seq
 	}
 
 func load_from_dict(d: Dictionary, clock: GameClock = null) -> void:
 	max_slots = clampi(int(d.get("max_slots", initial_slots)), initial_slots, max_slots_cap)
+	batch_unlocked = bool(d.get("batch_unlocked", false))
+	batch_mode = bool(d.get("batch_mode", false)) and batch_unlocked
 	_next_job_seq = maxi(0, int(d.get("next_job_seq", 0)))
 	queue.clear()
 	var raw_q: Variant = d.get("queue", [])

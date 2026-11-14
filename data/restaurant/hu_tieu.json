@@ -16,8 +16,8 @@
       "display_name": "Hủ tiếu chay thanh đạm",
       "inputs": { "noodle_sheet": 1, "carrot": 2, "scallion": 1 },
       "cook_duration_sec": 8,
-      "reward_coins": 55,
-      "reward_xp": 30
+      "reward_coins": 72,
+      "reward_xp": 32
     },
     {
       "id": "hu_tieu_toi",

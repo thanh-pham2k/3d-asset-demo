@@ -263,14 +263,12 @@ func claim_milestone(mid: String, collection_score: int, wallet: Wallet, progres
 			}
 	return {"ok": false, "reason": "Không tìm thấy cột mốc."}
 
-func get_collection_score(home: HomeSystem, pets: PetSystem, neighborhood: NeighborhoodSystem) -> int:
+func get_collection_score(home: HomeSystem, pets: PetSystem, _neighborhood: NeighborhoodSystem = null) -> int:
 	var score := discovered_crops.size() + discovered_recipes.size() + discovered_dishes.size()
 	if home != null:
 		score += home.owned_furniture.size()
 	if pets != null:
 		score += pets.owned_items.size()
-	if neighborhood != null:
-		score += neighborhood.built_areas.size() + neighborhood.claimed_stories.size()
 	return score
 
 func get_next_recommendation(collection_score: int) -> String:

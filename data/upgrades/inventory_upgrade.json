@@ -1,7 +1,7 @@
 {
-  "initial_capacity": 25,
-  "capacity_step": 10,
+  "initial_capacity": 35,
+  "capacity_step": 15,
   "base_upgrade_cost": 40,
-  "cost_step": 50,
-  "max_capacity": 115
+  "cost_step": 45,
+  "max_capacity": 155
 }

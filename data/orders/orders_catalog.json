@@ -8,8 +8,8 @@
       "type": "standard",
       "min_level": 1,
       "requirements": { "carrot": 4 },
-      "reward_coins": 60,
-      "reward_xp": 25
+      "reward_coins": 48,
+      "reward_xp": 20
     },
     {
       "id": "order_scallion_3",
@@ -17,8 +17,8 @@
       "type": "standard",
       "min_level": 1,
       "requirements": { "scallion": 3 },
-      "reward_coins": 25,
-      "reward_xp": 15
+      "reward_coins": 24,
+      "reward_xp": 14
     },
     {
       "id": "order_herb_mix",
@@ -26,8 +26,8 @@
       "type": "standard",
       "min_level": 1,
       "requirements": { "carrot": 2, "scallion": 2 },
-      "reward_coins": 45,
-      "reward_xp": 22
+      "reward_coins": 44,
+      "reward_xp": 20
     },
     {
       "id": "order_rice_bag",
@@ -35,8 +35,8 @@
       "type": "standard",
       "min_level": 2,
       "requirements": { "rice": 6 },
-      "reward_coins": 65,
-      "reward_xp": 30
+      "reward_coins": 58,
+      "reward_xp": 26
     },
     {
       "id": "order_broth_prep",
@@ -71,8 +71,8 @@
       "type": "standard",
       "min_level": 1,
       "requirements": { "carrot_pickles": 2 },
-      "reward_coins": 56,
-      "reward_xp": 28
+      "reward_coins": 68,
+      "reward_xp": 30
     },
     {
       "id": "order_noodle_supply",

@@ -4,25 +4,36 @@
   "max_speed_level": 3,
   "speed_upgrade_costs": [90, 180],
   "speed_multipliers": [1.0, 0.75, 0.55],
-  "max_capacity_level": 3,
-  "capacity_upgrade_costs": [100, 200],
-  "capacity_slots": [1, 2, 3],
   "vehicles": [
     {
-      "id": "scooter",
-      "display_name": "Xe Máy Giao Hàng",
+      "id": "scooter_1",
+      "display_name": "Xe Máy #1",
       "ascii": "o==o>",
       "min_level": 2,
-      "repair_cost": 40,
-      "repair_items": {}
+      "buy_cost": 0,
+      "owned_by_default": true,
+      "max_durability": 5,
+      "repair_cost": 20
+    },
+    {
+      "id": "scooter_2",
+      "display_name": "Xe Máy #2",
+      "ascii": "o==o>",
+      "min_level": 2,
+      "buy_cost": 120,
+      "owned_by_default": false,
+      "max_durability": 6,
+      "repair_cost": 25
     },
     {
       "id": "mini_van",
       "display_name": "Xe Tải Nhỏ",
       "ascii": "[===|o>",
       "min_level": 3,
-      "repair_cost": 120,
-      "repair_items": {}
+      "buy_cost": 220,
+      "owned_by_default": false,
+      "max_durability": 8,
+      "repair_cost": 35
     }
   ],
   "routes": [
@@ -30,7 +41,7 @@
       "id": "route_market",
       "display_name": "Chợ Đầu Mối",
       "min_level": 2,
-      "requires_vehicle": "scooter",
+      "requires_vehicle": "",
       "duration_sec": 15,
       "requirements": { "carrot": 3, "scallion": 2 },
       "reward_coins": 45,
@@ -41,7 +52,7 @@
       "id": "route_noodle_hub",
       "display_name": "Tiệm Gia Vị Phố Cổ",
       "min_level": 2,
-      "requires_vehicle": "scooter",
+      "requires_vehicle": "",
       "duration_sec": 20,
       "requirements": { "herb_seasoning": 1, "carrot_pickles": 1 },
       "reward_coins": 55,

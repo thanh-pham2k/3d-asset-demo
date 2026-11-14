@@ -3,6 +3,7 @@ extends RefCounted
 ## Manages Miu Miu, optional cozy pet care, toys/beds/accessories, unlocked behaviors, and one-time collection rewards.
 
 signal pets_changed()
+signal pet_discovered_gift(gift: Dictionary)
 
 var pet_cfg: Dictionary = {}
 var items_by_id: Dictionary = {}
@@ -21,6 +22,7 @@ var unlocked_behaviors: Dictionary = {}
 var claimed_milestones: Dictionary = {}
 var interactions_count: int = 0
 var last_reaction: String = ""
+var last_gift_unix: int = 0
 
 func _init(cfg: Dictionary = {}) -> void:
 	apply_config(cfg)
@@ -76,6 +78,7 @@ func reset() -> void:
 	unlocked_behaviors.clear()
 	claimed_milestones.clear()
 	interactions_count = 0
+	last_gift_unix = 0
 	last_reaction = "Miu Miu đang vẫy đuôi chào Boy & Girl!"
 	_sync_unlocked_behaviors()
 	pets_changed.emit()
@@ -213,6 +216,43 @@ func feed_miu_miu(inventory: Inventory, crop_id: String = "carrot") -> Dictionar
 	pets_changed.emit()
 	return {"ok": true, "text": last_reaction, "consumed": crop_id}
 
+func maybe_discover_gift(clock: GameClock, wallet: Wallet, inventory: Inventory, unlocked_crops: Array[String]) -> Dictionary:
+	if interactions_count <= 0 or (interactions_count % 3) != 0:
+		return {"ok": false}
+	var now_u := clock.now() if clock != null else 0
+	if clock != null and last_gift_unix > 0 and (now_u - last_gift_unix) < 30:
+		return {"ok": false}
+	last_gift_unix = now_u
+	var gift := {}
+	if not unlocked_crops.is_empty() and inventory != null and inventory.can_add(1) and (interactions_count % 2 == 1):
+		var cid := unlocked_crops[interactions_count % unlocked_crops.size()]
+		inventory.add_item(cid, 1)
+		gift = {"ok": true, "kind": "item", "item_id": cid, "amount": 1, "text": "🎁 Miu Miu tha về 1 %s từ ngoài vườn!" % cid}
+	else:
+		var bonus := 8
+		if wallet != null:
+			wallet.earn(bonus)
+		gift = {"ok": true, "kind": "coins", "coins": bonus, "text": "🎁 Miu Miu khều dưới ghế tìm thấy +%d xu!" % bonus}
+	last_reaction = String(gift["text"])
+	pet_discovered_gift.emit(gift)
+	pets_changed.emit()
+	return gift
+
+func react_to_activity(activity: String) -> String:
+	match activity:
+		"harvest":
+			last_reaction = "Miu Miu ngửi ngửi rổ rau vừa thu hoạch!"
+		"cook":
+			last_reaction = "Miu Miu ngóng mũi về phía nồi Hủ Tiếu thơm phức!"
+		"delivery":
+			last_reaction = "Miu Miu vẫy đuôi tiễn xe Ga-ra lên đường!"
+		"upgrade":
+			last_reaction = "Miu Miu chạy quanh kiểm tra góc nhà mới nâng cấp!"
+		_:
+			last_reaction = "Miu Miu kêu meo nhẹ đầy hứng khởi."
+	pets_changed.emit()
+	return last_reaction
+
 func claim_milestone(milestone_id: String, wallet: Wallet, progression: ProgressionSystem) -> Dictionary:
 	if not milestones_by_id.has(milestone_id):
 		return {"ok": false, "reason": "Cột mốc không tồn tại."}
@@ -273,6 +313,7 @@ func to_dict() -> Dictionary:
 		"owned_items": owned_arr,
 		"claimed_milestones": claimed_arr,
 		"interactions_count": interactions_count,
+		"last_gift_unix": last_gift_unix,
 		"last_reaction": last_reaction
 	}
 
@@ -304,6 +345,7 @@ func load_from_dict(data: Dictionary) -> void:
 				claimed_milestones[mid] = true
 
 	interactions_count = maxi(0, int(data.get("interactions_count", 0)))
+	last_gift_unix = maxi(0, int(data.get("last_gift_unix", 0)))
 	var lr := String(data.get("last_reaction", ""))
 	if lr != "":
 		last_reaction = lr

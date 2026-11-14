@@ -42,8 +42,8 @@
     },
     {
       "id": "weekly_community",
-      "display_name": "Nhịp Sống Khu Phố (2 lần giúp hàng xóm & 3 lần chăm Miu Miu/Nhà)",
-      "requirements": { "npc_helps": 2, "cozy_actions": 3 },
+      "display_name": "Nhịp Sống Ấm Áp (5 lần tương tác Nhà / Miu Miu)",
+      "requirements": { "cozy_actions": 5 },
       "reward_coins": 80,
       "reward_xp": 50
     }

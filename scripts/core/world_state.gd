@@ -2,6 +2,8 @@ class_name WorldState
 extends RefCounted
 ## Unified Game Core coordinator owning shared systems and cross-module transactions.
 
+signal activity_event(kind: String, payload: Dictionary)
+
 var clock: GameClock
 var wallet: Wallet
 var inventory: Inventory
@@ -154,14 +156,36 @@ func try_emergency_recovery() -> Dictionary:
 	wallet.earn(needed)
 	return {"recovered": true, "granted_coins": needed, "crop_id": selected_crop_id}
 
+func get_cozy_weather() -> Dictionary:
+	var slot := int(floor(float(clock.now()) / 120.0)) % 3
+	match slot:
+		1:
+			return {"id": "light_rain", "label": "🌦️ Mưa rào nhẹ", "desc": "Cây lớn nhanh hơn 20%", "grow_mult": 0.8, "bonus_mult": 1.0}
+		2:
+			return {"id": "breeze", "label": "🌸 Gió mát", "desc": "+10% xu Hủ Tiếu & Ga-ra", "grow_mult": 1.0, "bonus_mult": 1.1}
+		_:
+			return {"id": "sunny", "label": "☀️ Nắng ấm", "desc": "Ngày đẹp trời bình yên", "grow_mult": 1.0, "bonus_mult": 1.0}
+
+func _get_weather_crop_cfg(cfg: Dictionary) -> Dictionary:
+	var w := get_cozy_weather()
+	var g_mult := float(w.get("grow_mult", 1.0))
+	if is_equal_approx(g_mult, 1.0):
+		return cfg
+	var out := cfg.duplicate(true)
+	var base_dur := maxi(1, int(out.get("grow_duration_sec", 5)))
+	out["grow_duration_sec"] = maxi(2, int(round(float(base_dur) * g_mult)))
+	return out
+
 func plant_plot(plot_id: int) -> Dictionary:
 	if not is_crop_unlocked(selected_crop_id):
 		var req_lv := UnlockRules.get_required_level_for_crop(selected_crop_id, progression)
 		return {"ok": false, "reason": "Giống cây cần Level %d." % req_lv}
 	var recovery := try_emergency_recovery()
-	var cfg := get_selected_crop_cfg()
+	var cfg := _get_weather_crop_cfg(get_selected_crop_cfg())
 	var res := farm.plant_plot(plot_id, cfg, wallet, clock)
 	res["recovered_coins"] = int(recovery.get("granted_coins", 0))
+	if bool(res.get("ok", false)):
+		activity_event.emit("planted", {"plot_id": plot_id, "crop_id": selected_crop_id})
 	return res
 
 func plant_all_empty() -> Dictionary:
@@ -169,9 +193,11 @@ func plant_all_empty() -> Dictionary:
 		var req_lv := UnlockRules.get_required_level_for_crop(selected_crop_id, progression)
 		return {"ok": false, "reason": "Giống cây cần Level %d." % req_lv}
 	var recovery := try_emergency_recovery()
-	var cfg := get_selected_crop_cfg()
+	var cfg := _get_weather_crop_cfg(get_selected_crop_cfg())
 	var res := farm.plant_all_empty(cfg, wallet, clock)
 	res["recovered_coins"] = int(recovery.get("granted_coins", 0))
+	if int(res.get("planted_count", 0)) > 0:
+		activity_event.emit("planted_all", {"count": int(res.get("planted_count", 0)), "crop_id": selected_crop_id})
 	return res
 
 func harvest_plot(plot_id: int) -> Dictionary:
@@ -230,16 +256,95 @@ func collect_all_production() -> Dictionary:
 func upgrade_production_slot() -> Dictionary:
 	return production.upgrade_slot(wallet)
 
+func unlock_production_batch() -> Dictionary:
+	return production.unlock_batch_mode(wallet, progression.level)
+
+func toggle_production_batch() -> bool:
+	return production.toggle_batch_mode()
+
 func unlock_restaurant() -> Dictionary:
 	return restaurant.unlock_restaurant(wallet, progression.level)
 
 func cook_dish(dish_id: String) -> Dictionary:
-	return restaurant.start_cook(dish_id, inventory, clock)
+	var res := restaurant.start_cook(dish_id, inventory, clock)
+	if bool(res.get("ok", false)):
+		pets.react_to_activity("cook")
+		activity_event.emit("cooking_started", {"dish_id": dish_id})
+	return res
 
 func serve_restaurant_customer(cust_idx: int) -> Dictionary:
 	var res := restaurant.serve_customer(cust_idx, wallet, progression)
 	if bool(res.get("ok", false)):
+		var b_mult := float(get_cozy_weather().get("bonus_mult", 1.0))
+		if b_mult > 1.0:
+			var extra := maxi(1, int(round(float(res.get("reward_coins", 0)) * (b_mult - 1.0))))
+			wallet.earn(extra)
+			res["weather_bonus"] = extra
+			res["reward_coins"] = int(res.get("reward_coins", 0)) + extra
 		goals.record_dish_served(String(res.get("dish_id", "")), 1)
+		home.get_contextual_reaction("cook", String(res.get("dish_name", "")))
+		activity_event.emit("dish_served", res)
+	return res
+
+func serve_all_restaurant() -> Dictionary:
+	var res := restaurant.serve_all_ready(wallet, progression)
+	var cnt := int(res.get("served", 0))
+	if cnt > 0:
+		var b_mult := float(get_cozy_weather().get("bonus_mult", 1.0))
+		if b_mult > 1.0:
+			var extra := maxi(1, int(round(float(res.get("coins", 0)) * (b_mult - 1.0))))
+			wallet.earn(extra)
+			res["weather_bonus"] = extra
+			res["coins"] = int(res.get("coins", 0)) + extra
+		goals.record_dish_served("", cnt)
+		home.get_contextual_reaction("cook", "Hủ Tiếu")
+		activity_event.emit("dishes_served_bulk", res)
+	return res
+
+func claim_all_garage() -> Dictionary:
+	var res := garage.claim_all_ready(wallet, progression, home, pets)
+	var cnt := int(res.get("claimed", 0))
+	if cnt > 0:
+		var b_mult := float(get_cozy_weather().get("bonus_mult", 1.0))
+		if b_mult > 1.0:
+			var extra := maxi(1, int(round(float(res.get("coins", 0)) * (b_mult - 1.0))))
+			wallet.earn(extra)
+			res["weather_bonus"] = extra
+			res["coins"] = int(res.get("coins", 0)) + extra
+		goals.record_delivery(cnt)
+		home.get_contextual_reaction("delivery", "")
+		pets.react_to_activity("delivery")
+		activity_event.emit("garage_claimed_bulk", res)
+	return res
+
+func get_unlocked_crop_ids() -> Array[String]:
+	var out: Array[String] = []
+	for cid in crop_ids_sorted:
+		if is_crop_unlocked(cid):
+			out.append(cid)
+	return out
+
+func pet_miu_miu_interactive() -> Dictionary:
+	var res := pets.pet_miu_miu(home)
+	var gift := pets.maybe_discover_gift(clock, wallet, inventory, get_unlocked_crop_ids())
+	res["gift"] = gift
+	goals.record_cozy_action(1)
+	activity_event.emit("pet_interacted", res)
+	return res
+
+func play_miu_miu_interactive() -> Dictionary:
+	var res := pets.play_with_miu_miu(home)
+	var gift := pets.maybe_discover_gift(clock, wallet, inventory, get_unlocked_crop_ids())
+	res["gift"] = gift
+	goals.record_cozy_action(1)
+	activity_event.emit("pet_interacted", res)
+	return res
+
+func do_couple_coop() -> Dictionary:
+	var res := home.do_couple_coop(clock, wallet, progression)
+	if bool(res.get("ok", false)):
+		goals.record_cozy_action(1)
+		activity_event.emit("couple_coop", res)
 	return res
 
 func dismiss_restaurant_customer(cust_idx: int) -> Dictionary:

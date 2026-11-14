@@ -1,6 +1,6 @@
 class_name GarageSystem
 extends RefCounted
-## Manages the unlockable Garage, vehicle repairs, delivery routes, speed/capacity upgrades, and special rewards.
+## Manages the unlockable Garage, fleet expansion (overlapping deliveries), vehicle durability & repair, routes, and upgrades.
 
 signal garage_changed()
 
@@ -9,9 +9,6 @@ var unlock_cost: int = 120
 var max_speed_level: int = 3
 var speed_upgrade_costs: Array[int] = [90, 180]
 var speed_multipliers: Array[float] = [1.0, 0.75, 0.55]
-var max_capacity_level: int = 3
-var capacity_upgrade_costs: Array[int] = [100, 200]
-var capacity_slots: Array[int] = [1, 2, 3]
 
 var vehicles_by_id: Dictionary = {}
 var vehicle_ids_sorted: Array[String] = []
@@ -20,9 +17,9 @@ var route_ids_sorted: Array[String] = []
 
 # Persistent state
 var is_unlocked: bool = false
-var repaired_vehicles: Dictionary = {} # vehicle_id -> true
+var owned_vehicles: Dictionary = {} # vehicle_id -> true
+var vehicle_durability: Dictionary = {} # vehicle_id -> int
 var speed_level: int = 1
-var capacity_level: int = 1
 var active_deliveries: Array[Dictionary] = []
 var claimed_route_rewards: Dictionary = {} # route_id -> true
 var auto_dispatch_enabled: bool = false
@@ -38,7 +35,6 @@ func apply_config(cfg: Dictionary) -> void:
 	unlock_level = maxi(1, int(cfg.get("unlock_level", 2)))
 	unlock_cost = maxi(0, int(cfg.get("unlock_cost", 120)))
 	max_speed_level = maxi(1, int(cfg.get("max_speed_level", 3)))
-	max_capacity_level = maxi(1, int(cfg.get("max_capacity_level", 3)))
 
 	speed_upgrade_costs.clear()
 	for c in (cfg.get("speed_upgrade_costs", [90, 180]) as Array):
@@ -46,13 +42,6 @@ func apply_config(cfg: Dictionary) -> void:
 	speed_multipliers.clear()
 	for m in (cfg.get("speed_multipliers", [1.0, 0.75, 0.55]) as Array):
 		speed_multipliers.append(float(m))
-
-	capacity_upgrade_costs.clear()
-	for c in (cfg.get("capacity_upgrade_costs", [100, 200]) as Array):
-		capacity_upgrade_costs.append(int(c))
-	capacity_slots.clear()
-	for s in (cfg.get("capacity_slots", [1, 2, 3]) as Array):
-		capacity_slots.append(int(s))
 
 	vehicles_by_id.clear()
 	vehicle_ids_sorted.clear()
@@ -82,9 +71,14 @@ func apply_config(cfg: Dictionary) -> void:
 
 func reset() -> void:
 	is_unlocked = false
-	repaired_vehicles.clear()
+	owned_vehicles.clear()
+	vehicle_durability.clear()
+	for vid: String in vehicle_ids_sorted:
+		var v := vehicles_by_id[vid] as Dictionary
+		if bool(v.get("owned_by_default", false)):
+			owned_vehicles[vid] = true
+			vehicle_durability[vid] = maxi(1, int(v.get("max_durability", 5)))
 	speed_level = 1
-	capacity_level = 1
 	active_deliveries.clear()
 	claimed_route_rewards.clear()
 	auto_dispatch_enabled = false
@@ -94,8 +88,7 @@ func reset() -> void:
 	garage_changed.emit()
 
 func get_max_slots() -> int:
-	var idx := clampi(capacity_level - 1, 0, capacity_slots.size() - 1)
-	return maxi(1, capacity_slots[idx]) if not capacity_slots.is_empty() else 1
+	return maxi(1, owned_vehicles.size())
 
 func get_speed_multiplier() -> float:
 	var idx := clampi(speed_level - 1, 0, speed_multipliers.size() - 1)
@@ -112,38 +105,63 @@ func unlock(player_level: int, wallet: Wallet) -> Dictionary:
 	garage_changed.emit()
 	return {"ok": true, "cost": unlock_cost}
 
-func is_vehicle_repaired(vid: String) -> bool:
-	return repaired_vehicles.has(vid)
+func is_vehicle_owned(vid: String) -> bool:
+	return owned_vehicles.has(vid)
 
-func repair_vehicle(vid: String, player_level: int, wallet: Wallet, inventory: Inventory) -> Dictionary:
+func get_vehicle_max_durability(vid: String) -> int:
+	var v := vehicles_by_id.get(vid, {}) as Dictionary
+	return maxi(1, int(v.get("max_durability", 5)))
+
+func get_vehicle_durability(vid: String) -> int:
+	return int(vehicle_durability.get(vid, 0))
+
+func is_vehicle_busy(vid: String) -> bool:
+	for job in active_deliveries:
+		if String(job.get("vehicle_id", "")) == vid:
+			return true
+	return false
+
+func get_idle_healthy_count() -> int:
+	var cnt := 0
+	for vid: String in vehicle_ids_sorted:
+		if owned_vehicles.has(vid) and get_vehicle_durability(vid) > 0 and not is_vehicle_busy(vid):
+			cnt += 1
+	return cnt
+
+func buy_vehicle(vid: String, player_level: int, wallet: Wallet) -> Dictionary:
 	if not is_unlocked:
 		return {"ok": false, "reason": "Hãy mở khóa Ga-ra trước."}
 	if not vehicles_by_id.has(vid):
 		return {"ok": false, "reason": "Phương tiện không tồn tại."}
-	if repaired_vehicles.has(vid):
-		return {"ok": false, "reason": "Phương tiện này đã được sửa xong."}
+	if owned_vehicles.has(vid):
+		return {"ok": false, "reason": "Bạn đã sở hữu xe này rồi."}
 	var v := vehicles_by_id[vid] as Dictionary
 	var req_lv := int(v.get("min_level", 2))
 	if player_level < req_lv:
-		return {"ok": false, "reason": "Cần Lv.%d để sửa %s." % [req_lv, String(v.get("display_name", vid))]}
-
-	var cost := maxi(0, int(v.get("repair_cost", 0)))
-	var req_items := v.get("repair_items", {}) as Dictionary
-	if not wallet.can_afford(cost):
-		return {"ok": false, "reason": "Không đủ xu (cần %d xu)." % cost}
-	for item_id: String in req_items.keys():
-		if inventory.get_count(item_id) < int(req_items[item_id]):
-			return {"ok": false, "reason": "Thiếu vật tư sửa xe (%s x%d)." % [item_id, int(req_items[item_id])]}
-
-	# Atomic deduction
+		return {"ok": false, "reason": "Cần Lv.%d để mua %s." % [req_lv, String(v.get("display_name", vid))]}
+	var cost := maxi(0, int(v.get("buy_cost", 0)))
 	if not wallet.spend(cost):
-		return {"ok": false, "reason": "Không đủ xu."}
-	for item_id: String in req_items.keys():
-		if not inventory.remove_item(item_id, int(req_items[item_id])):
-			wallet.earn(cost)
-			return {"ok": false, "reason": "Lỗi trừ vật tư kho."}
+		return {"ok": false, "reason": "Không đủ xu (cần %d xu)." % cost}
+	owned_vehicles[vid] = true
+	vehicle_durability[vid] = get_vehicle_max_durability(vid)
+	garage_changed.emit()
+	return {"ok": true, "cost": cost, "vehicle_id": vid}
 
-	repaired_vehicles[vid] = true
+func repair_vehicle(vid: String, wallet: Wallet) -> Dictionary:
+	if not is_unlocked:
+		return {"ok": false, "reason": "Hãy mở khóa Ga-ra trước."}
+	if not owned_vehicles.has(vid) or not vehicles_by_id.has(vid):
+		return {"ok": false, "reason": "Bạn chưa sở hữu xe này."}
+	if is_vehicle_busy(vid):
+		return {"ok": false, "reason": "Xe đang chạy giao hàng, chờ về bến rồi sửa."}
+	var max_dur := get_vehicle_max_durability(vid)
+	if get_vehicle_durability(vid) >= max_dur:
+		return {"ok": false, "reason": "Xe vẫn còn tốt (%d/%d)." % [max_dur, max_dur]}
+	var v := vehicles_by_id[vid] as Dictionary
+	var cost := maxi(0, int(v.get("repair_cost", 20)))
+	if not wallet.spend(cost):
+		return {"ok": false, "reason": "Không đủ xu sửa xe (cần %d xu)." % cost}
+	vehicle_durability[vid] = max_dur
 	garage_changed.emit()
 	return {"ok": true, "cost": cost, "vehicle_id": vid}
 
@@ -165,23 +183,15 @@ func upgrade_speed(wallet: Wallet) -> Dictionary:
 	garage_changed.emit()
 	return {"ok": true, "cost": cost, "new_level": speed_level}
 
-func get_next_capacity_upgrade_cost() -> int:
-	if capacity_level >= max_capacity_level:
-		return -1
-	var idx := capacity_level - 1
-	return capacity_upgrade_costs[idx] if idx >= 0 and idx < capacity_upgrade_costs.size() else 200
-
-func upgrade_capacity(wallet: Wallet) -> Dictionary:
-	if not is_unlocked:
-		return {"ok": false, "reason": "Hãy mở khóa Ga-ra trước."}
-	var cost := get_next_capacity_upgrade_cost()
-	if cost < 0:
-		return {"ok": false, "reason": "Sức chứa đội xe đã đạt tối đa."}
-	if not wallet.spend(cost):
-		return {"ok": false, "reason": "Không đủ xu (cần %d xu)." % cost}
-	capacity_level += 1
-	garage_changed.emit()
-	return {"ok": true, "cost": cost, "new_level": capacity_level}
+func _find_available_vehicle(req_veh: String) -> String:
+	if req_veh != "":
+		if owned_vehicles.has(req_veh) and get_vehicle_durability(req_veh) > 0 and not is_vehicle_busy(req_veh):
+			return req_veh
+		return ""
+	for vid: String in vehicle_ids_sorted:
+		if owned_vehicles.has(vid) and get_vehicle_durability(vid) > 0 and not is_vehicle_busy(vid):
+			return vid
+	return ""
 
 func is_route_unlocked(rid: String, player_level: int) -> bool:
 	if not is_unlocked or not routes_by_id.has(rid):
@@ -190,16 +200,16 @@ func is_route_unlocked(rid: String, player_level: int) -> bool:
 	if player_level < int(r.get("min_level", 2)):
 		return false
 	var req_veh := String(r.get("requires_vehicle", ""))
-	if req_veh != "" and not repaired_vehicles.has(req_veh):
+	if req_veh != "" and not owned_vehicles.has(req_veh):
 		return false
 	return true
 
 func can_start_delivery(rid: String, player_level: int, inventory: Inventory) -> bool:
 	if not is_route_unlocked(rid, player_level):
 		return false
-	if active_deliveries.size() >= get_max_slots():
-		return false
 	var r := routes_by_id[rid] as Dictionary
+	if _find_available_vehicle(String(r.get("requires_vehicle", ""))) == "":
+		return false
 	var reqs := r.get("requirements", {}) as Dictionary
 	for iid: String in reqs.keys():
 		if inventory.get_count(iid) < int(reqs[iid]):
@@ -216,11 +226,12 @@ func start_delivery(rid: String, player_level: int, inventory: Inventory, clock:
 	if player_level < min_lv:
 		return {"ok": false, "reason": "Cần Lv.%d cho tuyến này." % min_lv}
 	var req_veh := String(r.get("requires_vehicle", ""))
-	if req_veh != "" and not repaired_vehicles.has(req_veh):
+	if req_veh != "" and not owned_vehicles.has(req_veh):
 		var v_cfg := vehicles_by_id.get(req_veh, {}) as Dictionary
-		return {"ok": false, "reason": "Cần sửa %s trước." % String(v_cfg.get("display_name", req_veh))}
-	if active_deliveries.size() >= get_max_slots():
-		return {"ok": false, "reason": "Đội xe đang bận (%d/%d)." % [active_deliveries.size(), get_max_slots()]}
+		return {"ok": false, "reason": "Cần mua %s trước." % String(v_cfg.get("display_name", req_veh))}
+	var chosen_vid := _find_available_vehicle(req_veh)
+	if chosen_vid == "":
+		return {"ok": false, "reason": "Không có xe rảnh hoặc xe cần sửa chữa!"}
 
 	var reqs := r.get("requirements", {}) as Dictionary
 	for iid: String in reqs.keys():
@@ -240,9 +251,12 @@ func start_delivery(rid: String, player_level: int, inventory: Inventory, clock:
 	_next_seq += 1
 	var base_dur := maxi(5, int(r.get("duration_sec", 15)))
 	var dur := maxi(3, int(round(float(base_dur) * get_speed_multiplier())))
+	var v_name := String((vehicles_by_id.get(chosen_vid, {}) as Dictionary).get("display_name", chosen_vid))
 	var job := {
 		"delivery_id": "deliv_%d" % _next_seq,
 		"route_id": rid,
+		"vehicle_id": chosen_vid,
+		"vehicle_name": v_name,
 		"display_name": String(r.get("display_name", rid)),
 		"started_at_unix": clock.now(),
 		"duration_sec": dur,
@@ -267,7 +281,7 @@ func tick(clock: GameClock) -> int:
 		garage_changed.emit()
 	return completed
 
-func claim_delivery(idx: int, wallet: Wallet, progression: ProgressionSystem, home: HomeSystem = null, pets: PetSystem = null) -> Dictionary:
+func claim_delivery(idx: int, wallet: Wallet, progression: ProgressionSystem, _home: HomeSystem = null, _pets: PetSystem = null) -> Dictionary:
 	if idx < 0 or idx >= active_deliveries.size():
 		return {"ok": false, "reason": "Chuyến giao không tồn tại."}
 	var job := active_deliveries[idx]
@@ -277,6 +291,10 @@ func claim_delivery(idx: int, wallet: Wallet, progression: ProgressionSystem, ho
 	# Remove first so rewards can never be claimed twice
 	active_deliveries.remove_at(idx)
 	var rid := String(job.get("route_id", ""))
+	var vid := String(job.get("vehicle_id", ""))
+	if vid != "" and owned_vehicles.has(vid):
+		vehicle_durability[vid] = maxi(0, get_vehicle_durability(vid) - 1)
+
 	var coins := maxi(0, int(job.get("reward_coins", 0)))
 	var xp := maxi(0, int(job.get("reward_xp", 0)))
 	if coins > 0 and wallet != null:
@@ -306,23 +324,52 @@ func claim_delivery(idx: int, wallet: Wallet, progression: ProgressionSystem, ho
 		"coins": coins,
 		"xp": xp,
 		"special": special_granted,
+		"worn_out": (vid != "" and get_vehicle_durability(vid) == 0),
+		"vehicle_name": String(job.get("vehicle_name", vid)),
 		"leveled_up": bool(lv_res.get("leveled_up", false)),
 		"new_level": int(lv_res.get("new_level", progression.level if progression != null else 1))
+	}
+
+func claim_all_ready(wallet: Wallet, progression: ProgressionSystem, home: HomeSystem = null, pets: PetSystem = null) -> Dictionary:
+	var claimed := 0
+	var total_coins := 0
+	var total_xp := 0
+	var worn_names: Array[String] = []
+	var leveled_up := false
+	var new_level := progression.level if progression != null else 1
+	for i in range(active_deliveries.size() - 1, -1, -1):
+		if String(active_deliveries[i].get("status", "")) == "READY":
+			var res := claim_delivery(i, wallet, progression, home, pets)
+			if bool(res.get("ok", false)):
+				claimed += 1
+				total_coins += int(res.get("coins", 0))
+				total_xp += int(res.get("xp", 0))
+				if bool(res.get("worn_out", false)):
+					worn_names.append(String(res.get("vehicle_name", "Xe")))
+				if bool(res.get("leveled_up", false)):
+					leveled_up = true
+					new_level = int(res.get("new_level", new_level))
+	return {
+		"ok": claimed > 0,
+		"claimed": claimed,
+		"coins": total_coins,
+		"xp": total_xp,
+		"worn_names": worn_names,
+		"leveled_up": leveled_up,
+		"new_level": new_level
 	}
 
 func step_automation(clock: GameClock, inventory: Inventory, wallet: Wallet, progression: ProgressionSystem, home: HomeSystem = null, pets: PetSystem = null) -> Dictionary:
 	var summary := {"claimed": 0, "dispatched": 0}
 	if not is_unlocked or not auto_dispatch_enabled:
 		return summary
-	# 1. Auto-claim READY deliveries
 	for i in range(active_deliveries.size() - 1, -1, -1):
 		if String(active_deliveries[i].get("status", "")) == "READY":
 			var c_res := claim_delivery(i, wallet, progression, home, pets)
 			if bool(c_res.get("ok", false)):
 				summary["claimed"] = int(summary["claimed"]) + 1
-	# 2. Auto-dispatch selected route if slot & items available
 	var lv := progression.level if progression != null else 1
-	if active_deliveries.size() < get_max_slots() and can_start_delivery(auto_route_id, lv, inventory):
+	if can_start_delivery(auto_route_id, lv, inventory):
 		var d_res := start_delivery(auto_route_id, lv, inventory, clock)
 		if bool(d_res.get("ok", false)):
 			summary["dispatched"] = int(summary["dispatched"]) + 1
@@ -330,16 +377,16 @@ func step_automation(clock: GameClock, inventory: Inventory, wallet: Wallet, pro
 
 func to_dict() -> Dictionary:
 	var veh_arr: Array[String] = []
-	for vid: String in repaired_vehicles.keys():
+	for vid: String in owned_vehicles.keys():
 		veh_arr.append(vid)
 	var claimed_arr: Array[String] = []
 	for rid: String in claimed_route_rewards.keys():
 		claimed_arr.append(rid)
 	return {
 		"is_unlocked": is_unlocked,
-		"repaired_vehicles": veh_arr,
+		"owned_vehicles": veh_arr,
+		"vehicle_durability": vehicle_durability.duplicate(true),
 		"speed_level": speed_level,
-		"capacity_level": capacity_level,
 		"active_deliveries": active_deliveries.duplicate(true),
 		"claimed_route_rewards": claimed_arr,
 		"auto_dispatch_enabled": auto_dispatch_enabled,
@@ -352,7 +399,6 @@ func load_from_dict(data: Dictionary, clock: GameClock) -> void:
 	reset()
 	is_unlocked = bool(data.get("is_unlocked", false))
 	speed_level = clampi(int(data.get("speed_level", 1)), 1, max_speed_level)
-	capacity_level = clampi(int(data.get("capacity_level", 1)), 1, max_capacity_level)
 	auto_dispatch_enabled = bool(data.get("auto_dispatch_enabled", false))
 	var ar := String(data.get("auto_route_id", ""))
 	if ar != "" and routes_by_id.has(ar):
@@ -360,12 +406,20 @@ func load_from_dict(data: Dictionary, clock: GameClock) -> void:
 	delivered_count = maxi(0, int(data.get("delivered_count", 0)))
 	_next_seq = maxi(0, int(data.get("next_seq", 0)))
 
-	var raw_veh: Variant = data.get("repaired_vehicles", [])
-	if typeof(raw_veh) == TYPE_ARRAY:
-		for v in (raw_veh as Array):
+	var raw_owned: Variant = data.get("owned_vehicles", [])
+	if typeof(raw_owned) == TYPE_ARRAY and not (raw_owned as Array).is_empty():
+		owned_vehicles.clear()
+		for v in (raw_owned as Array):
 			var vid := String(v)
 			if vehicles_by_id.has(vid):
-				repaired_vehicles[vid] = true
+				owned_vehicles[vid] = true
+				vehicle_durability[vid] = get_vehicle_max_durability(vid)
+
+	var raw_dur: Variant = data.get("vehicle_durability", {})
+	if typeof(raw_dur) == TYPE_DICTIONARY:
+		for vid: String in (raw_dur as Dictionary).keys():
+			if owned_vehicles.has(vid):
+				vehicle_durability[vid] = clampi(int((raw_dur as Dictionary)[vid]), 0, get_vehicle_max_durability(vid))
 
 	var raw_cr: Variant = data.get("claimed_route_rewards", [])
 	if typeof(raw_cr) == TYPE_ARRAY:

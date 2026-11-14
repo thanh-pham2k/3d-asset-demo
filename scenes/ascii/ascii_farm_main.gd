@@ -2,7 +2,7 @@ extends Control
 ## ASCII Presentation layer for Phase 3 (Orders, Economy & Progression — Tabbed ASCII UI).
 ## Strictly reads WorldState and invokes WorldState methods.
 
-enum Tab { FARM, ORDERS, PRODUCTION, RESTAURANT, AUTOMATION, HOME, PETS, GARAGE, NEIGHBORHOOD, GOALS, INVENTORY, UPGRADES }
+enum Tab { FARM, ORDERS, PRODUCTION, RESTAURANT, AUTOMATION, HOME, PETS, GARAGE, GOALS, INVENTORY, UPGRADES }
 
 var world: WorldState
 var active_tab: Tab = Tab.FARM
@@ -10,8 +10,10 @@ var active_tab: Tab = Tab.FARM
 var status_label: Label
 var clock_label: Label
 var next_goal_label: Label
+var cozy_banner_label: Label
 
 var tab_buttons: Dictionary = {}
+var tab_base_labels: Dictionary = {}
 var tab_containers: Dictionary = {}
 
 # Farm tab widgets
@@ -20,6 +22,7 @@ var plot_buttons: Array[Button] = []
 
 # Orders tab widgets
 var order_slot_labels: Array[Label] = []
+var order_goto_buttons: Array[Button] = []
 var order_deliver_buttons: Array[Button] = []
 var order_skip_buttons: Array[Button] = []
 
@@ -28,6 +31,7 @@ var prod_recipe_buttons: Dictionary = {} # recipe_id -> {"label": Label, "btn": 
 var prod_queue_header: Label
 var prod_queue_buttons: Array[Button] = []
 var prod_upgrade_button: Button
+var prod_batch_button: Button
 
 # Restaurant tab widgets
 var rest_lock_box: VBoxContainer
@@ -78,18 +82,9 @@ var garage_active_box: HBoxContainer
 var garage_header_label: Label
 var garage_vehicle_rows: Dictionary = {}
 var garage_speed_btn: Button
-var garage_cap_btn: Button
 var garage_auto_btn: Button
 var garage_route_rows: Dictionary = {}
 var garage_queue_rows: Array[Dictionary] = []
-
-# Neighborhood tab widgets
-var neigh_story_label: Label
-var neigh_area_buttons: Dictionary = {}
-var neigh_area_ascii_label: Label
-var neigh_area_unlock_btn: Button
-var neigh_area_build_btn: Button
-var neigh_npc_rows: Dictionary = {}
 
 # Goals & Collections tab widgets
 var goals_rec_label: Label
@@ -256,6 +251,11 @@ func _build_ascii_ui() -> void:
 	next_goal_label.add_theme_color_override("font_color", Color("ffe082"))
 	hud_vbox.add_child(next_goal_label)
 
+	cozy_banner_label = Label.new()
+	cozy_banner_label.add_theme_font_size_override("font_size", 12)
+	cozy_banner_label.add_theme_color_override("font_color", Color("ce93d8"))
+	hud_vbox.add_child(cozy_banner_label)
+
 	# 3. Debug Clock & Save Controls + Tab Bar
 	var tools_hbox := HBoxContainer.new()
 	tools_hbox.add_theme_constant_override("separation", 6)
@@ -309,7 +309,6 @@ func _build_ascii_ui() -> void:
 		{"id": Tab.HOME, "label": "🏠 Nhà"},
 		{"id": Tab.PETS, "label": "🐱 Miu Miu"},
 		{"id": Tab.GARAGE, "label": "🚚 Ga-ra"},
-		{"id": Tab.NEIGHBORHOOD, "label": "🏘️ Khu phố"},
 		{"id": Tab.GOALS, "label": "🏆 Mục tiêu"},
 		{"id": Tab.INVENTORY, "label": "📦 Kho"},
 		{"id": Tab.UPGRADES, "label": "🔓 Nâng cấp"}
@@ -324,6 +323,7 @@ func _build_ascii_ui() -> void:
 		t_btn.pressed.connect(_switch_tab.bind(tid))
 		tabs_hbox.add_child(t_btn)
 		tab_buttons[tid] = t_btn
+		tab_base_labels[tid] = String(tab_def["label"])
 
 	# Main Tab Content Area
 	var content_panel := PanelContainer.new()
@@ -345,7 +345,6 @@ func _build_ascii_ui() -> void:
 	_build_home_tab(content_stack)
 	_build_pets_tab(content_stack)
 	_build_garage_tab(content_stack)
-	_build_neighborhood_tab(content_stack)
 	_build_goals_tab(content_stack)
 	_build_inventory_tab(content_stack)
 	_build_upgrades_tab(content_stack)
@@ -412,6 +411,7 @@ func _build_orders_tab(parent: Control) -> void:
 	tab_containers[Tab.ORDERS] = vbox
 
 	order_slot_labels.clear()
+	order_goto_buttons.clear()
 	order_deliver_buttons.clear()
 	order_skip_buttons.clear()
 
@@ -429,6 +429,12 @@ func _build_orders_tab(parent: Control) -> void:
 		lbl.add_theme_font_size_override("font_size", 15)
 		hbox.add_child(lbl)
 		order_slot_labels.append(lbl)
+
+		var g_btn := Button.new()
+		g_btn.custom_minimum_size = Vector2(130, 44)
+		g_btn.pressed.connect(_on_order_goto.bind(slot_idx))
+		hbox.add_child(g_btn)
+		order_goto_buttons.append(g_btn)
 
 		var d_btn := Button.new()
 		d_btn.custom_minimum_size = Vector2(140, 44)
@@ -516,6 +522,11 @@ func _build_production_tab(parent: Control) -> void:
 	prod_upgrade_button.pressed.connect(_on_upgrade_prod_slot)
 	q_actions.add_child(prod_upgrade_button)
 
+	prod_batch_button = Button.new()
+	prod_batch_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	prod_batch_button.pressed.connect(_on_toggle_or_unlock_batch)
+	q_actions.add_child(prod_batch_button)
+
 func _build_restaurant_tab(parent: Control) -> void:
 	var root := VBoxContainer.new()
 	root.add_theme_constant_override("separation", 8)
@@ -599,10 +610,20 @@ func _build_restaurant_tab(parent: Control) -> void:
 	right.add_theme_constant_override("separation", 6)
 	rest_active_box.add_child(right)
 
+	var c_head := HBoxContainer.new()
+	c_head.add_theme_constant_override("separation", 8)
+	right.add_child(c_head)
+
 	var c_title := Label.new()
 	c_title.text = "🪑 KHÁCH HÀNG ĐANG CHỜ"
+	c_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	c_title.add_theme_color_override("font_color", Color("a5d6a7"))
-	right.add_child(c_title)
+	c_head.add_child(c_title)
+
+	var serve_all_btn := Button.new()
+	serve_all_btn.text = "🍜 Phục vụ tất cả"
+	serve_all_btn.pressed.connect(_on_serve_all_customers)
+	c_head.add_child(serve_all_btn)
 
 	rest_cust_rows.clear()
 	for idx in range(world.restaurant.max_table_slots):
@@ -975,24 +996,14 @@ func _build_garage_tab(parent: Control) -> void:
 		v_lbl.add_theme_font_size_override("font_size", 12)
 		v_row.add_child(v_lbl)
 		var v_btn := Button.new()
-		v_btn.custom_minimum_size = Vector2(120, 28)
-		v_btn.pressed.connect(_on_repair_vehicle.bind(vid))
+		v_btn.custom_minimum_size = Vector2(130, 28)
+		v_btn.pressed.connect(_on_vehicle_action.bind(vid))
 		v_row.add_child(v_btn)
 		garage_vehicle_rows[vid] = {"label": v_lbl, "btn": v_btn}
 
-	var upg_hbox := HBoxContainer.new()
-	upg_hbox.add_theme_constant_override("separation", 6)
-	left.add_child(upg_hbox)
-
 	garage_speed_btn = Button.new()
-	garage_speed_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	garage_speed_btn.pressed.connect(_on_upgrade_garage_speed)
-	upg_hbox.add_child(garage_speed_btn)
-
-	garage_cap_btn = Button.new()
-	garage_cap_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	garage_cap_btn.pressed.connect(_on_upgrade_garage_capacity)
-	upg_hbox.add_child(garage_cap_btn)
+	left.add_child(garage_speed_btn)
 
 	garage_auto_btn = Button.new()
 	garage_auto_btn.pressed.connect(_on_toggle_garage_auto)
@@ -1019,6 +1030,11 @@ func _build_garage_tab(parent: Control) -> void:
 		q_btn.pressed.connect(_on_claim_delivery.bind(i))
 		q_row.add_child(q_btn)
 		garage_queue_rows.append({"card": q_card, "label": q_lbl, "btn": q_btn})
+
+	var claim_all_btn := Button.new()
+	claim_all_btn.text = "🎁 Nhận tất cả chuyến xong"
+	claim_all_btn.pressed.connect(_on_claim_all_deliveries)
+	left.add_child(claim_all_btn)
 
 	# Right: Delivery Routes
 	var right := VBoxContainer.new()
@@ -1057,111 +1073,6 @@ func _build_garage_tab(parent: Control) -> void:
 		r_btn.pressed.connect(_on_start_delivery.bind(rid))
 		r_row.add_child(r_btn)
 		garage_route_rows[rid] = {"label": r_lbl, "btn": r_btn}
-
-func _build_neighborhood_tab(parent: Control) -> void:
-	var root := VBoxContainer.new()
-	root.add_theme_constant_override("separation", 8)
-	parent.add_child(root)
-	tab_containers[Tab.NEIGHBORHOOD] = root
-
-	neigh_story_label = Label.new()
-	neigh_story_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	neigh_story_label.add_theme_color_override("font_color", Color("f48fb1"))
-	root.add_child(neigh_story_label)
-
-	var body := HBoxContainer.new()
-	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	body.add_theme_constant_override("separation", 12)
-	root.add_child(body)
-
-	# Left: Areas & Construction Unlocks
-	var left := VBoxContainer.new()
-	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	left.add_theme_constant_override("separation", 6)
-	body.add_child(left)
-
-	var a_title := Label.new()
-	a_title.text = "🗺️ KHU VỰC & CÔNG TRÌNH KHU PHỐ"
-	a_title.add_theme_color_override("font_color", Color("ffe082"))
-	left.add_child(a_title)
-
-	var a_hbox := HBoxContainer.new()
-	a_hbox.add_theme_constant_override("separation", 6)
-	left.add_child(a_hbox)
-	neigh_area_buttons.clear()
-	for aid: String in world.neighborhood.area_ids_sorted:
-		var a_btn := Button.new()
-		a_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		a_btn.pressed.connect(_on_select_area.bind(aid))
-		a_hbox.add_child(a_btn)
-		neigh_area_buttons[aid] = a_btn
-
-	var art_panel := PanelContainer.new()
-	art_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	left.add_child(art_panel)
-	neigh_area_ascii_label = Label.new()
-	neigh_area_ascii_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	neigh_area_ascii_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	neigh_area_ascii_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	neigh_area_ascii_label.add_theme_color_override("font_color", Color("a5d6a7"))
-	art_panel.add_child(neigh_area_ascii_label)
-
-	neigh_area_unlock_btn = Button.new()
-	neigh_area_unlock_btn.pressed.connect(_on_unlock_active_area)
-	left.add_child(neigh_area_unlock_btn)
-
-	neigh_area_build_btn = Button.new()
-	neigh_area_build_btn.pressed.connect(_on_build_active_area)
-	left.add_child(neigh_area_build_btn)
-
-	# Right: NPCs, Requests & Story Milestones
-	var right := VBoxContainer.new()
-	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	right.add_theme_constant_override("separation", 6)
-	body.add_child(right)
-
-	var n_title := Label.new()
-	n_title.text = "👥 HÀNG XÓM, YÊU CẦU & CÂU CHUYỆN"
-	n_title.add_theme_color_override("font_color", Color("80d8ff"))
-	right.add_child(n_title)
-
-	var scroll := ScrollContainer.new()
-	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	right.add_child(scroll)
-
-	var n_list := VBoxContainer.new()
-	n_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	n_list.add_theme_constant_override("separation", 6)
-	scroll.add_child(n_list)
-
-	neigh_npc_rows.clear()
-	for nid: String in world.neighborhood.npc_ids_sorted:
-		var card := PanelContainer.new()
-		n_list.add_child(card)
-		var vbox := VBoxContainer.new()
-		vbox.add_theme_constant_override("separation", 4)
-		card.add_child(vbox)
-		var lbl := Label.new()
-		lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		lbl.add_theme_font_size_override("font_size", 12)
-		vbox.add_child(lbl)
-		var btns := HBoxContainer.new()
-		btns.add_theme_constant_override("separation", 6)
-		vbox.add_child(btns)
-		var chat_btn := Button.new()
-		chat_btn.text = "💬 Trò chuyện"
-		chat_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		chat_btn.pressed.connect(_on_chat_npc.bind(nid))
-		btns.add_child(chat_btn)
-		var help_btn := Button.new()
-		help_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		help_btn.pressed.connect(_on_help_npc.bind(nid))
-		btns.add_child(help_btn)
-		var story_btn := Button.new()
-		story_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		story_btn.pressed.connect(_on_claim_npc_story.bind(nid))
-		btns.add_child(story_btn)
-		neigh_npc_rows[nid] = {"label": lbl, "chat": chat_btn, "help": help_btn, "story": story_btn}
 
 func _build_goals_tab(parent: Control) -> void:
 	var root := VBoxContainer.new()
@@ -1457,6 +1368,30 @@ func _on_deliver_slot(slot_idx: int) -> void:
 		_add_log("⚠️ %s" % String(res.get("reason", "Không thể giao đơn.")))
 	_refresh_ui()
 
+func _on_order_goto(slot_idx: int) -> void:
+	var slot := world.order_board.get_slot(slot_idx)
+	var reqs := slot.get("requirements", {}) as Dictionary
+	var first_missing := ""
+	for r_id in reqs.keys():
+		if world.inventory.get_count(String(r_id)) < int(reqs[r_id]):
+			first_missing = String(r_id)
+			break
+	if first_missing == "":
+		return
+	var cfg := world.get_item_cfg(first_missing)
+	var dname := String(cfg.get("display_name", first_missing))
+	if world.production.recipes_by_id.has(first_missing):
+		_switch_tab(Tab.PRODUCTION)
+		_add_log("⚙️ Chế biến '%s' tại mục này!" % dname)
+	elif world.crops_by_id.has(first_missing):
+		if world.is_crop_unlocked(first_missing):
+			world.select_crop(first_missing)
+		_switch_tab(Tab.FARM)
+		_add_log("🌾 Trồng & thu hoạch '%s' tại mục này!" % dname)
+	else:
+		_switch_tab(Tab.INVENTORY)
+	_refresh_ui()
+
 func _on_skip_slot(slot_idx: int) -> void:
 	var res := world.skip_order_slot(slot_idx)
 	if bool(res.get("ok", false)):
@@ -1556,12 +1491,17 @@ func _on_cook_dish(dish_id: String) -> void:
 func _on_serve_customer(cust_idx: int) -> void:
 	var res := world.serve_restaurant_customer(cust_idx)
 	if bool(res.get("ok", false)):
-		_add_log("🍜 Phục vụ %s (%s) → +%d xu | +%d XP!" % [
+		var fav_tag := " ❤️ Món ruột!" if bool(res.get("is_regular_fav", false)) else ""
+		_add_log("🍜 Phục vụ %s (%s)%s → +%d xu | +%d XP!" % [
 			String(res.get("customer_name", "Khách")),
 			String(res.get("dish_name", "")),
+			fav_tag,
 			int(res.get("reward_coins", 0)),
 			int(res.get("reward_xp", 0))
 		])
+		var q_txt := String(res.get("quote", ""))
+		if q_txt != "":
+			_add_log("💬 %s: \"%s\"" % [String(res.get("customer_name", "Khách")), q_txt])
 		var new_dish := String(res.get("unlocked_dish", ""))
 		if new_dish != "":
 			_add_log("🌟 Mở khóa công thức mới: %s!" % String(world.restaurant.get_dish(new_dish).get("display_name", new_dish)))
@@ -1570,6 +1510,48 @@ func _on_serve_customer(cust_idx: int) -> void:
 		world.save()
 	else:
 		_add_log("⚠️ %s" % String(res.get("reason", "Chưa nấu xong món.")))
+	_refresh_ui()
+
+func _on_serve_all_customers() -> void:
+	var res := world.serve_all_restaurant()
+	if bool(res.get("ok", false)):
+		_add_log("🍜 Phục vụ nhanh %d khách → +%d xu | +%d XP!" % [
+			int(res.get("served", 0)), int(res.get("coins", 0)), int(res.get("xp", 0))
+		])
+		if bool(res.get("leveled_up", false)):
+			_add_log("🎉 LÊN LEVEL %d!" % int(res.get("new_level", 1)))
+		world.save()
+	else:
+		_add_log("ℹ️ Chưa có khách nào sẵn sàng để phục vụ.")
+	_refresh_ui()
+
+func _on_toggle_or_unlock_batch() -> void:
+	if not world.production.batch_unlocked:
+		var res := world.unlock_production_batch()
+		if bool(res.get("ok", false)):
+			_add_log("⚡ Đã mở khóa Chế biến đôi (x2) (-%d xu)!" % int(res.get("cost", 140)))
+			world.save()
+		else:
+			_add_log("⚠️ %s" % String(res.get("reason", "Không thể mở Chế biến đôi.")))
+	else:
+		var on := world.toggle_production_batch()
+		_add_log("⚡ Chế biến đôi (x2): %s" % ("BẬT" if on else "TẮT"))
+		world.save()
+	_refresh_ui()
+
+func _on_claim_all_deliveries() -> void:
+	var res := world.claim_all_garage()
+	if bool(res.get("ok", false)):
+		_add_log("🎁 Nhận nhanh %d chuyến Ga-ra → +%d xu | +%d XP!" % [
+			int(res.get("claimed", 0)), int(res.get("coins", 0)), int(res.get("xp", 0))
+		])
+		for wn in (res.get("worn_names", []) as Array):
+			_add_log("🔧 %s đã hết độ bền, hãy vào Ga-ra sửa chữa!" % String(wn))
+		if bool(res.get("leveled_up", false)):
+			_add_log("⭐ Lên cấp Lv.%d!" % int(res.get("new_level", 1)))
+		world.save()
+	else:
+		_add_log("ℹ️ Chưa có chuyến nào tới nơi.")
 	_refresh_ui()
 
 func _on_dismiss_customer(cust_idx: int) -> void:
@@ -1664,10 +1646,17 @@ func _on_switch_character() -> void:
 	_refresh_ui()
 
 func _on_couple_moment() -> void:
-	var res := world.home.trigger_couple_moment()
-	world.goals.record_cozy_action(1)
-	_add_log("💞 %s (Khoảnh khắc #%d)" % [String(res.get("text", "")), int(res.get("count", 0))])
-	world.save()
+	var coop := world.do_couple_coop()
+	if bool(coop.get("ok", false)):
+		_add_log("💞 %s (+%d xu, +%d XP)" % [String(coop.get("text", "")), int(coop.get("coins", 0)), int(coop.get("xp", 0))])
+		if bool(coop.get("leveled_up", false)):
+			_add_log("⭐ Lên cấp Lv.%d!" % int(coop.get("new_level", 1)))
+		world.save()
+	else:
+		var res := world.home.trigger_couple_moment()
+		world.goals.record_cozy_action(1)
+		_add_log("💞 %s (Khoảnh khắc #%d)" % [String(res.get("text", "")), int(res.get("count", 0))])
+		world.save()
 	_refresh_ui()
 
 func _on_select_room(rid: String) -> void:
@@ -1724,16 +1713,20 @@ func _on_furniture_action(fid: String) -> void:
 	_refresh_ui()
 
 func _on_pet_miu_miu() -> void:
-	var res := world.pets.pet_miu_miu(world.home)
-	world.goals.record_cozy_action(1)
+	var res := world.pet_miu_miu_interactive()
 	_add_log("🐾 %s" % String(res.get("text", "")))
+	var gift := res.get("gift", {}) as Dictionary
+	if bool(gift.get("ok", false)):
+		_add_log(String(gift.get("text", "")))
 	world.save()
 	_refresh_ui()
 
 func _on_play_miu_miu() -> void:
-	var res := world.pets.play_with_miu_miu(world.home)
-	world.goals.record_cozy_action(1)
+	var res := world.play_miu_miu_interactive()
 	_add_log("🧶 %s" % String(res.get("text", "")))
+	var gift := res.get("gift", {}) as Dictionary
+	if bool(gift.get("ok", false)):
+		_add_log(String(gift.get("text", "")))
 	world.save()
 	_refresh_ui()
 
@@ -1782,29 +1775,29 @@ func _on_unlock_garage() -> void:
 		_add_log("⚠️ %s" % String(res.get("reason", "Không thể mở khóa Ga-ra.")))
 	_refresh_ui()
 
-func _on_repair_vehicle(vid: String) -> void:
-	var res := world.garage.repair_vehicle(vid, world.progression.level, world.wallet, world.inventory)
-	if bool(res.get("ok", false)):
-		var v_cfg := world.garage.vehicles_by_id.get(vid, {}) as Dictionary
-		_add_log("🔧 Đã sửa xong %s (-%d xu)!" % [String(v_cfg.get("display_name", vid)), int(res.get("cost", 0))])
-		world.save()
+func _on_vehicle_action(vid: String) -> void:
+	var v_cfg := world.garage.vehicles_by_id.get(vid, {}) as Dictionary
+	var v_name := String(v_cfg.get("display_name", vid))
+	if not world.garage.is_vehicle_owned(vid):
+		var res := world.garage.buy_vehicle(vid, world.progression.level, world.wallet)
+		if bool(res.get("ok", false)):
+			_add_log("🚚 Đã mua thêm %s (-%d xu)! Đội xe: %d chiếc." % [v_name, int(res.get("cost", 0)), world.garage.get_max_slots()])
+			world.save()
+		else:
+			_add_log("⚠️ %s" % String(res.get("reason", "Không thể mua xe.")))
 	else:
-		_add_log("⚠️ %s" % String(res.get("reason", "Không thể sửa xe.")))
+		var res := world.garage.repair_vehicle(vid, world.wallet)
+		if bool(res.get("ok", false)):
+			_add_log("🔧 Đã sửa xong %s (-%d xu)!" % [v_name, int(res.get("cost", 0))])
+			world.save()
+		else:
+			_add_log("⚠️ %s" % String(res.get("reason", "Không thể sửa xe.")))
 	_refresh_ui()
 
 func _on_upgrade_garage_speed() -> void:
 	var res := world.garage.upgrade_speed(world.wallet)
 	if bool(res.get("ok", false)):
 		_add_log("⚡ Nâng tốc độ Ga-ra lên Lv.%d (-%d xu)!" % [int(res.get("new_level", 2)), int(res.get("cost", 0))])
-		world.save()
-	else:
-		_add_log("⚠️ %s" % String(res.get("reason", "Không thể nâng cấp.")))
-	_refresh_ui()
-
-func _on_upgrade_garage_capacity() -> void:
-	var res := world.garage.upgrade_capacity(world.wallet)
-	if bool(res.get("ok", false)):
-		_add_log("📦 Nâng sức chứa đội xe lên Lv.%d (-%d xu)!" % [int(res.get("new_level", 2)), int(res.get("cost", 0))])
 		world.save()
 	else:
 		_add_log("⚠️ %s" % String(res.get("reason", "Không thể nâng cấp.")))
@@ -1836,73 +1829,13 @@ func _on_claim_delivery(idx: int) -> void:
 		if spec != "":
 			msg += " 🎁 Quà đặc biệt: %s!" % spec
 		_add_log(msg)
+		if bool(res.get("worn_out", false)):
+			_add_log("🔧 %s đã hết độ bền, hãy vào Ga-ra sửa chữa!" % String(res.get("vehicle_name", "Xe")))
 		if bool(res.get("leveled_up", false)):
 			_add_log("⭐ Lên cấp Lv.%d!" % int(res.get("new_level", 1)))
 		world.save()
 	else:
 		_add_log("⚠️ %s" % String(res.get("reason", "Chưa thể nhận.")))
-	_refresh_ui()
-
-func _on_select_area(aid: String) -> void:
-	world.neighborhood.select_area(aid)
-	_refresh_ui()
-
-func _on_unlock_active_area() -> void:
-	var aid := world.neighborhood.active_area_id
-	var res := world.neighborhood.unlock_area(aid, world.progression.level, world.wallet)
-	if bool(res.get("ok", false)):
-		var a_cfg := world.neighborhood.areas_by_id.get(aid, {}) as Dictionary
-		_add_log("🏘️ Đã mở khóa %s (-%d xu)!" % [String(a_cfg.get("display_name", aid)), int(res.get("cost", 0))])
-		world.save()
-	else:
-		_add_log("⚠️ %s" % String(res.get("reason", "Không thể mở khu vực.")))
-	_refresh_ui()
-
-func _on_build_active_area() -> void:
-	var aid := world.neighborhood.active_area_id
-	var res := world.neighborhood.build_area_project(aid, world.wallet, world.inventory)
-	if bool(res.get("ok", false)):
-		_add_log("🔨 Hoàn thành công trình '%s' (-%d xu)!" % [String(res.get("build_name", "")), int(res.get("cost", 0))])
-		world.save()
-	else:
-		_add_log("⚠️ %s" % String(res.get("reason", "Không thể xây công trình.")))
-	_refresh_ui()
-
-func _on_chat_npc(nid: String) -> void:
-	var res := world.neighborhood.chat_with_npc(nid)
-	if bool(res.get("ok", false)):
-		world.goals.record_cozy_action(1)
-		_add_log("💬 %s" % String(res.get("text", "")))
-		world.save()
-	else:
-		_add_log("⚠️ %s" % String(res.get("reason", "")))
-	_refresh_ui()
-
-func _on_help_npc(nid: String) -> void:
-	var res := world.neighborhood.fulfill_npc_request(nid, world.inventory, world.wallet, world.progression)
-	if bool(res.get("ok", false)):
-		world.goals.record_npc_help(1)
-		_add_log("🤝 Giúp hàng xóm thành công: +%d xu, +%d XP!" % [int(res.get("coins", 0)), int(res.get("xp", 0))])
-		if bool(res.get("leveled_up", false)):
-			_add_log("⭐ Lên cấp Lv.%d!" % int(res.get("new_level", 1)))
-		world.save()
-	else:
-		_add_log("⚠️ %s" % String(res.get("reason", "Chưa đủ vật phẩm.")))
-	_refresh_ui()
-
-func _on_claim_npc_story(nid: String) -> void:
-	var res := world.neighborhood.claim_story_milestone(nid, world.wallet, world.progression, world.home, world.pets)
-	if bool(res.get("ok", false)):
-		var msg := "📖 Mở khóa câu chuyện '%s': +%d xu, +%d XP!" % [String(res.get("title", "")), int(res.get("coins", 0)), int(res.get("xp", 0))]
-		var spec := String(res.get("special", ""))
-		if spec != "":
-			msg += " 🎁 Quà: %s!" % spec
-		_add_log(msg)
-		if bool(res.get("leveled_up", false)):
-			_add_log("⭐ Lên cấp Lv.%d!" % int(res.get("new_level", 1)))
-		world.save()
-	else:
-		_add_log("⚠️ %s" % String(res.get("reason", "Chưa thể nhận câu chuyện.")))
 	_refresh_ui()
 
 func _on_refresh_daily() -> void:
@@ -2004,6 +1937,13 @@ func _refresh_ui() -> void:
 		world.progression.completed_orders
 	]
 	next_goal_label.text = "🎯 Mục tiêu tiếp theo: %s" % world.progression.get_next_goal_text()
+	var w_info := world.get_cozy_weather()
+	var pet_note := world.pets.last_reaction if world.pets.last_reaction != "" else "Miu Miu đang ngái ngủ."
+	cozy_banner_label.text = "%s (%s)  |  🐾 %s" % [
+		String(w_info.get("label", "☀️ Nắng ấm")),
+		String(w_info.get("desc", "")),
+		pet_note
+	]
 
 	var dt := Time.get_datetime_dict_from_unix_time(world.clock.now())
 	clock_label.text = "🕒 %02d:%02d:%02d (+%s)" % [
@@ -2013,6 +1953,7 @@ func _refresh_ui() -> void:
 
 	for t in tab_buttons.keys():
 		(tab_buttons[t] as Button).modulate = Color("ffd54f") if t == active_tab else Color("b0bec5")
+	_refresh_tab_badges()
 
 	# Refresh Farm Tab
 	for cid in crop_buttons.keys():
@@ -2089,6 +2030,23 @@ func _refresh_ui() -> void:
 			int(slot.get("reward_xp", 0))
 		]
 		d_btn.disabled = not world.order_board.can_deliver_slot(idx, world.inventory)
+		var g_btn := order_goto_buttons[idx]
+		if not d_btn.disabled:
+			g_btn.visible = false
+		else:
+			var first_missing := ""
+			for r_id in reqs.keys():
+				if world.inventory.get_count(String(r_id)) < int(reqs[r_id]):
+					first_missing = String(r_id)
+					break
+			if first_missing == "":
+				g_btn.visible = false
+			elif world.production.recipes_by_id.has(first_missing):
+				g_btn.visible = true
+				g_btn.text = "⚙️ Đi chế biến"
+			else:
+				g_btn.visible = true
+				g_btn.text = "🌾 Đi trồng"
 		var cd := world.order_board.get_refresh_remaining_sec(idx, world.clock)
 		s_btn.text = "🔄 Đổi (%s)" % GameClock.format_duration(cd) if cd > 0 else "🔄 Đổi đơn"
 		s_btn.disabled = cd > 0
@@ -2156,6 +2114,13 @@ func _refresh_ui() -> void:
 	else:
 		prod_upgrade_button.text = "Slot tối đa (%d)" % world.production.max_slots_cap
 		prod_upgrade_button.disabled = true
+
+	if not world.production.batch_unlocked:
+		prod_batch_button.text = "⚡ Mở Chế biến x2 (-%dxu)" % ProductionSystem.BATCH_UNLOCK_COST
+		prod_batch_button.disabled = (world.progression.level < ProductionSystem.BATCH_UNLOCK_LEVEL or not world.wallet.can_afford(ProductionSystem.BATCH_UNLOCK_COST))
+	else:
+		prod_batch_button.text = "⚡ Chế biến x2: %s" % ("BẬT" if world.production.batch_mode else "TẮT")
+		prod_batch_button.disabled = false
 
 	# Refresh Restaurant Tab
 	rest_lock_box.visible = not world.restaurant.is_unlocked
@@ -2229,10 +2194,14 @@ func _refresh_ui() -> void:
 				continue
 			card.visible = true
 			var cust := world.restaurant.customers[idx]
+			var cust_name := String(cust.get("name", "Khách"))
 			var dish_id := String(cust.get("dish_id", ""))
 			var dish_name := String(world.restaurant.get_dish(dish_id).get("display_name", dish_id))
+			var visits := int(world.restaurant.regular_visits.get(cust_name, 0))
+			var fav_mark := " ❤️" if (visits >= 1 and dish_id == String(cust.get("fav_dish", ""))) else ""
+			var visit_txt := (" (Quen #%d)" % (visits + 1)) if visits > 0 else ""
 			var tag := "🌟 [ĐẶC BIỆT]" if String(cust.get("type", "normal")) == "special" else "🙂"
-			(r["label"] as Label).text = "%s %s\nMuốn ăn: %s" % [tag, String(cust.get("name", "Khách")), dish_name]
+			(r["label"] as Label).text = "%s %s%s\nMuốn ăn: %s%s" % [tag, cust_name, visit_txt, dish_name, fav_mark]
 			(r["serve"] as Button).disabled = (world.restaurant.find_ready_dish_idx(dish_id) == -1)
 
 	# Refresh Automation Tab
@@ -2464,29 +2433,48 @@ func _refresh_ui() -> void:
 	else:
 		garage_lock_box.visible = false
 		garage_active_box.visible = true
-		garage_header_label.text = "🚚 Chuyến đang chạy: %d/%d  |  Tổng đã giao: %d" % [
-			world.garage.active_deliveries.size(), world.garage.get_max_slots(), world.garage.delivered_count
+		garage_header_label.text = "🚚 Đang chạy: %d/%d  |  Rảnh: %d  |  Đã giao: %d" % [
+			world.garage.active_deliveries.size(), world.garage.get_max_slots(), world.garage.get_idle_healthy_count(), world.garage.delivered_count
 		]
 		for vid: String in garage_vehicle_rows.keys():
 			var v_row := garage_vehicle_rows[vid] as Dictionary
 			var v_cfg := world.garage.vehicles_by_id.get(vid, {}) as Dictionary
 			var v_lbl := v_row["label"] as Label
 			var v_btn := v_row["btn"] as Button
-			var repaired := world.garage.is_vehicle_repaired(vid)
-			var req_items := v_cfg.get("repair_items", {}) as Dictionary
-			var req_parts: Array[String] = []
-			for iid: String in req_items.keys():
-				req_parts.append("%s x%d" % [iid, int(req_items[iid])])
-			var r_cost := int(v_cfg.get("repair_cost", 0))
-			var cost_str := ("Sửa: %d xu" % r_cost) if req_parts.is_empty() else ("Sửa: %d xu + %s" % [r_cost, ", ".join(req_parts)])
-			v_lbl.text = "%s %s (Lv.%d) — %s" % [
-				String(v_cfg.get("ascii", "🚚")),
-				String(v_cfg.get("display_name", vid)),
-				int(v_cfg.get("min_level", 2)),
-				"Đã sẵn sàng" if repaired else cost_str
-			]
-			v_btn.text = "✓ Sẵn sàng" if repaired else "🔧 Sửa xe"
-			v_btn.disabled = repaired
+			var owned := world.garage.is_vehicle_owned(vid)
+			var min_lv := int(v_cfg.get("min_level", 1))
+			if not owned:
+				var b_cost := int(v_cfg.get("buy_cost", 0))
+				v_lbl.text = "%s %s (Lv.%d) — Chưa sở hữu" % [
+					String(v_cfg.get("ascii", "🚚")),
+					String(v_cfg.get("display_name", vid)),
+					min_lv
+				]
+				v_btn.text = "🛒 Mua (-%dxu)" % b_cost
+				v_btn.disabled = (world.progression.level < min_lv or not world.wallet.can_afford(b_cost))
+			else:
+				var cur_dur := world.garage.get_vehicle_durability(vid)
+				var max_dur := world.garage.get_vehicle_max_durability(vid)
+				var busy := world.garage.is_vehicle_busy(vid)
+				var r_cost := int(v_cfg.get("repair_cost", 0))
+				var st_txt := "Đang giao" if busy else ("Hỏng! Cần sửa" if cur_dur <= 0 else "Sẵn sàng")
+				v_lbl.text = "%s %s — Bền: %d/%d (%s)" % [
+					String(v_cfg.get("ascii", "🚚")),
+					String(v_cfg.get("display_name", vid)),
+					cur_dur, max_dur, st_txt
+				]
+				if busy:
+					v_btn.text = "🚚 Đang chạy"
+					v_btn.disabled = true
+				elif cur_dur <= 0:
+					v_btn.text = "🔧 Sửa (-%dxu)" % r_cost
+					v_btn.disabled = not world.wallet.can_afford(r_cost)
+				elif cur_dur < max_dur:
+					v_btn.text = "🔧 Bảo dưỡng (-%dxu)" % r_cost
+					v_btn.disabled = not world.wallet.can_afford(r_cost)
+				else:
+					v_btn.text = "✓ Tốt"
+					v_btn.disabled = true
 
 		var sp_cost := world.garage.get_next_speed_upgrade_cost()
 		if sp_cost < 0:
@@ -2495,14 +2483,6 @@ func _refresh_ui() -> void:
 		else:
 			garage_speed_btn.text = "⚡ Tốc độ Lv.%d (-%dxu)" % [world.garage.speed_level + 1, sp_cost]
 			garage_speed_btn.disabled = not world.wallet.can_afford(sp_cost)
-
-		var cap_cost := world.garage.get_next_capacity_upgrade_cost()
-		if cap_cost < 0:
-			garage_cap_btn.text = "📦 Đội xe tối đa"
-			garage_cap_btn.disabled = true
-		else:
-			garage_cap_btn.text = "📦 Đội xe Lv.%d (-%dxu)" % [world.garage.capacity_level + 1, cap_cost]
-			garage_cap_btn.disabled = not world.wallet.can_afford(cap_cost)
 
 		garage_auto_btn.text = "🤖 Tự động giao (%s): %s" % [
 			world.garage.auto_route_id,
@@ -2559,92 +2539,16 @@ func _refresh_ui() -> void:
 			r_btn.text = "Xuất phát" if world.garage.is_route_unlocked(rid, world.progression.level) else "🔒 Khóa"
 			r_btn.disabled = not can_go
 
-	# Refresh Neighborhood Tab
-	neigh_story_label.text = "📖 " + world.neighborhood.last_story_text
-	for aid: String in neigh_area_buttons.keys():
-		var a_btn := neigh_area_buttons[aid] as Button
-		var a_cfg := world.neighborhood.areas_by_id.get(aid, {}) as Dictionary
-		var mark := "▶ " if aid == world.neighborhood.active_area_id else ""
-		var lock_m := "" if world.neighborhood.is_area_unlocked(aid) else " 🔒"
-		a_btn.text = "%s%s%s" % [mark, String(a_cfg.get("display_name", aid)), lock_m]
-
-	var act_aid := world.neighborhood.active_area_id
-	var act_acfg := world.neighborhood.areas_by_id.get(act_aid, {}) as Dictionary
-	var a_unlocked := world.neighborhood.is_area_unlocked(act_aid)
-	var a_built := world.neighborhood.is_area_built(act_aid)
-	neigh_area_ascii_label.text = "%s\n\n%s\n%s" % [
-		String(act_acfg.get("ascii_art", "")),
-		String(act_acfg.get("display_name", act_aid)),
-		"✅ Công trình '%s' đã hoàn thành!" % String(act_acfg.get("build_name", "")) if a_built else ("🔒 Khu vực chưa mở (Lv.%d)" % int(act_acfg.get("min_level", 1)) if not a_unlocked else "✨ Khu vực đã mở — có thể xây công trình!")
-	]
-	if a_unlocked:
-		neigh_area_unlock_btn.visible = false
-	else:
-		var u_cost := int(act_acfg.get("unlock_cost", 0))
-		neigh_area_unlock_btn.visible = true
-		neigh_area_unlock_btn.text = "🔓 Mở %s (Lv.%d, -%dxu)" % [String(act_acfg.get("display_name", act_aid)), int(act_acfg.get("min_level", 1)), u_cost]
-		neigh_area_unlock_btn.disabled = (world.progression.level < int(act_acfg.get("min_level", 1)) or not world.wallet.can_afford(u_cost))
-
-	if not a_unlocked or a_built:
-		neigh_area_build_btn.visible = false
-	else:
-		neigh_area_build_btn.visible = true
-		var b_items := act_acfg.get("build_items", {}) as Dictionary
-		var b_parts: Array[String] = []
-		for iid: String in b_items.keys():
-			b_parts.append("%s x%d" % [iid, int(b_items[iid])])
-		var b_cost := int(act_acfg.get("build_cost", 0))
-		neigh_area_build_btn.text = "🔨 Xây %s (-%dxu, %s)" % [String(act_acfg.get("build_name", "")), b_cost, ", ".join(b_parts)]
-		neigh_area_build_btn.disabled = not world.wallet.can_afford(b_cost)
-
-	for nid: String in neigh_npc_rows.keys():
-		var row := neigh_npc_rows[nid] as Dictionary
-		var n_cfg := world.neighborhood.npcs_by_id.get(nid, {}) as Dictionary
-		var lbl := row["label"] as Label
-		var chat_b := row["chat"] as Button
-		var help_b := row["help"] as Button
-		var story_b := row["story"] as Button
-		var reqs := n_cfg.get("request", {}) as Dictionary
-		var req_parts: Array[String] = []
-		for iid: String in reqs.keys():
-			req_parts.append("%s x%d" % [iid, int(reqs[iid])])
-		var helps := int(world.neighborhood.npc_helps.get(nid, 0))
-		var aid_n := String(n_cfg.get("area_id", ""))
-		var area_open := world.neighborhood.is_area_unlocked(aid_n)
-		lbl.text = "%s %s | Thích: %s\nYêu cầu: %s (+%dxu, +%dXP) | Đã giúp: %d" % [
-			String(n_cfg.get("ascii", "( ^_^ )")),
-			String(n_cfg.get("display_name", nid)),
-			String(n_cfg.get("preference", "")),
-			", ".join(req_parts),
-			int(n_cfg.get("reward_coins", 0)),
-			int(n_cfg.get("reward_xp", 0)),
-			helps
-		]
-		chat_b.disabled = not area_open
-		help_b.text = "🤝 Giao đồ" if area_open else "🔒 Khu khóa"
-		help_b.disabled = not area_open
-		if world.neighborhood.is_story_claimed(nid):
-			story_b.text = "✓ Đã đọc truyện"
-			story_b.disabled = true
-		elif world.neighborhood.can_claim_story(nid):
-			story_b.text = "📖 Nhận truyện"
-			story_b.disabled = false
-		else:
-			story_b.text = "📖 Khóa"
-			story_b.disabled = true
-
 	# Refresh Goals & Collections Tab
 	var coll_score := world.goals.get_collection_score(world.home, world.pets, world.neighborhood)
 	goals_rec_label.text = world.goals.get_next_recommendation(coll_score)
-	goals_coll_label.text = "📚 Sưu tầm tổng hợp (%d điểm): 🌱 Nông sản %d/%d | ⚙️ Công thức %d/%d | 🍜 Món Hủ Tiếu %d/%d | 🏠 Nội thất %d/%d | 🐱 Đồ Miu Miu %d/%d | 🏘️ Khu phố %d/%d" % [
+	goals_coll_label.text = "📚 Sưu tầm tổng hợp (%d điểm): 🌱 Nông sản %d/%d | ⚙️ Công thức %d/%d | 🍜 Món Hủ Tiếu %d/%d | 🏠 Nội thất %d/%d | 🐱 Đồ Miu Miu %d/%d" % [
 		coll_score,
 		world.goals.discovered_crops.size(), world.crop_ids_sorted.size(),
 		world.goals.discovered_recipes.size(), world.production.recipe_ids_sorted.size(),
 		world.goals.discovered_dishes.size(), world.restaurant.dish_ids_sorted.size(),
 		world.home.owned_furniture.size(), world.home.item_ids_sorted.size(),
-		world.pets.owned_items.size(), world.pets.item_ids_sorted.size(),
-		world.neighborhood.built_areas.size() + world.neighborhood.claimed_stories.size(),
-		world.neighborhood.area_ids_sorted.size() + world.neighborhood.npc_ids_sorted.size()
+		world.pets.owned_items.size(), world.pets.item_ids_sorted.size()
 	]
 
 	for obj in world.goals.daily_cfg:
@@ -2765,6 +2669,84 @@ func _refresh_ui() -> void:
 		var mark := "✅" if world.progression.level >= lv else "🔒"
 		m_lines.append("%s Lv.%d (%d XP): %s" % [mark, lv, int(row_lv.get("xp_required", 0)), String(row_lv.get("goal", ""))])
 	milestone_label.text = "\n".join(m_lines)
+
+func _refresh_tab_badges() -> void:
+	var farm_ready := 0
+	for p in world.farm.plots:
+		if p.state == FarmPlot.State.READY:
+			farm_ready += 1
+
+	var orders_ready := 0
+	for idx in range(world.order_board.slots.size()):
+		if world.order_board.can_deliver_slot(idx, world.inventory):
+			orders_ready += 1
+
+	var prod_ready := 0
+	for job in world.production.queue:
+		if String(job.get("status", "")) == "READY":
+			prod_ready += 1
+
+	var rest_ready := 0
+	if world.restaurant.is_unlocked:
+		for cust in world.restaurant.customers:
+			var did := String(cust.get("dish_id", ""))
+			if did != "" and world.restaurant.find_ready_dish_idx(did) != -1:
+				rest_ready += 1
+
+	var goals_ready := 0
+	for obj in world.goals.daily_cfg:
+		if world.goals.can_claim_daily(String(obj.get("id", ""))):
+			goals_ready += 1
+	for w in world.goals.weekly_cfg:
+		if world.goals.can_claim_weekly(String(w.get("id", ""))):
+			goals_ready += 1
+	var c_score := world.goals.get_collection_score(world.home, world.pets, world.neighborhood)
+	for m in world.goals.milestones_cfg:
+		if world.goals.can_claim_milestone(String(m.get("id", "")), c_score):
+			goals_ready += 1
+
+	var garage_ready := 0
+	var garage_broken := false
+	if world.garage.is_unlocked:
+		for job in world.garage.active_deliveries:
+			if String(job.get("status", "")) == "READY":
+				garage_ready += 1
+		for vid: String in world.garage.owned_vehicles:
+			if world.garage.get_vehicle_durability(vid) <= 0:
+				garage_broken = true
+				break
+
+	var inv_warn := world.inventory.get_free_space() <= 3
+
+	for t in tab_buttons.keys():
+		var btn := tab_buttons[t] as Button
+		var base := String(tab_base_labels.get(t, btn.text))
+		var badge := ""
+		match t:
+			Tab.FARM:
+				if farm_ready > 0:
+					badge = " (%d)" % farm_ready
+			Tab.ORDERS:
+				if orders_ready > 0:
+					badge = " (%d)" % orders_ready
+			Tab.PRODUCTION:
+				if prod_ready > 0:
+					badge = " (%d)" % prod_ready
+			Tab.RESTAURANT:
+				if rest_ready > 0:
+					badge = " (%d)" % rest_ready
+			Tab.GARAGE:
+				if garage_ready > 0:
+					badge = " (%d)" % garage_ready
+				elif garage_broken:
+					badge = " (!)"
+			Tab.GOALS:
+				if goals_ready > 0:
+					badge = " (%d)" % goals_ready
+			Tab.INVENTORY:
+				if inv_warn:
+					badge = " (!)"
+		btn.text = base + badge
 
 func _add_log(msg: String) -> void:
 	log_lines.append(msg)

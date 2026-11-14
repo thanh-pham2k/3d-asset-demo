@@ -3,6 +3,7 @@ extends RefCounted
 ## Manages the shared Boy/Girl home, room unlocks, furniture collection & placement, and cozy moments.
 
 signal home_changed()
+signal character_reacted(character_id: String, text: String)
 
 var rooms_by_id: Dictionary = {}
 var room_ids_sorted: Array[String] = []
@@ -19,6 +20,7 @@ var owned_furniture: Dictionary = {}
 var placements: Dictionary = {} # room_id -> Array[String]
 var cozy_moments_count: int = 0
 var last_moment: String = ""
+var last_coop_unix: int = 0
 
 func _init(cfg: Dictionary = {}) -> void:
 	apply_config(cfg)
@@ -66,6 +68,7 @@ func reset() -> void:
 	placements.clear()
 	cozy_moments_count = 0
 	last_moment = ""
+	last_coop_unix = 0
 
 	for rid in room_ids_sorted:
 		var r := rooms_by_id[rid] as Dictionary
@@ -163,6 +166,57 @@ func trigger_couple_moment() -> Dictionary:
 	home_changed.emit()
 	return {"ok": true, "text": last_moment, "count": cozy_moments_count}
 
+func get_contextual_reaction(event_type: String, detail: String = "") -> String:
+	var who := "Boy" if active_character == "boy" else "Girl"
+	var partner := "Girl" if active_character == "boy" else "Boy"
+	var msg := ""
+	match event_type:
+		"harvest":
+			msg = "%s: \"Rau vườn mình tươi quá, %s qua phụ bưng nhé!\"" % [who, partner]
+		"cook":
+			msg = "%s: \"Nồi %s thơm nức mũi luôn!\"" % [who, detail if detail != "" else "Hủ Tiếu"]
+		"delivery":
+			msg = "%s: \"Chuyến xe %s về an toàn rồi, làm tốt lắm!\"" % [who, detail if detail != "" else "Ga-ra"]
+		"upgrade":
+			msg = "%s: \"Tiệm mình càng ngày càng khang trang hơn rồi!\"" % who
+		"level_up":
+			msg = "%s & %s đập tay ăn mừng lên cấp mới!" % [who, partner]
+		_:
+			msg = "%s mỉm cười nhìn góc nhà ấm áp." % who
+	character_reacted.emit(active_character, msg)
+	return msg
+
+func do_couple_coop(clock: GameClock, wallet: Wallet, progression: ProgressionSystem = null) -> Dictionary:
+	var now_u := clock.now() if clock != null else 0
+	if clock != null and last_coop_unix > 0 and (now_u - last_coop_unix) < 45:
+		var wait_s := 45 - (now_u - last_coop_unix)
+		return {"ok": false, "reason": "Boy & Girl vừa mới phối hợp xong (nghỉ %ds nữa)." % wait_s}
+	last_coop_unix = now_u
+	cozy_moments_count += 1
+	var tasks := [
+		"Boy & Girl cùng dọn bếp và chuẩn bị nước dùng thơm phức!",
+		"Boy & Girl cùng tưới vườn và kiểm tra xe giao hàng!",
+		"Boy & Girl cùng sắp xếp lại kho đồ gọn gàng!"
+	]
+	last_moment = tasks[(cozy_moments_count - 1) % tasks.size()]
+	var bonus_coins := 10
+	var bonus_xp := 8
+	if wallet != null:
+		wallet.earn(bonus_coins)
+	var lv_res := {}
+	if progression != null:
+		lv_res = progression.add_xp(bonus_xp)
+	home_changed.emit()
+	character_reacted.emit(active_character, last_moment)
+	return {
+		"ok": true,
+		"text": last_moment,
+		"coins": bonus_coins,
+		"xp": bonus_xp,
+		"leveled_up": bool(lv_res.get("leveled_up", false)),
+		"new_level": int(lv_res.get("new_level", progression.level if progression != null else 1))
+	}
+
 func to_dict() -> Dictionary:
 	var u_rooms: Array[String] = []
 	for k in unlocked_rooms.keys():
@@ -178,6 +232,7 @@ func to_dict() -> Dictionary:
 		"owned_furniture": o_furn,
 		"placements": placements.duplicate(true),
 		"cozy_moments_count": cozy_moments_count,
+		"last_coop_unix": last_coop_unix,
 		"last_moment": last_moment
 	}
 
@@ -221,5 +276,6 @@ func load_from_dict(d: Dictionary) -> void:
 				dst_arr[idx] = fid if (fid == "" or owned_furniture.has(fid)) else ""
 
 	cozy_moments_count = maxi(0, int(d.get("cozy_moments_count", 0)))
+	last_coop_unix = maxi(0, int(d.get("last_coop_unix", 0)))
 	last_moment = String(d.get("last_moment", ""))
 	home_changed.emit()

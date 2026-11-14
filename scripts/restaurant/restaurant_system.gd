@@ -5,6 +5,14 @@ extends RefCounted
 signal restaurant_changed()
 
 const NORMAL_NAMES := ["Anh Minh", "Chị Lan", "Bé Na", "Anh Tuấn", "Cô Mai", "Bác Hùng"]
+const REGULAR_PROFILES := {
+	"Anh Minh": {"fav": "hu_tieu_toi", "quote": "Tỏi phi thơm lừng, đúng gu anh rồi!"},
+	"Chị Lan": {"fav": "hu_tieu_chay", "quote": "Nước dùng thanh ngọt quá em ơi!"},
+	"Bé Na": {"fav": "hu_tieu_cai_thao", "quote": "Cải thảo giòn ngon lắm ạ!"},
+	"Anh Tuấn": {"fav": "hu_tieu_sa_te", "quote": "Cay nồng đã miệng thật!"},
+	"Cô Mai": {"fav": "hu_tieu_chay", "quote": "Quán nhỏ mà ấm cúng ghê."},
+	"Bác Hùng": {"fav": "hu_tieu_toi", "quote": "Làm thêm tô nữa bác vẫn ăn hết!"}
+}
 
 var unlock_level: int = 2
 var unlock_cost: int = 100
@@ -28,6 +36,7 @@ var kitchen_slots: int = 1
 var table_slots: int = 2
 var unlocked_dishes: Dictionary = {}
 var special_served_ids: Dictionary = {}
+var regular_visits: Dictionary = {}
 var customers: Array[Dictionary] = []
 var cooking_queue: Array[Dictionary] = []
 var served_count: int = 0
@@ -84,6 +93,7 @@ func reset() -> void:
 		if dishes_by_id.has(did):
 			unlocked_dishes[did] = true
 	special_served_ids.clear()
+	regular_visits.clear()
 	customers.clear()
 	cooking_queue.clear()
 	served_count = 0
@@ -148,13 +158,20 @@ func _spawn_customer(player_level: int) -> Dictionary:
 			pool.append(did)
 	if pool.is_empty():
 		pool.append("hu_tieu_chay")
+	var cust_name := String(NORMAL_NAMES[_next_seq % NORMAL_NAMES.size()])
+	var prof: Dictionary = REGULAR_PROFILES.get(cust_name, {}) as Dictionary
+	var fav_dish := String(prof.get("fav", ""))
 	var chosen_dish := pool[_next_seq % pool.size()]
+	if fav_dish != "" and unlocked_dishes.has(fav_dish) and (_next_seq % 2 == 0):
+		chosen_dish = fav_dish
 	return {
 		"instance_id": "cust_%d" % _next_seq,
 		"special_id": "",
-		"name": NORMAL_NAMES[_next_seq % NORMAL_NAMES.size()],
+		"name": cust_name,
 		"type": "normal",
 		"dish_id": chosen_dish,
+		"fav_dish": fav_dish,
+		"quote": String(prof.get("quote", "Hủ tiếu nóng hổi ngon quá!")),
 		"unlocks_dish": ""
 	}
 
@@ -247,6 +264,12 @@ func serve_customer(cust_idx: int, wallet: Wallet, progression: ProgressionSyste
 	var d := get_dish(dish_id)
 	var coins := maxi(0, int(d.get("reward_coins", 50)))
 	var xp := maxi(0, int(d.get("reward_xp", 25)))
+	var visits := int(regular_visits.get(cust_name, 0)) + 1
+	regular_visits[cust_name] = visits
+	var fav_dish := String(cust.get("fav_dish", ""))
+	var is_regular_fav := (visits >= 2 and fav_dish != "" and dish_id == fav_dish)
+	if is_regular_fav:
+		coins = int(round(float(coins) * 1.15))
 	wallet.earn(coins)
 	var prog_res := {"leveled_up": false, "new_level": 1, "new_unlocks": []}
 	if progression != null:
@@ -264,14 +287,56 @@ func serve_customer(cust_idx: int, wallet: Wallet, progression: ProgressionSyste
 	restaurant_changed.emit()
 	return {
 		"ok": true,
+		"dish_id": dish_id,
 		"customer_name": cust_name,
 		"dish_name": String(d.get("display_name", dish_id)),
 		"reward_coins": coins,
 		"reward_xp": xp,
+		"visit_count": visits,
+		"is_regular_fav": is_regular_fav,
+		"quote": String(cust.get("quote", "")),
 		"unlocked_dish": newly_unlocked_dish,
 		"leveled_up": bool(prog_res.get("leveled_up", false)),
 		"new_level": int(prog_res.get("new_level", lv)),
 		"new_unlocks": prog_res.get("new_unlocks", [])
+	}
+
+func serve_all_ready(wallet: Wallet, progression: ProgressionSystem) -> Dictionary:
+	if not is_unlocked:
+		return {"ok": false, "reason": "Quán Hủ Tiếu chưa mở khóa."}
+	var served := 0
+	var total_coins := 0
+	var total_xp := 0
+	var leveled_up := false
+	var new_level := progression.level if progression != null else 1
+	var unlocked_dishes_list: Array[String] = []
+	var prog := true
+	while prog:
+		prog = false
+		for i in range(customers.size()):
+			var did := String(customers[i].get("dish_id", ""))
+			if find_ready_dish_idx(did) != -1:
+				var res := serve_customer(i, wallet, progression)
+				if bool(res.get("ok", false)):
+					served += 1
+					total_coins += int(res.get("reward_coins", 0))
+					total_xp += int(res.get("reward_xp", 0))
+					if bool(res.get("leveled_up", false)):
+						leveled_up = true
+						new_level = int(res.get("new_level", new_level))
+					var ud := String(res.get("unlocked_dish", ""))
+					if ud != "":
+						unlocked_dishes_list.append(ud)
+					prog = true
+					break
+	return {
+		"ok": served > 0,
+		"served": served,
+		"coins": total_coins,
+		"xp": total_xp,
+		"leveled_up": leveled_up,
+		"new_level": new_level,
+		"unlocked_dishes": unlocked_dishes_list
 	}
 
 func dismiss_customer(cust_idx: int, player_level: int) -> Dictionary:
@@ -328,6 +393,7 @@ func to_dict() -> Dictionary:
 		"table_slots": table_slots,
 		"unlocked_dishes": u_dishes,
 		"special_served_ids": s_ids,
+		"regular_visits": regular_visits.duplicate(true),
 		"customers": customers.duplicate(true),
 		"cooking_queue": cooking_queue.duplicate(true),
 		"served_count": served_count,
@@ -357,6 +423,12 @@ func load_from_dict(d: Dictionary, player_level: int, clock: GameClock = null) -
 	if typeof(raw_ss) == TYPE_ARRAY:
 		for item in (raw_ss as Array):
 			special_served_ids[String(item)] = true
+
+	regular_visits.clear()
+	var raw_rv: Variant = d.get("regular_visits", {})
+	if typeof(raw_rv) == TYPE_DICTIONARY:
+		for k in (raw_rv as Dictionary).keys():
+			regular_visits[String(k)] = maxi(0, int((raw_rv as Dictionary)[k]))
 
 	customers.clear()
 	var raw_c: Variant = d.get("customers", [])

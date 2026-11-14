@@ -1,49 +1,34 @@
-# Couple Chaos 3D prototype
+# Couple Chaos 3D
 
-Prototype một người chơi, Godot 4.7.2, renderer Compatibility. Mở `project.godot` trong Godot và nhấn F5. Hoặc chạy `/Applications/Godot.app/Contents/MacOS/Godot --path .` trên máy hiện tại.
+Cozy farming & life-sim developed **ASCII-first** in **Godot 4.7.2** (*Gameplay First, Assets Later*).
 
-| Hành động | Phím |
-|---|---|
-| Di chuyển | WASD |
-| Chạy | Shift trái |
-| Tương tác / nhặt / thả | E |
-| Ném vật đang cầm | F |
-| Đập khi cầm búa đồ chơi | Q |
-| Lướt theo hướng di chuyển hoặc hướng đang nhìn | Space |
+## Development Phases
+1. **Phase 0 — Repository Foundation:** Clean structure, docs, and prompts.
+2. **Phase 1 — ASCII VERY MVP:** *Hay Day* core loop (`Plant -> Wait/Fast-forward -> Harvest -> Order -> Unlock Plot -> Save/Reload`) in ASCII + deterministic `GameClock`.
+3. **Phase 1.5 — 3D Interaction Spike:** Minimal 4–6 box-plot isometric prototype to validate click feel.
+4. **Phase 2 — ASCII Gameplay Expansion:** More crops, orders, upgrades, offline rewards.
+5. **Phase 3 — ASCII Vertical Slice:** 7-day loop & playtest.
+6. **Phase 4 — Asset Integration:** Swap ASCII view for low-poly pastel 3D assets without rewriting Game Core.
 
-Game mở trong cửa sổ; nhấn F11 để bật/tắt toàn màn hình và Esc để tạm dừng hoặc tiếp tục. Camera theo nhân vật khi đi đến hai đầu phòng. Chọn Boy hoặc Girl, rồi chọn Bắt đầu ở menu để chơi; vẫn chỉ có một người chơi.
+## Minimal Repository Structure
 
-Đến gần vật dụng để xem gợi ý. Sofa và giường dùng cùng phím để ngồi/nằm và đứng dậy; đèn và cửa bật/tắt. Nhặt gối, búa đồ chơi, gấu, hộp, sách hoặc bóng bằng E và ném bằng F; sau khi vật rơi có thể nhặt lại. Restart đặt lại scene.
-
-## Khu phố
-
-Chọn **KHÁM PHÁ KHU PHỐ** tại menu chính để khám phá bản đồ. Tab đổi giữa camera theo nhân vật và toàn cảnh; Esc trở về menu. Xem [hướng dẫn khu phố](docs/neighborhood.md) để biết bố cục, giới hạn và lệnh kiểm tra.
-
-## Thay model
-
-`scenes/player.tscn` dùng `PlayerConfig` (`scripts/player_config.gd`) để chọn `visual_scene`, `visual_scale`, `visual_offset`, `hold_offset`, tốc độ và gia tốc. Gán một PackedScene khác vào `visual_scene` trước khi player vào scene tree (hoặc cấu hình resource trên instance). Scene có root Node3D và pivot tại chân; GLB có thể được bọc trong một scene Node3D để điều chỉnh pivot. Visual nằm dưới `VisualRoot`; collision và HoldPoint thuộc player, không phụ thuộc mesh. Điều chỉnh scale/offset/hold offset cho từng model; nếu cần gắn tay theo xương, cung cấp adapter/attachment cho model đó.
-
-Nhân vật procedural dùng Skeleton3D và marker tay. Có thể thử model GLB Kenney bằng `COUPLE_VISUAL=kenney /Applications/Godot.app/Contents/MacOS/Godot --path .`; model này cần tiếp tục kiểm tra phong cách và animation. `scripts/animation_controller.gd` nhận trạng thái gameplay chung. Scene visual có thể triển khai `update_pose(move, running, holding, throwing, resting, lying, reacting, time)` để chuyển các trạng thái sang AnimationPlayer/AnimationTree và ánh xạ tên animation của GLB. Placeholder được animate qua adapter riêng. Một visual không có adapter vẫn hiển thị và gameplay vẫn chạy, nhưng sẽ không có animation. Test `tests/swap_visual.tscn` minh họa interface; chưa thử với GLB thực tế.
-
-## Gameplay đang phát triển
-
-Cửa hàng mở bằng E, cho xem danh mục và xác nhận mua; hàng nội thất được nhận tại thùng giao hàng trong nhà; đứng gần thùng và dùng R để chọn món nếu có nhiều món. Khi đặt đồ, dùng R để xoay, E để xác nhận, F hoặc Esc để hủy; đứng gần đồ đã đặt và nhấn G để sắp xếp lại. Ở luống đất trống, R đổi loại hạt đang chọn; đứng gần mèo và nhấn N để đổi tên. WASD, Shift trái, Space, E và F giữ chức năng di chuyển, chạy, lướt, tương tác và ném thông thường.
-
-Mã nguồn hiện có hệ thống mèo, vườn rau, mục tiêu hằng ngày và lưu tiến trình dùng chung. Đây là phần đang tích hợp: chưa xác minh các vòng chơi, điều hướng, dữ liệu lưu hay giao diện bằng runtime trong đợt thay đổi này. Các asset mèo và cây dùng hình học procedural hoặc low-poly và còn cần kiểm tra hình ảnh. Trong mã nguồn, nguyên liệu và vật tư trong kho được dùng ở bước tương ứng tại hai cơ sở; khi hết hàng, cơ sở dùng vật tư thường để vòng chơi tiếp tục. Phần này chưa được xác minh bằng runtime.
-
-## Kiểm tra
-
+```text
+3d-asset-demo/
+├── AGENTS.md           # Rules & ASCII-first VERY MVP guardrails
+├── project.godot       # Godot 4.7 project configuration
+├── docs/               # Research, game design, technical specs, roadmap
+├── prompts/            # Gameplay & asset prompts
+├── scripts/            # Pure GDScript Game Core (no UI/3D dependencies)
+│   ├── core/           # GameClock, game state, events
+│   ├── farming/        # FarmSystem, FarmPlot, CropTimer
+│   ├── economy/        # EconomySystem, Wallet, InventorySystem
+│   ├── orders/         # OrderSystem, OrderBoard
+│   ├── progression/    # ProgressionSystem, FarmUpgrade
+│   └── persistence/    # SaveSystem, SaveManager
+├── scenes/
+│   ├── ascii/          # Phase 1–3 ASCII playable prototype
+│   └── 3d/             # Phase 1.5 spike & Phase 4 3D presentation
+├── data/               # Crops, orders, upgrades balance config
+├── tests/              # Headless/unit tests for Game Core
+└── assets/             # Reserved for Phase 4 (unused during ASCII phases)
 ```
-/Applications/Godot.app/Contents/MacOS/Godot --headless --editor --path . --quit
-/Applications/Godot.app/Contents/MacOS/Godot --headless --path . --script res://tests/smoke.gd
-```
-
-Smoke test mô phỏng InputMap cho di chuyển, ném và bật đèn; các tương tác khác được gọi trực tiếp. Nó kiểm tra va tường, nhặt gối, ném, gối rơi và nhặt lại, sofa/giường/cửa, và một visual thay thế. Đây không phải kiểm thử bàn phím thật.
-
-## Giới hạn prototype
-
-Phòng và nhân vật được dựng bằng primitive, bố cục là bản giản lược so với ảnh. Cửa chỉ xoay phần hiển thị, biên phòng vẫn đóng. Âm thanh và VFX tổng hợp còn cần kiểm tra thực tế; chưa có gamepad; có thể cần chỉnh camera/bố cục và collision khi phát triển tiếp. Laptop, ghế, cây, sách và gấu dùng model Kenney Furniture Pack CC0 trong `assets/furniture/License.txt`; các vật còn lại vẫn là placeholder. Chưa kiểm tra thủ công các tổ hợp phím vật lý hoặc trải nghiệm chơi thực tế.
-
-## Kiểm kê asset
-
-Xem [docs/asset-inventory.md](docs/asset-inventory.md) để biết các placeholder, hạng mục còn thiếu, thứ tự thực hiện và phạm vi kiểm thử.

@@ -14,7 +14,7 @@
       "ascii": "o==o>",
       "min_level": 2,
       "repair_cost": 40,
-      "repair_items": { "carrot": 2 }
+      "repair_items": {}
     },
     {
       "id": "mini_van",
@@ -22,7 +22,7 @@
       "ascii": "[===|o>",
       "min_level": 3,
       "repair_cost": 120,
-      "repair_items": { "noodle_sheet": 2, "garlic_broth": 1 }
+      "repair_items": {}
     }
   ],
   "routes": [
@@ -35,7 +35,7 @@
       "requirements": { "carrot": 3, "scallion": 2 },
       "reward_coins": 45,
       "reward_xp": 25,
-      "special_reward": { "type": "home_furniture", "id": "string_lights", "display_name": "Đèn Dây Lấp Lánh (Nhà)" }
+      "first_clear_bonus": { "coins": 25, "xp": 15 }
     },
     {
       "id": "route_noodle_hub",
@@ -46,7 +46,7 @@
       "requirements": { "herb_seasoning": 1, "carrot_pickles": 1 },
       "reward_coins": 55,
       "reward_xp": 30,
-      "special_reward": { "type": "pet_item", "id": "ribbon_bow", "display_name": "Nơ Cổ Xinh (Miu Miu)" }
+      "first_clear_bonus": { "coins": 30, "xp": 20 }
     },
     {
       "id": "route_night_market",
@@ -57,7 +57,7 @@
       "requirements": { "noodle_sheet": 2, "garlic_broth": 1 },
       "reward_coins": 85,
       "reward_xp": 45,
-      "special_reward": { "type": "home_furniture", "id": "hammock_chair", "display_name": "Ghế Xích Đu (Nhà)" }
+      "first_clear_bonus": { "coins": 45, "xp": 25 }
     },
     {
       "id": "route_riverside",
@@ -68,7 +68,7 @@
       "requirements": { "chili_satay": 1, "cabbage": 2, "rice": 2 },
       "reward_coins": 110,
       "reward_xp": 60,
-      "special_reward": { "type": "pet_item", "id": "cat_tree", "display_name": "Cây Leo Mèo (Miu Miu)" }
+      "first_clear_bonus": { "coins": 60, "xp": 35 }
     }
   ]
 }

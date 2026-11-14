@@ -289,27 +289,16 @@ func claim_delivery(idx: int, wallet: Wallet, progression: ProgressionSystem, ho
 	var special_granted := ""
 	if routes_by_id.has(rid) and not claimed_route_rewards.has(rid):
 		var r_cfg := routes_by_id[rid] as Dictionary
-		var spec := r_cfg.get("special_reward", {}) as Dictionary
-		if not spec.is_empty():
+		var bonus := r_cfg.get("first_clear_bonus", {}) as Dictionary
+		if not bonus.is_empty():
 			claimed_route_rewards[rid] = true
-			var s_type := String(spec.get("type", ""))
-			var s_id := String(spec.get("id", ""))
-			var s_name := String(spec.get("display_name", s_id))
-			if s_type == "home_furniture" and home != null and home.items_by_id.has(s_id):
-				if not home.owned_furniture.has(s_id):
-					home.owned_furniture[s_id] = true
-					special_granted = s_name
-				elif wallet != null:
-					wallet.earn(25)
-					special_granted = s_name + " (đã có → +25 xu)"
-			elif s_type == "pet_item" and pets != null and pets.items_by_id.has(s_id):
-				if not pets.owned_items.has(s_id):
-					pets.owned_items[s_id] = true
-					pets._sync_unlocked_behaviors()
-					special_granted = s_name
-				elif wallet != null:
-					wallet.earn(25)
-					special_granted = s_name + " (đã có → +25 xu)"
+			var b_coins := maxi(0, int(bonus.get("coins", 0)))
+			var b_xp := maxi(0, int(bonus.get("xp", 0)))
+			if b_coins > 0 and wallet != null:
+				wallet.earn(b_coins)
+			if b_xp > 0 and progression != null:
+				lv_res = progression.add_xp(b_xp)
+			special_granted = "+%d xu, +%d XP (Mở tuyến lần đầu)" % [b_coins, b_xp]
 
 	garage_changed.emit()
 	return {

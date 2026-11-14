@@ -116,10 +116,25 @@ var log_lines: Array[String] = []
 var _refresh_accum: float = 0.0
 
 func _ready() -> void:
+	_apply_comfortable_window_size()
 	world = WorldState.new()
 	_build_ascii_ui()
 	_load_initial_state()
 	_switch_tab(Tab.FARM)
+
+func _apply_comfortable_window_size() -> void:
+	if DisplayServer.get_name() == "headless":
+		return
+	var win := get_window()
+	if win == null:
+		return
+	var usable := DisplayServer.screen_get_usable_rect(win.current_screen)
+	if usable.size.x > 0 and usable.size.y > 0:
+		var target_w := int(round(float(usable.size.x) * 0.90))
+		var target_h := int(round(float(usable.size.y) * 0.88))
+		win.mode = Window.MODE_WINDOWED
+		win.size = Vector2i(target_w, target_h)
+		win.position = usable.position + Vector2i((usable.size.x - target_w) / 2, (usable.size.y - target_h) / 2)
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST and world != null:
@@ -283,25 +298,27 @@ func _build_ascii_ui() -> void:
 
 	# Tab Navigation Bar
 	var tabs_hbox := HBoxContainer.new()
-	tabs_hbox.add_theme_constant_override("separation", 8)
+	tabs_hbox.add_theme_constant_override("separation", 4)
 	root_vbox.add_child(tabs_hbox)
 	for tab_def in [
-		{"id": Tab.FARM, "label": "[1] 🌾 Trại"},
-		{"id": Tab.ORDERS, "label": "[2] 📋 Đơn"},
-		{"id": Tab.PRODUCTION, "label": "[3] ⚙️ Chế biến"},
-		{"id": Tab.RESTAURANT, "label": "[4] 🍜 Hủ Tiếu"},
-		{"id": Tab.AUTOMATION, "label": "[5] 🤖 Tự động"},
-		{"id": Tab.HOME, "label": "[6] 🏠 Nhà"},
-		{"id": Tab.PETS, "label": "[7] 🐱 Miu Miu"},
-		{"id": Tab.GARAGE, "label": "[8] 🚚 Ga-ra"},
-		{"id": Tab.NEIGHBORHOOD, "label": "[9] 🏘️ Khu phố"},
-		{"id": Tab.GOALS, "label": "[G] 🏆 Mục tiêu"},
-		{"id": Tab.INVENTORY, "label": "[0] 📦 Kho"},
-		{"id": Tab.UPGRADES, "label": "[+] 🔓 Nâng cấp"}
+		{"id": Tab.FARM, "label": "🌾 Trại"},
+		{"id": Tab.ORDERS, "label": "📋 Đơn"},
+		{"id": Tab.PRODUCTION, "label": "⚙️ Chế biến"},
+		{"id": Tab.RESTAURANT, "label": "🍜 Hủ Tiếu"},
+		{"id": Tab.AUTOMATION, "label": "🤖 Tự động"},
+		{"id": Tab.HOME, "label": "🏠 Nhà"},
+		{"id": Tab.PETS, "label": "🐱 Miu Miu"},
+		{"id": Tab.GARAGE, "label": "🚚 Ga-ra"},
+		{"id": Tab.NEIGHBORHOOD, "label": "🏘️ Khu phố"},
+		{"id": Tab.GOALS, "label": "🏆 Mục tiêu"},
+		{"id": Tab.INVENTORY, "label": "📦 Kho"},
+		{"id": Tab.UPGRADES, "label": "🔓 Nâng cấp"}
 	]:
 		var t_btn := Button.new()
 		t_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		t_btn.custom_minimum_size = Vector2(0, 34)
+		t_btn.custom_minimum_size = Vector2(0, 32)
+		t_btn.clip_text = true
+		t_btn.add_theme_font_size_override("font_size", 12)
 		t_btn.text = String(tab_def["label"])
 		var tid: Tab = tab_def["id"]
 		t_btn.pressed.connect(_switch_tab.bind(tid))
@@ -1010,7 +1027,7 @@ func _build_garage_tab(parent: Control) -> void:
 	garage_active_box.add_child(right)
 
 	var r_title := Label.new()
-	r_title.text = "🗺️ TUYẾN GIAO HÀNG & PHẦN THƯỞNG ĐẶC BIỆT"
+	r_title.text = "🗺️ TUYẾN GIAO HÀNG & THƯỞNG MỞ TUYẾN"
 	r_title.add_theme_color_override("font_color", Color("80d8ff"))
 	right.add_child(r_title)
 
@@ -2461,11 +2478,12 @@ func _refresh_ui() -> void:
 			for iid: String in req_items.keys():
 				req_parts.append("%s x%d" % [iid, int(req_items[iid])])
 			var r_cost := int(v_cfg.get("repair_cost", 0))
+			var cost_str := ("Sửa: %d xu" % r_cost) if req_parts.is_empty() else ("Sửa: %d xu + %s" % [r_cost, ", ".join(req_parts)])
 			v_lbl.text = "%s %s (Lv.%d) — %s" % [
 				String(v_cfg.get("ascii", "🚚")),
 				String(v_cfg.get("display_name", vid)),
 				int(v_cfg.get("min_level", 2)),
-				"Đã sẵn sàng" if repaired else ("Sửa: %d xu + %s" % [r_cost, ", ".join(req_parts)])
+				"Đã sẵn sàng" if repaired else cost_str
 			]
 			v_btn.text = "✓ Sẵn sàng" if repaired else "🔧 Sửa xe"
 			v_btn.disabled = repaired
@@ -2523,11 +2541,11 @@ func _refresh_ui() -> void:
 			var req_txt: Array[String] = []
 			for iid: String in reqs.keys():
 				req_txt.append("%s x%d" % [iid, int(reqs[iid])])
-			var spec := r_cfg.get("special_reward", {}) as Dictionary
+			var bonus := r_cfg.get("first_clear_bonus", {}) as Dictionary
 			var spec_txt := ""
-			if not spec.is_empty():
+			if not bonus.is_empty():
 				var claimed := world.garage.claimed_route_rewards.has(rid)
-				spec_txt = " | 🎁 %s%s" % [String(spec.get("display_name", "")), " ✓" if claimed else ""]
+				spec_txt = " | 🎁 Lần đầu: +%dxu, +%dXP%s" % [int(bonus.get("coins", 0)), int(bonus.get("xp", 0)), " ✓" if claimed else ""]
 			r_lbl.text = "%s (Lv.%d, %ds) — Cần: %s\nThưởng: +%d xu, +%d XP%s" % [
 				String(r_cfg.get("display_name", rid)),
 				int(r_cfg.get("min_level", 2)),

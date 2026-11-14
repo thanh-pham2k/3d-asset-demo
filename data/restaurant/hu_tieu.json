@@ -1,0 +1,65 @@
+{
+  "unlock_level": 2,
+  "unlock_cost": 100,
+  "initial_kitchen_slots": 1,
+  "max_kitchen_slots": 4,
+  "kitchen_upgrade_base_cost": 120,
+  "kitchen_upgrade_cost_step": 100,
+  "initial_table_slots": 2,
+  "max_table_slots": 5,
+  "table_upgrade_base_cost": 90,
+  "table_upgrade_cost_step": 90,
+  "starter_dishes": ["hu_tieu_chay", "hu_tieu_toi"],
+  "dishes": [
+    {
+      "id": "hu_tieu_chay",
+      "display_name": "Hủ tiếu chay thanh đạm",
+      "inputs": { "noodle_sheet": 1, "carrot": 2, "scallion": 1 },
+      "cook_duration_sec": 8,
+      "reward_coins": 55,
+      "reward_xp": 30
+    },
+    {
+      "id": "hu_tieu_toi",
+      "display_name": "Hủ tiếu tỏi phi thơm",
+      "inputs": { "noodle_sheet": 1, "garlic_broth": 1, "scallion": 1 },
+      "cook_duration_sec": 12,
+      "reward_coins": 125,
+      "reward_xp": 55
+    },
+    {
+      "id": "hu_tieu_cai_thao",
+      "display_name": "Hủ tiếu cải thảo đặc biệt",
+      "inputs": { "noodle_sheet": 1, "cabbage": 2, "herb_seasoning": 1 },
+      "cook_duration_sec": 14,
+      "reward_coins": 140,
+      "reward_xp": 65
+    },
+    {
+      "id": "hu_tieu_sa_te",
+      "display_name": "Hủ tiếu sa tế cay nồng",
+      "inputs": { "noodle_sheet": 2, "garlic_broth": 1, "chili_satay": 1 },
+      "cook_duration_sec": 18,
+      "reward_coins": 265,
+      "reward_xp": 110
+    }
+  ],
+  "special_customers": [
+    {
+      "id": "special_co_ba",
+      "name": "Cô Ba Hàng Xóm",
+      "requires_min_served": 2,
+      "requires_level": 2,
+      "dish_id": "hu_tieu_chay",
+      "unlocks_dish": "hu_tieu_cai_thao"
+    },
+    {
+      "id": "special_chu_tu",
+      "name": "Chú Tư Tài Xế",
+      "requires_min_served": 4,
+      "requires_level": 3,
+      "dish_id": "hu_tieu_toi",
+      "unlocks_dish": "hu_tieu_sa_te"
+    }
+  ]
+}

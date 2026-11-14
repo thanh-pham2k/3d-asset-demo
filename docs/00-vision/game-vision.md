@@ -1,12 +1,18 @@
-# Game Vision — Couple Chaos 3D
+# Game Vision — Couple Chaos
 
-## Design Direction
-Couple Chaos 3D is a cozy 3D low-poly farming and couple life-simulation game built in **Godot 4.7.2**.
+## Vision Statement
+Couple Chaos is a **single-player** cozy farming and life-simulation game built **ASCII-first** in **Godot 4.7.2**. The player builds a shared life with Boy, Girl, and pet cat Miu Miu—starting from a small farm, growing into a Hu Tieu restaurant and delivery network, connecting with neighbors, and personalizing a cozy home.
 
-For Stage 1 (**VERY MVP**), the design direction combines three references (as qualitative design weights, not rigid metrics):
-- **Hay Day (~80% — Core Gameplay, Priority P0):** Click farm plots to plant, real-time crop growth (continuing offline), harvest crops into storage, fulfill orders for coins, and reinvest coins to unlock more land.
-- **My Dear Farm (~15% — Presentation, Priority P1):** Small, readable 3D low-poly pastel farm, clean minimal UI with few buttons, cute crops, and a relaxing atmosphere.
-- **Pocket Love (~5% — Home Atmosphere, Priority P2):** Boy, Girl, and pet cat Miu Miu living around a central cozy house (purely decorative in VERY MVP; home decoration expands in later stages).
+**Core focus:** Building a meaningful cozy life with interconnected systems—not just maximizing coin numbers.
 
-## Legal & Originality Guardrail
-We recreate familiar *Hay Day* mechanics using our own original GDScript code, 3D low-poly assets, and UI—never copying proprietary graphics, layouts, or copyrighted content.
+## Four Gameplay Pillars
+1. **Produce:** Plant, harvest, and process ingredients (`P1–P4`).
+2. **Business:** Fulfill orders, run the Hu Tieu restaurant, and automate workflows (`P3–P6`).
+3. **Life & Collection:** Decorate the home, switch/interact with Boy & Girl, and care for Miu Miu as optional emotional/collection rewards (`P7–P8`).
+4. **Discovery:** Unlock delivery routes, meet NPCs, and explore short neighborhood stories (`P9–P10`).
+
+## Research & Originality Guardrail
+Gameplay mechanics are synthesized from our 25-game benchmark study (`docs/01-research/game-benchmarks.md`, led by *Hay Day*, *My Dear Farm*, *Pocket Love*, *Animal Restaurant*, *Cats & Soup*, and *Township*) using original GDScript code, data configs, and ASCII presentation—never copying proprietary graphics, layouts, or copyrighted content.
+
+## Presentation Strategy
+All gameplay phases (`P1–P12`) are prototyped and validated in **ASCII** (`scenes/ascii/`). All 3D presentation work is deferred until explicitly requested.

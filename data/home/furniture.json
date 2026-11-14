@@ -1,0 +1,23 @@
+{
+  "rooms": [
+    { "id": "living_room", "display_name": "Phòng Khách", "unlock_cost": 0, "slots": 4, "unlocked_by_default": true },
+    { "id": "bedroom", "display_name": "Phòng Ngủ", "unlock_cost": 180, "slots": 4, "unlocked_by_default": false },
+    { "id": "balcony", "display_name": "Ban Công Chill", "unlock_cost": 280, "slots": 4, "unlocked_by_default": false }
+  ],
+  "items": [
+    { "id": "potted_monstera", "display_name": "Chậu Cây Xanh", "ascii": "[\\|/]", "cost": 30 },
+    { "id": "tea_table", "display_name": "Bàn Trà Nhỏ", "ascii": "[T-T]", "cost": 35 },
+    { "id": "warm_lamp", "display_name": "Đèn Ngủ Ấm", "ascii": "(*_*)", "cost": 40 },
+    { "id": "wooden_sofa", "display_name": "Ghế Sofa Gỗ", "ascii": "[===]", "cost": 45 },
+    { "id": "string_lights", "display_name": "Đèn Dây Lấp Lánh", "ascii": "~*~*~", "cost": 55 },
+    { "id": "bookshelf", "display_name": "Kệ Sách Nhỏ", "ascii": "[|||]", "cost": 65 },
+    { "id": "hammock_chair", "display_name": "Ghế Xích Đu", "ascii": "( ~ )", "cost": 85 },
+    { "id": "cozy_bed", "display_name": "Giường Đôi Êm Ái", "ascii": "[#==#]", "cost": 95 }
+  ],
+  "interactions": [
+    "cùng pha một bình trà nóng và trò chuyện.",
+    "cùng đọc sách dưới ánh đèn vàng ấm áp.",
+    "cùng ra ban công hóng gió và ngắm cây xanh.",
+    "cùng chia sẻ một tô Hủ Tiếu nóng hổi."
+  ]
+}

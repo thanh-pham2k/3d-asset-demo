@@ -1,0 +1,9 @@
+{
+  "id": "garlic",
+  "display_name": "Tỏi",
+  "seed_cost": 12,
+  "grow_duration_sec": 30,
+  "harvest_yield": 2,
+  "sell_price": 16,
+  "tags": ["spice", "hu_tieu"]
+}

@@ -1,34 +1,44 @@
-# Couple Chaos 3D
+# Couple Chaos
 
-Cozy farming & life-sim developed **ASCII-first** in **Godot 4.7.2** (*Gameplay First, Assets Later*).
+Single-player cozy farming & life-simulation game developed **ASCII-first** in **Godot 4.7.2** (*Gameplay First, Assets Later*).
 
-## Development Phases
-1. **Phase 0 — Repository Foundation:** Clean structure, docs, and prompts.
-2. **Phase 1 — ASCII VERY MVP:** *Hay Day* core loop (`Plant -> Wait/Fast-forward -> Harvest -> Order -> Unlock Plot -> Save/Reload`) in ASCII + deterministic `GameClock`.
-3. **Phase 1.5 — 3D Interaction Spike:** Minimal 4–6 box-plot isometric prototype to validate click feel.
-4. **Phase 2 — ASCII Gameplay Expansion:** More crops, orders, upgrades, offline rewards.
-5. **Phase 3 — ASCII Vertical Slice:** 7-day loop & playtest.
-6. **Phase 4 — Asset Integration:** Swap ASCII view for low-poly pastel 3D assets without rewriting Game Core.
+## Development Roadmap (12 Phases, ASCII-First)
+- **Stage A — Core Economy (`P1–P3`):**
+  1. `P1` Core Farming VERY MVP *(implemented in ASCII; verify runtime)*
+  2. `P2` Farming & Inventory Expansion
+  3. `P3` Orders, Economy & Progression *(tabbed ASCII UI)*
+- **Stage B — Production & Business (`P4–P6`, Playable Alpha):**
+  4. `P4` Production Chain
+  5. `P5` Hu Tieu Restaurant
+  6. `P6` Automation & Offline Progression
+- **Stage C–E — Cozy Life, Neighborhood & Polish (`P7–P12`):**
+  7. `P7` Home & Couple Life
+  8. `P8` Pets & Cozy Collection
+  9. `P9` Garage & Delivery Network
+  10. `P10` NPC, Neighborhood & Stories
+  11. `P11` Long-Term Goals & Collections
+  12. `P12` Balancing, Polish & Validation
 
-## Minimal Repository Structure
+All 3D assets, cameras, and animations are **deferred** until explicitly requested after gameplay is validated in ASCII. See [roadmap.md](docs/04-roadmap/roadmap.md) for details.
+
+## Repository Structure
 
 ```text
 3d-asset-demo/
-├── AGENTS.md           # Rules & ASCII-first VERY MVP guardrails
-├── project.godot       # Godot 4.7 project configuration
-├── docs/               # Research, game design, technical specs, roadmap
-├── prompts/            # Gameplay & asset prompts
+├── AGENTS.md           # Rules & ASCII-first guardrails
+├── project.godot       # Godot 4.7 project configuration (1280x720 windowed)
+├── docs/               # Vision, 25-game research, design, technical specs, 12-phase roadmap
+├── prompts/            # Feature execution & review prompts
 ├── scripts/            # Pure GDScript Game Core (no UI/3D dependencies)
-│   ├── core/           # GameClock, game state, events
+│   ├── core/           # GameClock, BalanceLoader
 │   ├── farming/        # FarmSystem, FarmPlot, CropTimer
-│   ├── economy/        # EconomySystem, Wallet, InventorySystem
-│   ├── orders/         # OrderSystem, OrderBoard
-│   ├── progression/    # ProgressionSystem, FarmUpgrade
-│   └── persistence/    # SaveSystem, SaveManager
+│   ├── economy/        # Wallet, Inventory
+│   ├── orders/         # OrderBoard
+│   ├── progression/    # FarmUpgrade
+│   └── persistence/    # SaveManager
 ├── scenes/
-│   ├── ascii/          # Phase 1–3 ASCII playable prototype
-│   └── 3d/             # Phase 1.5 spike & Phase 4 3D presentation
-├── data/               # Crops, orders, upgrades balance config
-├── tests/              # Headless/unit tests for Game Core
-└── assets/             # Reserved for Phase 4 (unused during ASCII phases)
+│   ├── ascii/          # Active ASCII playable prototype
+│   └── 3d/             # Deferred until explicitly requested
+├── data/               # Data-driven JSON balance configs
+└── tests/              # Headless/unit tests (when needed)
 ```

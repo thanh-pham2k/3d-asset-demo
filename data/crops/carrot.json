@@ -3,5 +3,7 @@
   "display_name": "Cà rốt",
   "seed_cost": 5,
   "grow_duration_sec": 5,
-  "harvest_yield": 2
+  "harvest_yield": 2,
+  "sell_price": 8,
+  "tags": ["vegetable", "soup_base"]
 }

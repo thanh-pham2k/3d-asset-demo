@@ -1,0 +1,78 @@
+{
+  "daily_objectives": [
+    {
+      "id": "daily_harvest",
+      "display_name": "Thu hoạch 4 cây trồng",
+      "metric": "harvests",
+      "target": 4,
+      "reward_coins": 30,
+      "reward_xp": 20
+    },
+    {
+      "id": "daily_order",
+      "display_name": "Hoàn thành 1 đơn hàng hoặc chuyến giao",
+      "metric": "orders_or_deliveries",
+      "target": 1,
+      "reward_coins": 35,
+      "reward_xp": 25
+    },
+    {
+      "id": "daily_cozy",
+      "display_name": "Tương tác Nhà / Miu Miu / Hàng xóm 2 lần",
+      "metric": "cozy_actions",
+      "target": 2,
+      "reward_coins": 25,
+      "reward_xp": 20
+    }
+  ],
+  "weekly_goals": [
+    {
+      "id": "weekly_kitchen",
+      "display_name": "Bếp Ấm Tuần Này (3 tô Hủ Tiếu & 2 món Chế biến)",
+      "requirements": { "dishes_served": 3, "crafted_items": 2 },
+      "reward_coins": 90,
+      "reward_xp": 55
+    },
+    {
+      "id": "weekly_logistics",
+      "display_name": "Kết Nối Giao Thương (2 chuyến Ga-ra & 2 đơn hàng)",
+      "requirements": { "deliveries_done": 2, "orders_done": 2 },
+      "reward_coins": 110,
+      "reward_xp": 65
+    },
+    {
+      "id": "weekly_community",
+      "display_name": "Nhịp Sống Khu Phố (2 lần giúp hàng xóm & 3 lần chăm Miu Miu/Nhà)",
+      "requirements": { "npc_helps": 2, "cozy_actions": 3 },
+      "reward_coins": 80,
+      "reward_xp": 50
+    }
+  ],
+  "long_term_milestones": [
+    {
+      "id": "lt_farmer",
+      "display_name": "Bàn Tay Xanh (Thu hoạch tổng 20 cây)",
+      "metric": "total_harvests",
+      "target": 20,
+      "reward_coins": 80,
+      "reward_xp": 50
+    },
+    {
+      "id": "lt_chef",
+      "display_name": "Bếp Trưởng Hủ Tiếu (Phục vụ tổng 10 tô)",
+      "metric": "total_dishes",
+      "target": 10,
+      "reward_coins": 120,
+      "reward_xp": 70
+    },
+    {
+      "id": "lt_collector",
+      "display_name": "Trái Tim Khu Phố (Đạt 12 điểm Sưu tầm tổng hợp)",
+      "metric": "collection_score",
+      "target": 12,
+      "reward_coins": 150,
+      "reward_xp": 100,
+      "special_reward": { "type": "home_furniture", "id": "potted_monstera", "display_name": "Chậu Cây Xanh (Nhà)" }
+    }
+  ]
+}

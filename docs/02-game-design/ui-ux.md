@@ -1,14 +1,13 @@
-# UI / UX Guidelines — ASCII-First (Phase 1–3)
+# UI / UX Guidelines — ASCII-First (`P1–P12`)
 
-## Phase 1–3: ASCII Presentation (`scenes/ascii/`)
+## P1–P2: Single-Screen ASCII Presentation (`scenes/ascii/`)
 - No 3D models, textures, or complex UI assets needed.
-- Render the farm grid cleanly using ASCII/text symbols and simple Godot `Control` buttons/labels, for example:
-  - `[ . ]` `EMPTY` (click to plant `-5 xu`)
-  - `[ ~ ]` `GROWING` (shows remaining time, e.g. `04:12`)
-  - `[ * ]` `READY` (click to harvest `+2` carrots)
-  - `[ X ]` `LOCKED` (click or use Upgrade button `-120 xu`)
-- Include a compact HUD bar:
-  - Coins (`xu`), Carrots (`Inventory`), `GameClock` display + Debug Time Travel buttons (`+1m`, `+5m`, `+1h`), `OrderBoard` (`4 carrots -> +60 xu`), `Save / Reload` test indicator.
+- Render the farm grid cleanly using pure ASCII symbols (`#` / `-` progress bars, `[ . ]`, `[ ~*~ ]`, `[ *!* ]`, `[ XXX ]`) and simple Godot `Control` buttons/labels.
+- Include a compact HUD bar: Coins (`xu`), Carrots (`Inventory`), `GameClock` display + Debug Time Travel buttons (`+1m`, `+5m`, `+1h`), `OrderBoard`, and `Save / Reload / Reset`.
 
-## Phase 1.5 & Phase 4: 3D Presentation (`scenes/3d/`)
-- Only after the ASCII loop is verified: test a minimal 4–6 box-plot isometric scene (Phase 1.5), then swap in low-poly pastel assets (Phase 4) calling the exact same Game Core APIs.
+## P3+: Tabbed ASCII Navigation
+- Starting in **P3**, organize growing systems into clean ASCII tabs (`[1] Farm`, `[2] Orders`, `[3] Inventory`, `[4] Upgrades`, plus `[Production]` in `P4` and `[Restaurant]` in `P5`) while keeping a persistent top HUD (`xu`, `Level`, `XP`, `Next Goal`, `GameClock`).
+- Keep `scenes/ascii/` strictly decoupled from `scripts/` Game Core logic.
+
+## 3D Presentation (`scenes/3d/`) — Deferred
+- All 3D prototypes, spikes, cameras, and assets are **deferred** until explicitly requested after ASCII gameplay validation.

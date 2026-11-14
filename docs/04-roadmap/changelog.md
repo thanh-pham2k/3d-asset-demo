@@ -2,4 +2,5 @@
 
 ## Unreleased
 - Reset repository to clean minimal **ASCII-first** structure (*Gameplay First, Assets Later*).
-- Adopted deterministic `GameClock`, pure GDScript Game Core (`scripts/`), and `Phase 0 -> Phase 1 (ASCII VERY MVP) -> Phase 1.5 (3D Spike) -> Phase 2–4` roadmap.
+- Implemented `P1` Core Farming VERY MVP in pure GDScript (`scripts/`) + ASCII UI (`scenes/ascii/`).
+- Aligned `AGENTS.md`, `docs/`, and `prompts/` with the **12-phase ASCII-first roadmap** (`P1–P6` Playable Alpha, `P7–P12` integration contracts, Phase 1.5 3D Spike removed, 3D deferred until explicitly requested).

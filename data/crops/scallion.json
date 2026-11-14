@@ -1,0 +1,9 @@
+{
+  "id": "scallion",
+  "display_name": "Hành lá",
+  "seed_cost": 2,
+  "grow_duration_sec": 3,
+  "harvest_yield": 1,
+  "sell_price": 5,
+  "tags": ["herb", "hu_tieu"]
+}

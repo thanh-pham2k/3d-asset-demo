@@ -1,0 +1,9 @@
+{
+  "id": "rice",
+  "display_name": "Lúa gạo",
+  "seed_cost": 8,
+  "grow_duration_sec": 15,
+  "harvest_yield": 3,
+  "sell_price": 6,
+  "tags": ["grain", "noodle_base"]
+}

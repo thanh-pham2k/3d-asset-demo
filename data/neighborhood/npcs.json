@@ -1,0 +1,108 @@
+{
+  "areas": [
+    {
+      "id": "alley_corner",
+      "display_name": "Ngõ Nhỏ Bình Yên",
+      "min_level": 1,
+      "unlock_cost": 0,
+      "unlocked_by_default": true,
+      "ascii_art": "[~*~]  /\\_/\\  [H]",
+      "build_name": "Giàn Đèn Ngõ Nhỏ",
+      "build_cost": 50,
+      "build_items": { "carrot": 2 }
+    },
+    {
+      "id": "community_park",
+      "display_name": "Công Viên Xanh",
+      "min_level": 2,
+      "unlock_cost": 100,
+      "unlocked_by_default": false,
+      "ascii_art": "( Y )  [===]  ( Y )",
+      "build_name": "Ghế Đá Công Viên",
+      "build_cost": 90,
+      "build_items": { "scallion": 3, "herb_seasoning": 1 }
+    },
+    {
+      "id": "riverside_square",
+      "display_name": "Quảng Trường Ven Sông",
+      "min_level": 3,
+      "unlock_cost": 180,
+      "unlocked_by_default": false,
+      "ascii_art": "~ ~ ~  |===|  ~ ~ ~",
+      "build_name": "Bến Thuyền Gỗ",
+      "build_cost": 150,
+      "build_items": { "noodle_sheet": 2, "garlic_broth": 1 }
+    }
+  ],
+  "npcs": [
+    {
+      "id": "co_tam",
+      "display_name": "Cô Tâm (Tạp Hóa Ngõ Nhỏ)",
+      "area_id": "alley_corner",
+      "ascii": "( ^_^ )",
+      "preference": "Cà rốt & Hành lá tươi",
+      "request": { "carrot": 3, "scallion": 2 },
+      "reward_coins": 40,
+      "reward_xp": 25,
+      "chat_lines": [
+        "Cô Tâm: 'Sáng nay ngõ nhỏ nắng đẹp quá, hai đứa nhớ nghỉ ngơi nhé!'",
+        "Cô Tâm: 'Miu Miu hôm qua lại sang tiệm cô ngủ trưa đấy.'"
+      ],
+      "story_milestone": {
+        "id": "story_co_tam",
+        "required_helps": 1,
+        "title": "Chuyện Bếp Cũ Của Cô Tâm",
+        "text": "Cô Tâm kể chuyện bếp xưa của xóm nhỏ và tặng một chiếc Bàn Trà Nhỏ cho nhà!",
+        "reward_coins": 30,
+        "reward_xp": 20,
+        "special_reward": { "type": "home_furniture", "id": "tea_table", "display_name": "Bàn Trà Nhỏ (Nhà)" }
+      }
+    },
+    {
+      "id": "chu_ba",
+      "display_name": "Chú Ba (Thợ Máy Công Viên)",
+      "area_id": "community_park",
+      "ascii": "( o_o )b",
+      "preference": "Gia vị thảo mộc & Dưa cà rốt",
+      "request": { "herb_seasoning": 1, "carrot_pickles": 1 },
+      "reward_coins": 55,
+      "reward_xp": 35,
+      "chat_lines": [
+        "Chú Ba: 'Xe chạy êm rồi thì cứ từ từ mà giao, đừng vội quá!'",
+        "Chú Ba: 'Quán hủ tiếu của hai đứa thơm nức cả công viên luôn.'"
+      ],
+      "story_milestone": {
+        "id": "story_chu_ba",
+        "required_helps": 1,
+        "title": "Chiếc Xe Cũ & Chuyến Giao Đầu",
+        "text": "Chú Ba ôn lại kỷ niệm sửa xe đầu tiên và tặng Miu Miu Cần Câu Lông Vũ!",
+        "reward_coins": 40,
+        "reward_xp": 25,
+        "special_reward": { "type": "pet_item", "id": "feather_wand", "display_name": "Cần Câu Lông Vũ (Miu Miu)" }
+      }
+    },
+    {
+      "id": "chi_linh",
+      "display_name": "Chị Linh (Nhạc Công Ven Sông)",
+      "area_id": "riverside_square",
+      "ascii": "( ^o^ )~",
+      "preference": "Nước dùng tỏi & Sa tế ớt",
+      "request": { "garlic_broth": 1, "chili_satay": 1 },
+      "reward_coins": 75,
+      "reward_xp": 45,
+      "chat_lines": [
+        "Chị Linh: 'Gió sông chiều nay mát rượi, nghe một bản guitar nhé!'",
+        "Chị Linh: 'Cảm ơn hai bạn đã giúp khu phố thêm ấm áp.'"
+      ],
+      "story_milestone": {
+        "id": "story_chi_linh",
+        "required_helps": 1,
+        "title": "Giai Điệu Chiều Ven Sông",
+        "text": "Chị Linh viết tặng Boy & Girl một khúc nhạc chiều và tặng Kệ Sách Nhỏ!",
+        "reward_coins": 50,
+        "reward_xp": 35,
+        "special_reward": { "type": "home_furniture", "id": "bookshelf", "display_name": "Kệ Sách Nhỏ (Nhà)" }
+      }
+    }
+  ]
+}

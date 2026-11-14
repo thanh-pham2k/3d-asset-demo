@@ -1,15 +1,9 @@
-# VERY MVP Roadmap & Acceptance Criteria (ASCII-First)
+# Phase 1 — Core Farming VERY MVP (Status & Acceptance)
 
-## Active Roadmap
-1. **Phase 0 — Repository Foundation:** Clean minimal folders, `AGENTS.md`, design docs, prompts.
-2. **Phase 1 — ASCII VERY MVP:** Pure Game Core + `GameClock` + `scenes/ascii/` playable prototype. No 3D/2D assets.
-3. **Phase 1.5 — 3D Interaction Spike:** Minimal 4–6 box-plot isometric scene to verify click-to-plant/harvest feel.
-4. **Phase 2 — ASCII Gameplay Expansion:** More crops, orders, upgrades, offline rewards, economy tuning.
-5. **Phase 3 — ASCII Vertical Slice:** 7-day experience & user playtest.
-6. **Phase 4 — Asset Integration:** Replace ASCII with low-poly pastel 3D assets, animation, and audio.
+> For the full 12-phase ASCII-first roadmap (`P1–P12`), see [roadmap.md](roadmap.md).
 
-## Phase 1 (ASCII VERY MVP) Completion Loop
-All steps must work end-to-end in ASCII **without any 3D/2D assets**:
+## Phase 1 Completion Loop (ASCII Only)
+All steps must work end-to-end in `scenes/ascii/` without any 3D/2D assets:
 1. `Plant` carrot on `EMPTY` plot (`-5 xu`)
 2. `Wait / Fast-forward` via `GameClock` (`GROWING` -> `READY`)
 3. `Harvest` (`+2` carrots into `Inventory`, plot -> `EMPTY`)
@@ -19,4 +13,4 @@ All steps must work end-to-end in ASCII **without any 3D/2D assets**:
 
 ## Strictly Out of Scope for Phase 1
 - Any 3D/2D art assets, animations, or sound effects
-- Garage, Hu Tieu shop, NPC AI, multiplayer, daily quests, multiple crops, crafting, energy system, furniture shop
+- `P2–P12` systems (multiple crops, tabbed UI, production chain, Hu Tieu restaurant, automation, Home/Pets, Garage, NPCs, multiplayer)

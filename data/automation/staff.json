@@ -1,0 +1,22 @@
+{
+  "max_offline_sec": 14400,
+  "offline_step_sec": 5,
+  "prep_helper": {
+    "id": "prep_helper",
+    "display_name": "Phụ bếp Chế biến",
+    "unlock_level": 1,
+    "hire_cost": 90,
+    "max_level": 3,
+    "upgrade_costs": [100, 200],
+    "actions_per_cycle": [1, 2, 3]
+  },
+  "hu_tieu_chef": {
+    "id": "hu_tieu_chef",
+    "display_name": "Đầu bếp Hủ Tiếu",
+    "unlock_level": 2,
+    "hire_cost": 160,
+    "max_level": 3,
+    "upgrade_costs": [140, 260],
+    "actions_per_cycle": [1, 2, 3]
+  }
+}

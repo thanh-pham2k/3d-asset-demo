@@ -1,0 +1,96 @@
+{
+  "refresh_cooldown_sec": 30,
+  "max_slots": 3,
+  "templates": [
+    {
+      "id": "order_carrot_4",
+      "title": "Đơn Cà rốt tươi",
+      "type": "standard",
+      "min_level": 1,
+      "requirements": { "carrot": 4 },
+      "reward_coins": 60,
+      "reward_xp": 25
+    },
+    {
+      "id": "order_scallion_3",
+      "title": "Bó Hành lá sáng",
+      "type": "standard",
+      "min_level": 1,
+      "requirements": { "scallion": 3 },
+      "reward_coins": 25,
+      "reward_xp": 15
+    },
+    {
+      "id": "order_herb_mix",
+      "title": "Combo Rau thơm",
+      "type": "standard",
+      "min_level": 1,
+      "requirements": { "carrot": 2, "scallion": 2 },
+      "reward_coins": 45,
+      "reward_xp": 22
+    },
+    {
+      "id": "order_rice_bag",
+      "title": "Bao Gạo nấu phở",
+      "type": "standard",
+      "min_level": 2,
+      "requirements": { "rice": 6 },
+      "reward_coins": 65,
+      "reward_xp": 30
+    },
+    {
+      "id": "order_broth_prep",
+      "title": "Đơn Đặc Biệt: Nồi Nước Dùng",
+      "type": "special",
+      "min_level": 2,
+      "requirements": { "carrot": 3, "garlic": 2, "scallion": 2 },
+      "reward_coins": 120,
+      "reward_xp": 55
+    },
+    {
+      "id": "order_cabbage_crate",
+      "title": "Sọt Cải thảo tươi",
+      "type": "standard",
+      "min_level": 3,
+      "requirements": { "cabbage": 4 },
+      "reward_coins": 90,
+      "reward_xp": 40
+    },
+    {
+      "id": "order_spicy_feast",
+      "title": "Đơn Đặc Biệt: Tiệc Cay Nồng",
+      "type": "special",
+      "min_level": 4,
+      "requirements": { "chili": 3, "garlic": 2, "rice": 4 },
+      "reward_coins": 220,
+      "reward_xp": 95
+    },
+    {
+      "id": "order_pickles_jar",
+      "title": "Hũ Cà rốt ngâm giòn",
+      "type": "standard",
+      "min_level": 1,
+      "requirements": { "carrot_pickles": 2 },
+      "reward_coins": 56,
+      "reward_xp": 28
+    },
+    {
+      "id": "order_noodle_supply",
+      "title": "Nguyên liệu Hủ tiếu",
+      "type": "standard",
+      "min_level": 2,
+      "requirements": { "noodle_sheet": 2, "herb_seasoning": 1 },
+      "reward_coins": 98,
+      "reward_xp": 45
+    },
+    {
+      "id": "order_broth_pot",
+      "title": "Đơn Đặc Biệt: Nồi Nước Lèo",
+      "type": "special",
+      "min_level": 3,
+      "requirements": { "garlic_broth": 1, "cabbage": 2 },
+      "reward_coins": 148,
+      "reward_xp": 65
+    }
+  ]
+}

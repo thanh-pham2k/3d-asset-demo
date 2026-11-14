@@ -1,0 +1,9 @@
+{
+  "id": "cabbage",
+  "display_name": "Cải thảo",
+  "seed_cost": 15,
+  "grow_duration_sec": 45,
+  "harvest_yield": 3,
+  "sell_price": 14,
+  "tags": ["vegetable", "broth"]
+}

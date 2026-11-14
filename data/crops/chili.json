@@ -1,0 +1,9 @@
+{
+  "id": "chili",
+  "display_name": "Ớt đỏ",
+  "seed_cost": 25,
+  "grow_duration_sec": 90,
+  "harvest_yield": 2,
+  "sell_price": 38,
+  "tags": ["spice", "premium"]
+}

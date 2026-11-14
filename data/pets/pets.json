@@ -1,0 +1,31 @@
+{
+  "pet": {
+    "id": "miu_miu",
+    "display_name": "Miu Miu",
+    "species": "Mèo tam thể",
+    "ascii_idle": " /\\_/\\\n( o.o )\n > ^ <",
+    "ascii_happy": " /\\_/\\\n( ^.^ )\n > w <",
+    "ascii_sleep": " /\\_/\\\n( -.- ) zZ\n > ~ <"
+  },
+  "items": [
+    { "id": "yarn_ball", "display_name": "Cuộn Len Hồng", "category": "toy", "ascii": "(@)~", "cost": 25 },
+    { "id": "bell_collar", "display_name": "Vòng Cổ Chuông", "category": "accessory", "ascii": "~(o)~", "cost": 35 },
+    { "id": "cat_bed_cozy", "display_name": "Ổ Nệm Ấm", "category": "bed", "ascii": "[u_u]", "cost": 45 },
+    { "id": "feather_wand", "display_name": "Cần Câu Lông Vũ", "category": "toy", "ascii": "--<*", "cost": 55 },
+    { "id": "ribbon_bow", "display_name": "Nơ Cổ Xinh", "category": "accessory", "ascii": ">*<", "cost": 65 },
+    { "id": "cat_tree", "display_name": "Cây Leo Mèo", "category": "bed", "ascii": "|^=^|", "cost": 85 }
+  ],
+  "behaviors": [
+    { "id": "purr", "display_name": "Gừ Gừ Ấm Áp", "unlocked_by": "", "text": "Miu Miu cọ nhẹ vào chân và kêu gừ gừ êm ái." },
+    { "id": "chasing_yarn", "display_name": "Vờn Cuộn Len", "unlocked_by": "yarn_ball", "text": "Miu Miu lăn tròn vờn Cuộn Len Hồng khắp sàn!" },
+    { "id": "bell_jingle", "display_name": "Lắc Chuông Leng Keng", "unlocked_by": "bell_collar", "text": "Miu Miu nghiêng đầu làm Vòng Cổ Chuông kêu leng keng!" },
+    { "id": "nap_in_bed", "display_name": "Cuộn Tròn Ngủ Say", "unlocked_by": "cat_bed_cozy", "text": "Miu Miu cuộn tròn ngủ ngon lành trong Ổ Nệm Ấm." },
+    { "id": "feather_leap", "display_name": "Nhảy Vồ Lông Vũ", "unlocked_by": "feather_wand", "text": "Miu Miu bật nhảy tung tăng theo Cần Câu Lông Vũ!" },
+    { "id": "tree_perch", "display_name": "Ngắm Cảnh Trên Cây", "unlocked_by": "cat_tree", "text": "Miu Miu ngồi chễm chệ trên Cây Leo Mèo quan sát cả nhà." }
+  ],
+  "milestones": [
+    { "id": "cozy_friend", "display_name": "Bạn Thân Của Miu Miu", "required_items": 2, "reward_coins": 30, "reward_xp": 20 },
+    { "id": "cozy_corner", "display_name": "Góc Mèo Ấm Áp", "required_items": 4, "reward_coins": 60, "reward_xp": 35 },
+    { "id": "miu_paradise", "display_name": "Thiên Đường Của Miu Miu", "required_items": 6, "reward_coins": 120, "reward_xp": 60 }
+  ]
+}

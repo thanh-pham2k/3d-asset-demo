@@ -1,0 +1,58 @@
+{
+  "initial_slots": 2,
+  "max_slots": 5,
+  "slot_upgrade_base_cost": 80,
+  "slot_upgrade_cost_step": 80,
+  "recipes": [
+    {
+      "id": "herb_seasoning",
+      "display_name": "Gia vị rau thơm",
+      "min_level": 1,
+      "inputs": { "carrot": 2, "scallion": 1 },
+      "duration_sec": 8,
+      "output_id": "herb_seasoning",
+      "output_yield": 1,
+      "sell_price": 34
+    },
+    {
+      "id": "carrot_pickles",
+      "display_name": "Cà rốt ngâm giòn",
+      "min_level": 1,
+      "inputs": { "carrot": 3 },
+      "duration_sec": 12,
+      "output_id": "carrot_pickles",
+      "output_yield": 2,
+      "sell_price": 20
+    },
+    {
+      "id": "noodle_sheet",
+      "display_name": "Sợi hủ tiếu gạo",
+      "min_level": 2,
+      "inputs": { "rice": 3 },
+      "duration_sec": 15,
+      "output_id": "noodle_sheet",
+      "output_yield": 2,
+      "sell_price": 18
+    },
+    {
+      "id": "garlic_broth",
+      "display_name": "Nước dùng tỏi hầm",
+      "min_level": 2,
+      "inputs": { "garlic": 2, "scallion": 2 },
+      "duration_sec": 25,
+      "output_id": "garlic_broth",
+      "output_yield": 1,
+      "sell_price": 72
+    },
+    {
+      "id": "chili_satay",
+      "display_name": "Sa tế ớt tỏi",
+      "min_level": 4,
+      "inputs": { "chili": 2, "garlic": 1 },
+      "duration_sec": 35,
+      "output_id": "chili_satay",
+      "output_yield": 2,
+      "sell_price": 75
+    }
+  ]
+}
